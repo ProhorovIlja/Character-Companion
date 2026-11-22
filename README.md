@@ -1,8 +1,16 @@
 # Character Companion — Android
 
-**v0.7.0 source preview · 22 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
+**v0.8.0 source preview · 23 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
 
-**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (20 structural Python tests + 149 Kotlin assertions). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
+**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (23 structural Python tests + 162 Kotlin assertions). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
+
+## v0.8.0 update (23 November 2026)
+
+- **Android Share Sheet receiver (opt-in):** select Character Companion from another app's "Share" menu for `text/plain`. Only public `https://character.ai/` or `https://c.ai/` content links that pass existing URL sanitization are opened; identity, foreign domains, login/callback/token paths, malformed and oversized inputs are rejected. Safe links can also be received while the Activity is on top. No broad `ACTION_VIEW` link takeover, no site scraping, and no scheduled jobs.
+- **Optional screenshot/recents-thumbnail protection:** a Privacy settings toggle applies Android `FLAG_SECURE` only when the user enables it. It is off by default and does not promise to stop external camera photos or OS-level capture vulnerabilities. This setting is included in manual JSON backup and restore.
+- **Less persistent sensitive state:** WebView disables automatic Android view-hierarchy state snapshots, and untrusted Share intent extras are discarded after use. The user-selected resume feature still stores only sanitized first-party page URLs.
+- **More reliable file export:** writing settings now requires an actual document output stream; otherwise it reports failure rather than incorrectly confirming success. External browser launch handles security exceptions.
+- **Offline validation:** 23 Python structural tests and 162 standalone Kotlin assertions. **APK and device tests remain pending** because Android SDK 36, Gradle and ADB are not available in this execution environment. These tests do not prove that website authorization or voice works.
 
 ## v0.7.0 update (22 November 2026)
 
@@ -37,7 +45,7 @@
 | Area | Feature | Notes |
 | --- | --- | --- |
 | App | One Android `WebView` loading the official site | No reverse-engineered Character.AI API or credential bridge |
-| Navigation | Home, back/forward, reload, share link, open in system browser | Long-press Share to copy URL; long-press Reload for fresh cache |
+| Navigation | Home, back/forward, reload, share link, receive safe Android Share Sheet links, open in system browser | External Share text is validated before loading; long-press Share copies the current link |
 | Bookmarks | Local 100-entry list, save/open/delete | Only sanitized content URLs; exports and resume also sanitize legacy stored URLs |
 | Interface | Dark graphite/gold native layout, adaptive launcher icon | Status/loading/error overlays, larger touch targets and Android 15/16 system bar insets |
 | Profiles | Balanced / Compatibility / Private / Data saver | One-tap, atomic browser-setting changes; no background action |
@@ -46,7 +54,7 @@
 | Languages | English / Russian native resources | Website language remains controlled by Character.AI |
 | Blocking | 21 conservative host rules + optional extra 20-host strict mode | User block/allow domains, one-off manual hostlist import, in-memory per-rule filter stats; strict mode may break widgets |
 | Service workers | WebView and supported service-worker request interception | Does not block all first-party ads or WebSocket traffic |
-| Privacy | WebView cookies/storage on device, configurable third-party cookies | No application analytics, VPN, device-wide traffic interception or background jobs |
+| Privacy | WebView cookies/storage on device, configurable third-party cookies; optional FLAG_SECURE | Screenshots/recents protection is user-controlled and off by default; no analytics, VPN or background jobs |
 | Media | Camera/mic denied by default; trusted origin + per-request confirmation | Requires Android runtime permission; site voice support is unverified |
 | Files | Android system file picker; manual confirmation of HTTPS downloads | Query-bearing or auth-related URLs open externally; no WebView cookies sent to DownloadManager |
 | Compatibility | Renderer-crash replacement, TLS rejection, retry overlay | Site updates and external Google OAuth may still cause failures |

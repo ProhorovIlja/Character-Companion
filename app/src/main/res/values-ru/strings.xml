@@ -117,4 +117,7 @@
     <string name="filter_removed">Импортированный список удалён</string>
     <string name="filter_import_preview_title">Проверить импортированные правила</string>
     <string name="filter_import_preview">Блокировка: %1$d доменов\nИсключения: %2$d доменов\nПропущено: %3$d\n\nПоддерживаются только доменные правила, без косметической фильтрации или правил URL-путей. Агрессивный список может нарушить работу сайта. Применить список вместо предыдущего?</string>
+    <string name="toggle_protect_screen">Защитить экран и миниатюру в недавних</string>
+    <string name="toggle_protect_screen_desc">Запретить обычные снимки и запись экрана в приложении; по умолчанию выключено</string>
+    <string name="shared_link_rejected">В полученном тексте нет безопасной публичной ссылки Character.AI</string>
 </resources>

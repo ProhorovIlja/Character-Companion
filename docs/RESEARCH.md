@@ -39,3 +39,11 @@ The site itself, not this wrapper, owns account authentication and available cha
 - [Gradle 8.13 checksums](https://gradle.org/release-checksums/): the project's wrapper JAR was verified against `81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f`; Gradle ZIP pinned to `20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78`.
 - The wrapper JAR is from `gradle/gradle` release tag `v8.13.0`, Apache-2.0 licensed. No event-driven GitHub workflow was added.
 - [Edsuns/AdblockAndroid](https://github.com/Edsuns/AdblockAndroid), [AmniX/AdBlockedWebView-Android](https://github.com/AmniX/AdBlockedWebView-Android), and [brave/adblock-rust](https://github.com/brave/adblock-rust) remain design references only. The new parser is original, intentionally limited, and does not import upstream licensed filter-engine code.
+
+## v0.8 Android 2026 research
+
+- Android security checklist: https://developer.android.com/privacy-and-security/security-tips (WebView must not expose unnecessary JavaScript bridges or local files).
+- Android unsafe WebView file inclusion: https://developer.android.com/privacy-and-security/risks/webview-unsafe-file-inclusion (2026 guidance on file-access restrictions).
+- Android WebViewClient reference: https://developer.android.com/reference/android/webkit/WebViewClient (interception limitations; errors must not be conflated with site functionality).
+- Character.AI login documentation: https://support.character.ai/hc/en-us/articles/23628361893659-Trouble-logging-in-We-ve-Updated-our-Login-Process (Google/Apple/email sign-in, not a public client API).
+- Considered reusing alternative Android WebView adblock projects, but copying unreviewed third-party code is less safe than a bounded auditable domain filter. No third-party source merged.

@@ -7,6 +7,9 @@ import org.json.JSONObject
 /** Stores only browser shell configuration and user bookmarks, never messages or credentials. */
 class SettingsStore(context: Context) {
     private val prefs = context.getSharedPreferences("character_companion_v2", Context.MODE_PRIVATE)
+    var protectScreen: Boolean
+        get() = prefs.getBoolean("protect_screen", false)
+        set(v) = prefs.edit().putBoolean("protect_screen", v).apply()
     var strictBlocking: Boolean
         get() = prefs.getBoolean("strict_blocking", false)
         set(v) = prefs.edit().putBoolean("strict_blocking", v).apply()
@@ -104,6 +107,7 @@ class SettingsStore(context: Context) {
         put("schema", 1)
         put("application", "Character Companion for Android")
         put("blocking", blocking)
+        put("protectScreen", protectScreen)
         put("strictBlocking", strictBlocking)
         put("reduceImages", reduceImages)
         put("thirdPartyCookies", cookies)
@@ -139,6 +143,7 @@ class SettingsStore(context: Context) {
         }
         prefs.edit()
             .putBoolean("blocking", parsed.optBoolean("blocking", true))
+            .putBoolean("protect_screen", parsed.optBoolean("protectScreen", false))
             .putBoolean("strict_blocking", parsed.optBoolean("strictBlocking", false))
             .putBoolean("reduce_images", parsed.optBoolean("reduceImages", false))
             .putBoolean("third_party_cookies", parsed.optBoolean("thirdPartyCookies", true))

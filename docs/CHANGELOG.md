@@ -1,5 +1,13 @@
 # v0.7.0 — 2026-11-22 (source only)
 
+## v0.8.0 — 2026-11-23
+- Accept validated first-party Character.AI links explicitly shared as `text/plain` via the Android Share Sheet, including when the Activity is on top; discard untrusted extras after use.
+- Optional `FLAG_SECURE` switch to protect screenshots/recents snapshots; default off; restore/export supported.
+- Disable automatic WebView view-hierarchy state storage; keep session restoration explicitly opt-in and sanitized.
+- Correct document-export error reporting when no output stream is provided; catch external-launch security exceptions.
+- Offline tests: 23 structural, 162 Kotlin assertions; no Android SDK/Gradle/APK/device validation available.
+
+
 - Added bounded manual ad-host list import, preview, exceptions and atomic on-device storage; no automatic subscriptions. Supports hosts and simple Adblock Plus domain rules only.
 - Cached filter rule snapshots to avoid unnecessary rebuilds during UI-only settings changes. Protected key identity service hosts.
 - Added verified official Gradle 8.13 Wrapper binary on GitHub, manual POSIX launcher and pinned distribution checksum; lightweight ZIP omits wrapper JAR.

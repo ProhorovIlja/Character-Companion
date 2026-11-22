@@ -117,4 +117,7 @@
     <string name="filter_removed">Imported domain list removed</string>
     <string name="filter_import_preview_title">Review imported rules</string>
     <string name="filter_import_preview">Block: %1$d domains\nAllow: %2$d domains\nUnsupported/skipped: %3$d\n\nOnly domain rules are supported, not cosmetic or URL-path filters. Large or aggressive lists may break site features. Apply this list and replace the previous imported list?</string>
+    <string name="toggle_protect_screen">Protect screen and recent-app previews</string>
+    <string name="toggle_protect_screen_desc">Prevent normal screenshots and screen recording while this app is open; off by default</string>
+    <string name="shared_link_rejected">No safe public Character.AI link found in the shared text</string>
 </resources>

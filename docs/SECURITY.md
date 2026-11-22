@@ -43,3 +43,11 @@ The Android client is a native wrapper that loads first-party Character.AI conte
 - Stored domains are private app data and excluded from the settings JSON; import the original file on a new device if wanted. No chat or login content is read.
 - The first-party service and key identity domains are protected against accidental blocking, but additional website functionality can still break with aggressive third-party rules. Use Compatibility mode to diagnose.
 - The Gradle Wrapper JAR in GitHub is copied from official Gradle v8.13.0 and SHA-256 checked against the upstream release checksum listing; the Gradle distribution download is also checksum-pinned.
+
+## v0.8 manually shared links and screen-protection policy
+
+- Android Share Sheet receives only user-initiated text/plain input; the parser caps received text at 16,384 characters and scans only HTTPS candidates. It delegates host, path and query sanitization to the existing `UrlPolicy`. No `VIEW` intent filters or unverified app links are registered. Test with malicious lookalike domains and account/callback URLs.
+- After initial reception, the Activity replaces the retained untrusted Intent with an empty MAIN intent; subsequent shares are handled in `onNewIntent` without storing the raw shared content.
+- Android WebView's automatic hierarchy state saving is explicitly disabled. No browser-cookie or WebView-state Bundle backups are created.
+- The optional `FLAG_SECURE` toggle blocks ordinary platform screenshots, recording and recent-app thumbnails; it cannot guarantee protection from rooted devices, external cameras or compromised OS components. Default remains OFF so users can share their own screenshots if they wish.
+- For manual JSON export, a null document-provider output stream is an error. No automatic cloud sync is implemented.

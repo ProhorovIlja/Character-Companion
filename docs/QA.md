@@ -1,4 +1,4 @@
-# Quality assurance · 2026-11-22 · v0.7.0
+# Quality assurance · 2026-11-23 · v0.8.0
 
 ## Completed in offline environment
 
@@ -56,3 +56,11 @@
 - Test long sessions and 10k–40k imported rules on a low-memory Android device: measure heap, UI responsiveness and `shouldInterceptRequest` latency. No benchmark claims from offline JVM tests.
 - Verify Character.AI login, chat, image/CDN and WebRTC with filter enabled, then switch to Compatibility mode to troubleshoot. Google OAuth may be blocked independently of filtering.
 - Build using a full clone containing the verified Gradle Wrapper JAR and a local Android SDK 36, then install the resulting APK on a test device.
+
+## v0.8 pending manual Android validation
+
+- From a browser or messenger share a public Character.AI character link as `text/plain`; verify Character Companion appears in the system Share Sheet and loads only the sanitized URL. Share a lookalike domain, OAuth callback and oversize text; verify rejection with no external navigation.
+- Re-share while Character Companion is foreground (singleTop) and verify it uses the existing Activity. After rotation / process recreation, verify no raw Intent extras are retained.
+- Toggle screen protection; check screenshots, screen recording and recent-apps thumbnail behavior. Verify disabling it restores normal screenshots.
+- Export JSON to a functional Storage Access Framework provider; simulate a provider returning no stream and check the error message. Roundtrip the screen protection setting.
+- Confirm Android 29/33/35/36 app installation and real Character.AI site authentication, messaging and media functions; these remain untested and must not be represented as verified.

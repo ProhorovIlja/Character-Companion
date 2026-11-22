@@ -153,7 +153,7 @@ class Structure(unittest.TestCase):
         self.assertIn('BoundedText.read(reader, RuleListParser.MAX_CHARACTERS)', activity)
         self.assertIn('IMPORT_FILTER_LIST ->', activity)
         self.assertIn('if (configuration == appliedConfiguration) return', engine)
-        self.assertIn('RuleListParser}.kt', script)
+        self.assertIn('RuleListParser,IncomingLinkParser}.kt', script)
         self.assertNotIn('https://easylist.to/easylist/easylist.txt', activity)
         self.assertNotIn('PeriodicWorkRequest', activity)
 
@@ -178,5 +178,34 @@ class Structure(unittest.TestCase):
         rules=[s.strip() for s in lines if s.strip() and not s.startswith('#')]
         self.assertTrue(len(rules)>=20)
         self.assertFalse(any('character.ai' in r or 'c.ai' in r for r in rules))
+
+    def test_share_sheet_is_explicit_and_restricted(self):
+        manifest=(ROOT/'app/src/main/AndroidManifest.xml').read_text()
+        main=(ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
+        parsed=(ROOT/'app/src/main/java/dev/caicompanion/app/IncomingLinkParser.kt').read_text()
+        self.assertIn('android.intent.action.SEND', manifest)
+        self.assertNotIn('android.intent.action.VIEW', manifest)
+        self.assertIn('android:launchMode="singleTop"', manifest)
+        self.assertIn('IncomingLinkParser.safeSharedLink', main)
+        self.assertIn('UrlPolicy.sanitizeBookmark', parsed)
+        self.assertIn('onNewIntent(intent: Intent)', main)
+        self.assertIn('setIntent(Intent(Intent.ACTION_MAIN))', main)
+
+    def test_screen_privacy_opt_in_not_always_on(self):
+        main=(ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
+        pref=(ROOT/'app/src/main/java/dev/caicompanion/app/SettingsStore.kt').read_text()
+        self.assertIn('FLAG_SECURE', main)
+        self.assertIn('getBoolean("protect_screen", false)', pref)
+        self.assertIn('put("protectScreen", protectScreen)', pref)
+        self.assertIn('.putBoolean("protect_screen", parsed.optBoolean("protectScreen", false))', pref)
+        self.assertIn('view.isSaveEnabled = false', main)
+        self.assertIn('view.isSaveFromParentEnabled = false', main)
+        self.assertIn('Document provider returned no output stream', main)
+
+    def test_all_localized_keys_unique(self):
+        for locale in ('values','values-ru'):
+            root=ET.parse(ROOT/'app/src/main/res'/locale/'strings.xml').getroot()
+            keys=[el.attrib.get('name') for el in root if el.tag == 'string']
+            self.assertEqual(len(keys),len(set(keys)))
 
 if __name__=='__main__': unittest.main()

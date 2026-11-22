@@ -138,7 +138,10 @@ class MainActivity : Activity() {
         // Do not persist browser history / OAuth state in framework instance-state Bundles.
         // Orientation is handled through configChanges; after process death restore only
         // an explicitly enabled and sanitized first-party content URL.
-        lastUrl = if (store.resumePage) store.lastVisited.ifBlank { HOME } else HOME
+        val initialShare = incomingShareLink(intent)
+        // Drop untrusted share extras from the Activity's retained Intent after validation.
+        if (intent?.action == Intent.ACTION_SEND) setIntent(Intent(Intent.ACTION_MAIN))
+        lastUrl = initialShare ?: (if (store.resumePage) store.lastVisited.ifBlank { HOME } else HOME)
         webView.loadUrl(lastUrl)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             modernBackCallback = OnBackInvokedCallback { navigateBack() }
@@ -147,7 +150,26 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Only user-initiated Android Share Sheet text is accepted, never arbitrary intents. */
+    private fun incomingShareLink(shared: Intent?): String? {
+        if (shared?.action != Intent.ACTION_SEND || shared.type?.substringBefore(';') != "text/plain") return null
+        val text = runCatching { shared.getStringExtra(Intent.EXTRA_TEXT) }.getOrNull()
+        return IncomingLinkParser.safeSharedLink(text)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.action == Intent.ACTION_SEND && ::webView.isInitialized) {
+            val safe = incomingShareLink(intent)
+            if (safe == null) showToast(getString(R.string.shared_link_rejected))
+            else { lastUrl = safe; webView.loadUrl(safe) }
+        }
+    }
+
     private fun configureWebView(view: WebView) {
+        // Do not let Android's view-hierarchy snapshots serialize browser-related state.
+        view.isSaveEnabled = false
+        view.isSaveFromParentEnabled = false
         view.setBackgroundColor(if (store.darkCanvas) Color.rgb(17, 18, 25) else Color.WHITE)
         view.settings.apply {
             javaScriptEnabled = true // Required by Character.AI
@@ -479,6 +501,7 @@ class MainActivity : Activity() {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE)
             startActivity(intent)
         } catch (_: ActivityNotFoundException) { showToast(getString(R.string.error_browser)) }
+          catch (_: SecurityException) { showToast(getString(R.string.error_browser)) }
     }
     private fun copyPageLink() {
         val url = UrlPolicy.safeShareUrl(webView.url)
@@ -541,6 +564,10 @@ class MainActivity : Activity() {
 
     private fun applySettings(reload: Boolean) {
         if (!store.mediaAllowed) denyPendingMedia()
+        // FLAG_SECURE blocks normal screenshots and recent-app thumbnails when explicitly enabled.
+        // It is not a DRM mechanism and cannot prevent photos from another device.
+        if (store.protectScreen) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         filter.enabled = store.blocking
         filter.strict = store.strictBlocking
         filter.replace(store.customRules, store.excludeRules, importedRules)
@@ -622,6 +649,10 @@ class MainActivity : Activity() {
         addButton(layout, getString(R.string.profile_title)) { showProfiles() }
         layout.addView(infoLabel(getString(R.string.profile_desc)))
         layout.addView(sectionLabel(getString(R.string.section_privacy)))
+        addToggle(layout, getString(R.string.toggle_protect_screen),
+            getString(R.string.toggle_protect_screen_desc), store.protectScreen) {
+            store.protectScreen = it; applySettings(reload = false)
+        }
         addToggle(layout, getString(R.string.toggle_filter), getString(R.string.toggle_filter_desc), store.blocking) {
             store.blocking = it; applySettings(reload = true)
         }
@@ -872,7 +903,9 @@ class MainActivity : Activity() {
             }
             EXPORT_SETTINGS -> if (resultCode == RESULT_OK) data?.data?.let { uri ->
                 try {
-                    contentResolver.openOutputStream(uri, "w")?.bufferedWriter()?.use { it.write(store.exportJson()) }
+                    val output = contentResolver.openOutputStream(uri, "w")
+                        ?: throw java.io.IOException("Document provider returned no output stream")
+                    output.bufferedWriter(Charsets.UTF_8).use { it.write(store.exportJson()) }
                     showToast(getString(R.string.export_success))
                 } catch (_: Exception) { showToast(getString(R.string.export_failure)) }
             }

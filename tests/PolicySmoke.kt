@@ -6,6 +6,7 @@ import dev.caicompanion.app.BrowserProfiles
 import dev.caicompanion.app.SafeFilename
 import dev.caicompanion.app.DownloadPolicy
 import dev.caicompanion.app.RuleListParser
+import dev.caicompanion.app.IncomingLinkParser
 import dev.caicompanion.app.BrowserProfile
 import java.io.StringReader
 
@@ -206,5 +207,19 @@ fun main() {
     importedEngine.replace("", "")
     check(!importedEngine.shouldBlock("https://tracking.example/banner"))
     check(importedEngine.shouldBlock("https://doubleclick.net/x"))
+    // Never allow a shared URL to expand navigation beyond public Character.AI content.
+    check(IncomingLinkParser.safeSharedLink("https://character.ai/") == "https://character.ai/")
+    check(IncomingLinkParser.safeSharedLink("Check https://character.ai/chat?id=abc-42! ") == "https://character.ai/chat?id=abc-42")
+    check(IncomingLinkParser.safeSharedLink("https://character.ai.evil.test/x") == null)
+    check(IncomingLinkParser.safeSharedLink("https://evil.example/a https://character.ai/character/abc") == "https://character.ai/character/abc")
+    check(IncomingLinkParser.safeSharedLink("https://accounts.google.com/signin") == null)
+    check(IncomingLinkParser.safeSharedLink("https://character.ai/login?token=secret") == null)
+    check(IncomingLinkParser.safeSharedLink("https://character.ai/oauth/callback") == null)
+    check(IncomingLinkParser.safeSharedLink("https://character.ai/?token=SECRET") == "https://character.ai/")
+    check(IncomingLinkParser.safeSharedLink("www.character.ai/chat") == null)
+    check(IncomingLinkParser.safeSharedLink("x".repeat(16_385)) == null)
+    check(IncomingLinkParser.safeSharedLink(null) == null)
+    check(IncomingLinkParser.safeSharedLink("https://c.ai/abc#session=hidden") == "https://c.ai/abc")
+    check(IncomingLinkParser.safeSharedLink("https://character.ai/@trusted/one)") == "https://character.ai/@trusted/one")
     println("PolicySmoke: browser policy, concurrency, URL safety and local statistics assertions passed")
 }
