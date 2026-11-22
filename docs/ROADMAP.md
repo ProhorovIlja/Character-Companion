@@ -8,3 +8,8 @@
 6. **P2: Security.** Independent Android lint/static analysis and first-party account-flow review. No fake premium unlocks or undocumented API scraping.
 
 **No background timers, scheduled workflows, recurring tasks, notifications or events have been created.** All changes happen only during explicit user-requested work.
+
+
+## v0.5 follow-through and release acceptance criteria
+
+Before a production release: compile with the declared Android SDK and Gradle dependencies, perform a real installation test and ensure Character.AI login works for the intended account path. Google OAuth embedded-WebView restrictions remain unresolved. Measure cold start, scroll performance, peak memory and filter overhead on actual devices, and make an explicit manual release decision.

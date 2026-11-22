@@ -97,4 +97,13 @@
     <string name="profile_private">Private · strict filtering / fewer cookies</string>
     <string name="profile_data_saver">Low data · skip images</string>
     <string name="profile_applied">Profile applied: %1$s</string>
+    <string name="external_identity_title">Sign-in in another browser</string>
+    <string name="external_identity_message">This identity provider may reject sign-in inside Android WebView. Open the provider in your system browser? Browser cookies cannot automatically sign you in to this app.</string>
+    <string name="media_permission_title">Character.AI · access request</string>
+    <string name="privacy_stats">Blocked domains · this session</string>
+    <string name="privacy_stats_empty">No domains blocked in this session. No URLs or conversations are recorded.</string>
+    <string name="privacy_stats_reset">Reset counters</string>
+    <string name="status_blocked_accessibility">%1$d requests blocked this session</string>
+    <string name="about_details">Character Companion v%1$s · Android only\nUnofficial browser client; no affiliation with Character.AI. No private API or account-data interception.\n\nBlocked this session: %2$d requests.</string>
+    <string name="close">Close</string>
 </resources>

@@ -93,6 +93,38 @@ class Structure(unittest.TestCase):
         self.assertGreaterEqual(len(rules), 15)
         self.assertFalse(any('character.ai' in r or 'c.ai' in r for r in rules))
 
+    def test_download_cookie_isolation_and_safe_filenames(self):
+        activity=(ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
+        self.assertNotIn('request.addRequestHeader("Cookie"', activity)
+        self.assertNotIn('CookieManager.getInstance().getCookie(', activity)
+        self.assertIn('SafeFilename.from(URLUtil.guessFileName', activity)
+        self.assertIn('setDestinationInExternalPublicDir', activity)
+
+    def test_service_worker_callback_no_activity_capture(self):
+        activity=(ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
+        start=activity.index('    private fun installServiceWorkerFilter()')
+        end=activity.index('    private fun requestMediaPermission(', start)
+        handler=activity[start:end]
+        self.assertIn('val currentFilter = filter', handler)
+        self.assertIn('emptyBlockedResponse(currentFilter,', handler)
+        self.assertNotIn('filterResponse(request.url.toString())', handler)
+
+    def test_oauth_browser_handoff_and_session_privacy(self):
+        activity=(ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
+        self.assertIn('if (UrlPolicy.isIdentityUrl(url))', activity)
+        self.assertIn('confirmIdentityNavigation(url)', activity)
+        self.assertIn('R.string.external_identity_message', activity)
+        self.assertNotIn('@JavascriptInterface', activity)
+
+    def test_local_stats_and_ui_accessibility(self):
+        engine=(ROOT/'app/src/main/java/dev/caicompanion/app/FilterEngine.kt').read_text()
+        activity=(ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
+        self.assertIn('topBlockedRules', engine)
+        self.assertIn('clearStats()', engine)
+        self.assertIn('counters.size < 128', engine)
+        self.assertIn('contentDescription = "$name. $description"', activity)
+        self.assertTrue((ROOT/'app/src/main/res/drawable/settings_action.xml').exists())
+
     def test_conservative_host_rules(self):
         lines=(ROOT/'app/src/main/assets/blocked-hosts.txt').read_text().splitlines()
         rules=[s.strip() for s in lines if s.strip() and not s.startswith('#')]

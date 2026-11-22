@@ -1,8 +1,18 @@
 # Character Companion — Android
 
-**v0.4.0 source preview · 22 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
+**v0.5.0 source preview · 22 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
 
-**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (12 structural Python tests + 64 Kotlin assertions). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
+**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (16 structural Python tests + 104 Kotlin assertions). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
+
+## v0.5.0 update (22 November 2026)
+
+- Optimized ad-host matching to domain suffix walks rather than scanning every rule, retaining allowlist precedence.
+- Added volatile, resettable per-domain rule statistics (128 entries max); no visited URLs, query strings or conversation content recorded.
+- Removed all WebView cookies from system downloads, which may follow external redirects. Authenticated downloads may need a full browser.
+- Added explicit Google/Apple sign-in hand-off notice; external browser sessions do not transfer to WebView automatically.
+- Hardened saved/shared URLs against nested percent encoding, path traversal, controls and backslashes; sanitized download filenames.
+- Removed Activity capture from the process-wide service worker hook; improved settings action buttons and switch accessibility descriptions.
+- Offline checks passed: 16 structural tests and 104 Kotlin assertions. **No APK compiled or device validated**: SDK/Gradle unavailable in this runtime.
 
 ## What is implemented
 
@@ -16,11 +26,11 @@
 | Navigation safety | External-link confirmation, safe share/copy | Background redirects cannot launch external apps; OAuth/account URLs not shared |
 | Fullscreen | Native WebChromeClient HTML-media fullscreen | Website support depends on its own HTML and WebView; device test outstanding |
 | Languages | English / Russian native resources | Website language remains controlled by Character.AI |
-| Blocking | 21 conservative host rules + optional extra 20-host strict mode | User block/allow domains, filter counter; strict mode may break external widgets |
+| Blocking | 21 conservative host rules + optional extra 20-host strict mode | User block/allow domains, in-memory per-rule filter stats; strict mode may break widgets |
 | Service workers | WebView and supported service-worker request interception | Does not block all first-party ads or WebSocket traffic |
 | Privacy | WebView cookies/storage on device, configurable third-party cookies | No application analytics, VPN, device-wide traffic interception or background jobs |
 | Media | Camera/mic denied by default; trusted origin + per-request confirmation | Requires Android runtime permission; site voice support is unverified |
-| Files | Android system file picker; manual confirmation of HTTPS downloads | DownloadManager receives first-party cookies only for trusted origin |
+| Files | Android system file picker; manual confirmation of HTTPS downloads | No WebView cookies sent to DownloadManager; authenticated file download may fail |
 | Compatibility | Renderer-crash replacement, TLS rejection, retry overlay | Site updates and external Google OAuth may still cause failures |
 | Performance | Optional image download saver; compact chrome; text scale; media gesture | No measured performance claims without device benchmarks |
 | Session | Optional resume last visited first-party page | OFF by default; stores sanitized URL locally, not in exported backups |

@@ -3,7 +3,7 @@ package dev.caicompanion.app
 import java.net.URI
 import java.util.Locale
 
-/** Strict host-based blocking. Never blocks Character.AI or a user allowlisted host. */
+/** Stateless, exact host/suffix filter. O(number of labels), not O(number of rules). */
 class HostBlocker(
     baseRules: Collection<String>,
     customRules: Collection<String> = emptyList(),
@@ -12,11 +12,23 @@ class HostBlocker(
     val blockedDomains: Set<String> = (baseRules + customRules).mapNotNull(::normalizeRule).toSet()
     val allowDomains: Set<String> = excludedHosts.mapNotNull(::normalizeRule).toSet()
 
-    fun shouldBlock(rawUrl: String?): Boolean {
-        val host = hostFromUrl(rawUrl) ?: return false
-        if (isServiceHost(host) || allowDomains.any { isDomain(host, it) }) return false
-        return blockedDomains.any { isDomain(host, it) }
+    /** Returns the matched rule for statistics. Never returns full URLs. */
+    fun matchedBlockedDomain(rawUrl: String?): String? {
+        val host = hostFromUrl(rawUrl) ?: return null
+        if (isServiceHost(host)) return null
+        var suffix = host
+        var matched: String? = null
+        while (true) {
+            if (suffix in allowDomains) return null // exceptions always override other matches
+            if (suffix in blockedDomains) matched = suffix
+            val index = suffix.indexOf('.')
+            if (index < 0) break
+            suffix = suffix.substring(index + 1)
+        }
+        return matched
     }
+
+    fun shouldBlock(rawUrl: String?): Boolean = matchedBlockedDomain(rawUrl) != null
 
     companion object {
         private val rule = Regex("^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$")
@@ -30,7 +42,8 @@ class HostBlocker(
         fun hostFromUrl(rawUrl: String?): String? {
             val uri = try { URI(rawUrl ?: return null) } catch (_: Exception) { return null }
             if (!uri.scheme.equals("https", true) && !uri.scheme.equals("http", true)) return null
-            return uri.host?.trimEnd('.')?.lowercase(Locale.ROOT)
+            if (uri.userInfo != null || uri.host.isNullOrBlank()) return null
+            return uri.host.trimEnd('.').lowercase(Locale.ROOT)
         }
         fun isDomain(host: String, domain: String): Boolean =
             host.equals(domain, true) || host.endsWith(".$domain", true)

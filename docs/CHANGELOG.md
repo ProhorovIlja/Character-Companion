@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.5.0 — 2026-11-22 (source only)
+
+- Faster O(host-labels) adblock matching with correctly prioritized allowlist exceptions, no O(rule-count) scan on every resource request.
+- In-memory per-rule blocking counters, maximum 128 entries; manually resettable via diagnostics/settings; no URL/query/chat telemetry.
+- Removed WebView cookies from system download headers (DownloadManager can follow cross-domain redirects).
+- OAuth identity provider navigations show explicit external-browser consent and session-isolation limitation. No cookie bridging or User-Agent spoof workaround.
+- Stronger shared/bookmarked URL validation against double/triple percent encoded paths, dot segments, controls, backslash and credential URLs.
+- Sanitized downloaded file names and removed Activity capture in the process-wide ServiceWorker interception hook.
+- Improved settings buttons and TalkBack descriptions for toggles; RU/EN UI strings.
+- 16 structural tests, 104 standalone Kotlin assertions (including a 1000-request concurrency test) passed offline; SDK APK build remains unverified.
+
+
 ## v0.4.0 — 2026-11-22 (source only)
 
 - Security: sanitized URL sharing, copying and external-browser opening. Reject account, authorization, callback and session paths. No third-party URL is exported accidentally.

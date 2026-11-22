@@ -97,4 +97,13 @@
     <string name="profile_private">Приватность · строгая фильтрация</string>
     <string name="profile_data_saver">Экономия · без изображений</string>
     <string name="profile_applied">Применён профиль: %1$s</string>
+    <string name="external_identity_title">Вход в другом браузере</string>
+    <string name="external_identity_message">Этот сервис авторизации может запрещать вход через Android WebView. Открыть системный браузер? Его cookie не перенесутся автоматически в это приложение.</string>
+    <string name="media_permission_title">Character.AI · запрос доступа</string>
+    <string name="privacy_stats">Заблокированные домены · сеанс</string>
+    <string name="privacy_stats_empty">За этот сеанс запросы не блокировались. Ссылки и переписки не сохраняются.</string>
+    <string name="privacy_stats_reset">Обнулить счётчики</string>
+    <string name="status_blocked_accessibility">За этот сеанс заблокировано %1$d запросов</string>
+    <string name="about_details">Character Companion v%1$s · Android\nНеофициальный клиент без связи с Character.AI. Не использует закрытый API и не перехватывает данные аккаунта.\n\nЗа сеанс заблокировано: %2$d запросов.</string>
+    <string name="close">Закрыть</string>
 </resources>

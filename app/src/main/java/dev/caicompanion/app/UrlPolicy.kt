@@ -2,6 +2,7 @@ package dev.caicompanion.app
 
 import java.net.URI
 import java.util.Locale
+import java.net.URLDecoder
 
 /** HTTPS-only first party navigation with explicit separation of bookmarkable URLs. */
 object UrlPolicy {
@@ -41,9 +42,17 @@ object UrlPolicy {
     fun sanitizeBookmark(url: String?): String? {
         val uri = parsedHttps(url) ?: return null
         if (!HostBlocker.isServiceHost(uri.host) || (url?.length ?: 0) > 4096) return null
-        val decodedPath = uri.path.orEmpty()
-        if (decodedPath.length > 1500 || decodedPath.split('/').any {
-                it.lowercase(Locale.ROOT) in sensitivePathParts
+        var decodedPath = uri.path.orEmpty()
+        // Decode layered escapes: %252Fauth%252Fcallback must never bypass path checks.
+        // URLDecoder treats '+' as a space; preserve literal '+' for path inspection.
+        repeat(2) {
+            decodedPath = try { URLDecoder.decode(decodedPath.replace("+", "%2B"), "UTF-8") }
+                catch (_: IllegalArgumentException) { return null }
+        }
+        if (decodedPath.length > 1500 || decodedPath.any { it.isISOControl() || it == '\\' } ||
+            decodedPath.split('/').any {
+                val segment = it.lowercase(Locale.ROOT)
+                segment in sensitivePathParts || segment == "." || segment == ".."
             }) return null
         val query = uri.rawQuery?.takeIf { raw ->
             raw.length <= 1024 && raw.split('&').all { item ->

@@ -1,8 +1,8 @@
-# Quality assurance · 2026-11-22 · v0.4.0
+# Quality assurance · 2026-11-22 · v0.5.0
 
 ## Completed in offline environment
 
-- `bash scripts/test-offline.sh` passed: **12 Python structural tests** and **64 Kotlin assertions**.
+- `bash scripts/test-offline.sh` passed: **16 Python structural tests** and **104 Kotlin assertions**.
 - Kotlin checks cover HTTPS and hostname boundaries, rejecting domain spoofing, protected service hosts, strict filter rules/overrides, URL query sanitization, identity URL discrimination, request counts and bounded Reader behavior.
 - Static checks cover XML parsing, RU/EN parity, privacy manifest defaults, no scheduled jobs, HTTPS-only surface, atomic settings import, conservative domain rules and no Javascript bridge.
 - New offline cases cover URL sharing sanitization (including encoded auth paths), four browser profiles, UI code contracts for external-link and download confirmation, fullscreen, permission cleanup, and legacy storage sanitization.
@@ -30,3 +30,11 @@
 - Blocklists do not cover in-page first-party ads, WebSockets, encrypted payload contents, redirect destinations or all service-worker behavior; aggressive blocklists can cause regressions.
 - Strict ad/tracker rules and image saving modes are deliberately disabled by default.
 - No screenshot or APK is supplied because an actual device or emulator runtime and SDK are absent.
+
+
+## v0.5 offline regression results
+
+- 16 Python structural tests passed. Added download-cookie isolation, OAuth hand-off, service worker Activity lifetime and local statistics UI checks.
+- 104 pure Kotlin policy assertions passed with the installed Kotlin 1.9 CLI; including 1000 concurrent blocked requests (four short-lived threads), unsafe filename/path regressions, exception precedence and stats reset.
+- Android SDK, Gradle, adb and real Android runtime are missing; the Android app did not compile in this environment. Kotlin 1.9 standalone checks do not prove AGP 8.13 / AndroidX WebKit 1.18 project compilation.
+- The UI still needs a real Android build, accessibility inspection, sign-in tests and device performance measurements. Do not distribute this as a verified APK.

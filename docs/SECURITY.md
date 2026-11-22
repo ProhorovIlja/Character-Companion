@@ -1,4 +1,4 @@
-# Security and privacy model · v0.4.0
+# Security and privacy model · v0.5.0
 
 The Android client is a native wrapper that loads first-party Character.AI content. No native password form, Character.AI token extraction, private API calls, JS credential bridge, proxy/VPN, analytics SDK, automated tasks or content storage exist. The UI communicates via the official `WebView`; the website remains under Character.AI's control.
 
@@ -19,3 +19,12 @@ The Android client is a native wrapper that loads first-party Character.AI conte
 - External navigation requires a user gesture and a confirmation prompt. Non-gesture third-party redirects are cancelled. Downloads are user-confirmed; session cookies are attached only for the trusted first-party host.
 - Permission requests awaiting user decision are denied when navigation starts, app settings forbid media, or WebView is destroyed. No persistent microphone or camera grants are created by this shell.
 - Four preset profiles modify shell options only. Private mode denies third-party cookies, so some sign-in or embedded site features may stop working. Compatibility mode explicitly disables local filtering but is not a bypass of Character.AI protections.
+
+
+## v0.5 safeguards
+
+- System `DownloadManager` may follow HTTPS redirects to other hosts. No WebView cookie header is ever attached; signed or private downloads may need manual full-browser use.
+- In-memory blocking statistics contain matched rule domains only, capped at 128 domain entries. They reset on process exit or user command; no file export or analytics SDK.
+- `ServiceWorkerControllerCompat` registers a process-wide callback capturing only the filter engine, not an Android Activity.
+- OAuth URLs for Google/Apple receive a user-consent external-browser hand-off. Browser identity session cookies do not propagate back into WebView and successful client login is not guaranteed.
+- The URI sanitizer rejects nested path escapes, traversal, control characters and untrusted bookmark/share hosts. Passwords, chat text and auth tokens are not collected.

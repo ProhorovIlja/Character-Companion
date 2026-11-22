@@ -167,6 +167,12 @@ class MainActivity : Activity() {
                 val url = request.url.toString()
                 if (url == "about:blank") return false
                 if (!UrlPolicy.isHttps(url)) return true
+                if (UrlPolicy.isIdentityUrl(url)) {
+                    // Google and Apple may reject embedded OAuth. Explicit browser hand-off only.
+                    // Browser sign-in cannot be silently transferred into this WebView session.
+                    confirmIdentityNavigation(url)
+                    return true
+                }
                 if (UrlPolicy.isInternal(url)) return false
                 // Never launch an external application from a background redirect.
                 if (request.hasGesture()) confirmExternalNavigation(url)
@@ -263,8 +269,7 @@ class MainActivity : Activity() {
         view.setDownloadListener(DownloadListener { url, agent, disposition, mime, _ ->
             if (!UrlPolicy.isHttps(url)) return@DownloadListener
             val safeUrl = url ?: return@DownloadListener
-            val name = URLUtil.guessFileName(safeUrl, disposition, mime)
-                .replace(Regex("[\\\\/:*?\"<>|]"), "_").take(100)
+            val name = SafeFilename.from(URLUtil.guessFileName(safeUrl, disposition, mime))
             val host = Uri.parse(safeUrl).host ?: return@DownloadListener
             AlertDialog.Builder(this)
                 .setTitle(R.string.download_confirm_title)
@@ -279,18 +284,16 @@ class MainActivity : Activity() {
     private fun enqueueDownload(safeUrl: String, agent: String?, disposition: String?, mime: String?) {
             try {
                 val uri = Uri.parse(safeUrl)
-                val filename = URLUtil.guessFileName(safeUrl, disposition, mime)
-                    .replace(Regex("[\\\\/:*?\"<>|]"), "_").take(100)
+                val filename = SafeFilename.from(URLUtil.guessFileName(safeUrl, disposition, mime))
                 val request = DownloadManager.Request(uri)
                     .setTitle(filename).setMimeType(mime ?: "application/octet-stream")
                     .setDescription("Character Companion")
                     .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                     .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
                 request.addRequestHeader("User-Agent", agent ?: defaultAgent)
-                // Prevent session cookies from leaking to third-party download hosts.
-                if (UrlPolicy.isTrustedMediaOrigin(safeUrl)) {
-                    CookieManager.getInstance().getCookie(safeUrl)?.let { request.addRequestHeader("Cookie", it) }
-                }
+                // DownloadManager can follow redirects beyond our WebView URL policy.
+                // Never export a WebView session cookie to DownloadManager headers.
+                // Authenticated downloads may require opening the site in a full browser.
                 (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
                 showToast(getString(R.string.download_requested))
             } catch (_: Exception) { showToast(getString(R.string.error_download)) }
@@ -304,6 +307,7 @@ class MainActivity : Activity() {
         fullscreenView = customView
         fullscreenCallback = callback
         window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
+        (customView.parent as? ViewGroup)?.removeView(customView)
         container.addView(customView, FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         webView.visibility = View.GONE
@@ -328,19 +332,17 @@ class MainActivity : Activity() {
     private fun desktopAgent(): String = defaultAgent.replace(Regex("\\([^)]*\\)"), "(X11; Linux x86_64)")
         .replace(" Mobile ", " ")
 
-    private fun filterResponse(url: String): WebResourceResponse? {
-        if (!filter.shouldBlock(url)) return null
-        return WebResourceResponse("text/plain", "UTF-8", 200, "OK", mapOf("Cache-Control" to "no-store"),
-            ByteArrayInputStream(ByteArray(0)))
-    }
+    private fun filterResponse(url: String): WebResourceResponse? = emptyBlockedResponse(filter, url)
 
     private fun installServiceWorkerFilter() {
-        // Service workers do not necessarily pass through WebViewClient interceptors.
+        // The ServiceWorker controller is process-wide. Its callback must not retain an
+        // Activity, as it can outlive orientation changes and WebView recreation.
+        val currentFilter = filter
         if (WebViewFeature.isFeatureSupported(WebViewFeature.SERVICE_WORKER_BASIC_USAGE) &&
             WebViewFeature.isFeatureSupported(WebViewFeature.SERVICE_WORKER_SHOULD_INTERCEPT_REQUEST)) {
             ServiceWorkerControllerCompat.getInstance().setServiceWorkerClient(object : ServiceWorkerClientCompat() {
                 override fun shouldInterceptRequest(request: WebResourceRequest): WebResourceResponse? =
-                    filterResponse(request.url.toString())
+                    emptyBlockedResponse(currentFilter, request.url.toString())
             })
         }
     }
@@ -363,7 +365,7 @@ class MainActivity : Activity() {
             else -> R.string.microphone_reason
         }
         AlertDialog.Builder(this)
-            .setTitle("Character.AI · permission")
+            .setTitle(R.string.media_permission_title)
             .setMessage(message)
             .setNegativeButton(R.string.cancel) { _, _ -> denyPendingMedia() }
             .setOnCancelListener { denyPendingMedia() }
@@ -426,6 +428,16 @@ class MainActivity : Activity() {
         findViewById<View>(R.id.error_retry).setOnClickListener { errorOverlay.visibility = View.GONE; webView.loadUrl(lastUrl) }
     }
 
+    private fun confirmIdentityNavigation(url: String) {
+        if (!UrlPolicy.isIdentityUrl(url) || destroyed) return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.external_identity_title)
+            .setMessage(R.string.external_identity_message)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.open_browser) { _, _ -> openExternal(url) }
+            .show()
+    }
+
     private fun confirmExternalNavigation(url: String) {
         if (!UrlPolicy.isHttps(url)) return
         val host = Uri.parse(url).host ?: return
@@ -461,6 +473,20 @@ class MainActivity : Activity() {
             filter.ruleCount(), filter.blockedRequestCount.get(),
             if (store.blocking) getString(R.string.enabled) else getString(R.string.disabled))
         AlertDialog.Builder(this).setTitle(R.string.diagnostics).setMessage(text)
+            .setNeutralButton(R.string.privacy_stats) { _, _ -> showPrivacyStats() }
+            .setPositiveButton(R.string.confirm, null).show()
+    }
+    private fun showPrivacyStats() {
+        val top = filter.topBlockedRules()
+        val content = if (top.isEmpty()) getString(R.string.privacy_stats_empty) else
+            top.joinToString("\n") { (domain, count) -> "$domain  ·  $count" }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.privacy_stats)
+            .setMessage(content)
+            .setNegativeButton(R.string.cancel, null)
+            .setNeutralButton(R.string.privacy_stats_reset) { _, _ ->
+                filter.clearStats(); updateStatus()
+            }
             .setPositiveButton(R.string.confirm, null).show()
     }
     private fun sharePage() {
@@ -473,7 +499,9 @@ class MainActivity : Activity() {
     private fun updateStatus() {
         val blocked = filter.blockedRequestCount.get()
         status.text = if (store.blocking && blocked > 0) "◈ $blocked" else if (store.blocking) getString(R.string.shield_on) else getString(R.string.shield_off)
-        status.contentDescription = if (store.blocking) "$blocked blocked requests this session" else "Filter disabled"
+        status.contentDescription = if (store.blocking)
+            getString(R.string.status_blocked_accessibility, blocked)
+            else getString(R.string.shield_disabled)
         findViewById<TextView>(R.id.filter).setTextColor(if (store.blocking) ACCENT else MUTED)
     }
     private fun refreshBackForward() {
@@ -584,6 +612,7 @@ class MainActivity : Activity() {
         }
         addButton(layout, getString(R.string.filter_edit)) { showFilterRules() }
         addButton(layout, getString(R.string.diagnostics)) { showDiagnostics() }
+        addButton(layout, getString(R.string.privacy_stats)) { showPrivacyStats() }
         layout.addView(sectionLabel(getString(R.string.section_appearance)))
         addToggle(layout, getString(R.string.toggle_compact), getString(R.string.toggle_compact_desc), store.compactChrome) {
             store.compactChrome = it; applySettings(reload = false)
@@ -625,8 +654,9 @@ class MainActivity : Activity() {
         addButton(layout, getString(R.string.clear_cache)) { confirmClearCache() }
         addButton(layout, getString(R.string.clear_data)) { confirmClearSiteData() }
         layout.addView(sectionLabel(getString(R.string.section_about)))
-        layout.addView(infoLabel("Character Companion v0.4.0 · Android only\nUnofficial client. No Character.AI affiliation, API, bypass of premium features, chat interception or background tasks.\n\nFilter intercepted: ${filter.blockedRequestCount.get()} requests this session."))
-        AlertDialog.Builder(this).setView(scroll).setPositiveButton("Done", null).show()
+        layout.addView(infoLabel(getString(R.string.about_details, BuildConfig.VERSION_NAME,
+            filter.blockedRequestCount.get())))
+        AlertDialog.Builder(this).setView(scroll).setPositiveButton(R.string.close, null).show()
     }
 
     private fun settingsColumn(): LinearLayout = LinearLayout(this).apply {
@@ -651,13 +681,18 @@ class MainActivity : Activity() {
         row.addView(texts, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         row.addView(Switch(this).apply {
             isChecked = value
+            contentDescription = "$name. $description"
             setOnCheckedChangeListener { _, enabled -> changed(enabled) }
         })
         parent.addView(row)
     }
     private fun addButton(parent: LinearLayout, title: String, callback: () -> Unit) {
         parent.addView(Button(this).apply {
-            text = title; isAllCaps = false; setTextColor(TEXT); setOnClickListener { callback() }
+            text = title; isAllCaps = false; setTextColor(TEXT)
+            setBackgroundResource(R.drawable.settings_action)
+            minHeight = dp(52)
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            setOnClickListener { callback() }
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
     }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
@@ -756,4 +791,11 @@ class MainActivity : Activity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == MEDIA_PERMISSION) grantPendingMedia()
     }
+}
+
+/** Standalone: the process-wide service-worker hook must not capture MainActivity. */
+private fun emptyBlockedResponse(filter: FilterEngine, url: String): WebResourceResponse? {
+    if (!filter.shouldBlock(url)) return null
+    return WebResourceResponse("text/plain", "UTF-8", 200, "OK", mapOf("Cache-Control" to "no-store"),
+        ByteArrayInputStream(ByteArray(0)))
 }

@@ -3,6 +3,7 @@ import dev.caicompanion.app.UrlPolicy
 import dev.caicompanion.app.FilterEngine
 import dev.caicompanion.app.BoundedText
 import dev.caicompanion.app.BrowserProfiles
+import dev.caicompanion.app.SafeFilename
 import dev.caicompanion.app.BrowserProfile
 import java.io.StringReader
 
@@ -88,5 +89,54 @@ fun main() {
     check(!BrowserProfiles.options(BrowserProfile.PRIVATE).thirdPartyCookies)
     check(BrowserProfiles.options(BrowserProfile.DATA_SAVER).reduceImages)
     check(BrowserProfiles.options(BrowserProfile.DATA_SAVER).requireMediaGesture)
-    println("PolicySmoke: browser policy and profile assertions passed")
+    val efficient = HostBlocker(
+        listOf("ads.example", "example", "doubleclick.net", "specific.ads.example"),
+        listOf("tracker.example"), listOf("allowed.ads.example", "sub.tracker.example")
+    )
+    check(efficient.matchedBlockedDomain("https://ads.example/pixel") == "ads.example")
+    check(efficient.matchedBlockedDomain("https://cdn.ads.example/pixel") == "ads.example")
+    check(efficient.matchedBlockedDomain("https://specific.ads.example/pixel") == "ads.example")
+    check(efficient.matchedBlockedDomain("https://tracker.example/pixel") == "tracker.example")
+    check(efficient.matchedBlockedDomain("https://foo.tracker.example/pixel") == "tracker.example")
+    check(efficient.matchedBlockedDomain("https://sub.tracker.example/pixel") == null)
+    check(efficient.matchedBlockedDomain("https://nested.sub.tracker.example/pixel") == null)
+    check(efficient.matchedBlockedDomain("https://allowed.ads.example/pixel") == null)
+    check(efficient.matchedBlockedDomain("https://nested.allowed.ads.example/pixel") == null)
+    check(efficient.matchedBlockedDomain("https://notads.example/pixel") == null)
+    check(efficient.matchedBlockedDomain("https://character.ai/") == null)
+    check(efficient.matchedBlockedDomain("https://sub.c.ai/") == null)
+    check(efficient.matchedBlockedDomain("https://www.doubleclick.net/") == "doubleclick.net")
+    check(efficient.matchedBlockedDomain("https://evil@ads.example/") == null)
+    check(efficient.matchedBlockedDomain("file:///ads.example") == null)
+    check(UrlPolicy.sanitizeBookmark("https://character.ai/%252Flogin%252Fcallback") == null)
+    check(UrlPolicy.sanitizeBookmark("https://character.ai/%25252Fauth%25252Ftoken") == null)
+    check(UrlPolicy.sanitizeBookmark("https://character.ai/%2e%2e/login") == null)
+    check(UrlPolicy.sanitizeBookmark("https://character.ai/chat/%5caccount") == null)
+    check(UrlPolicy.sanitizeBookmark("https://character.ai/chat/%0afoo") == null)
+    check(UrlPolicy.sanitizeBookmark("https://character.ai/chat/normal") == "https://character.ai/chat/normal")
+    check(SafeFilename.from(null) == "download")
+    check(SafeFilename.from("../../weird\nname?.zip") == "_.._weird_name_.zip")
+    check(SafeFilename.from("test\u202Eexe.png") == "test_exe.png")
+    check(SafeFilename.from("  normal.zip  ") == "normal.zip")
+    check(SafeFilename.from("a".repeat(150)).length == 120)
+    check(SafeFilename.from("....") == "download")
+    val privateStats = FilterEngine(listOf("doubleclick.net", "ads.example"))
+    check(privateStats.topBlockedRules().isEmpty())
+    check(privateStats.shouldBlock("https://c.doubleclick.net/user/private?token=secret"))
+    check(privateStats.shouldBlock("https://ads.example/private-chat"))
+    check(privateStats.shouldBlock("https://c.doubleclick.net/another"))
+    check(privateStats.blockedRequestCount.get() == 3L)
+    check(privateStats.topBlockedRules().size == 2)
+    check(privateStats.topBlockedRules()[0] == ("doubleclick.net" to 2L))
+    check(privateStats.topBlockedRules().none { "private" in it.first || "secret" in it.first })
+    check(privateStats.topBlockedRules(0).isEmpty())
+    privateStats.clearStats()
+    check(privateStats.blockedRequestCount.get() == 0L)
+    check(privateStats.topBlockedRules().isEmpty())
+    val concurrent = FilterEngine(listOf("ad.test"))
+    val threads = (1..4).map { Thread { repeat(250) { concurrent.shouldBlock("https://sub.ad.test/") } } }
+    threads.forEach { it.start() }; threads.forEach { it.join() }
+    check(concurrent.blockedRequestCount.get() == 1000L)
+    check(concurrent.topBlockedRules()[0] == ("ad.test" to 1000L))
+    println("PolicySmoke: browser policy, concurrency, URL safety and local statistics assertions passed")
 }
