@@ -33,6 +33,8 @@ fun main() {
     check(UrlPolicy.isInternal("https://character.ai/"))
     check(UrlPolicy.isInternal("https://accounts.google.com/"))
     check(!UrlPolicy.isInternal("https://notcharacter.ai/"))
+    check(!UrlPolicy.isInternal("https://character.ai.evil.test/"))
+    check(HostBlocker.normalizeRule("-invalid.example") == null)
     check(!UrlPolicy.isTrustedMediaOrigin("https://accounts.google.com"))
     check(UrlPolicy.safeBookmark("https://foo.c.ai/"))
     val engine = FilterEngine(listOf("doubleclick.net"))
