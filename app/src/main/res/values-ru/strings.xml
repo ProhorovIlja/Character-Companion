@@ -106,4 +106,6 @@
     <string name="status_blocked_accessibility">За этот сеанс заблокировано %1$d запросов</string>
     <string name="about_details">Character Companion v%1$s · Android\nНеофициальный клиент без связи с Character.AI. Не использует закрытый API и не перехватывает данные аккаунта.\n\nЗа сеанс заблокировано: %2$d запросов.</string>
     <string name="close">Закрыть</string>
+    <string name="download_url_rejected">Ссылку нельзя безопасно загрузить. Откройте сайт в доверенном браузере.</string>
+    <string name="download_browser_only_message">Ссылка может содержать данные входа или временную подпись. Ради безопасности системный загрузчик её не получит. Открыть ссылку в браузере?</string>
 </resources>

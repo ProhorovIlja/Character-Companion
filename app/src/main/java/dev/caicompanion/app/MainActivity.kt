@@ -14,6 +14,8 @@ import android.net.Uri
 import android.os.Build
 import android.view.WindowInsets
 import android.view.WindowManager
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.os.Bundle
@@ -82,6 +84,7 @@ class MainActivity : Activity() {
     private var fullscreenView: View? = null
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
     private var destroyed = false
+    private var modernBackCallback: OnBackInvokedCallback? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -127,11 +130,16 @@ class MainActivity : Activity() {
             val keyboardVisible = root.rootView.height - visible.bottom > 180 * resources.displayMetrics.density
             footer.visibility = if (keyboardVisible || fullscreenView != null) View.GONE else View.VISIBLE
         }
-        if (savedInstanceState == null || webView.restoreState(savedInstanceState) == null) {
-            lastUrl = if (store.resumePage) store.lastVisited.ifBlank { HOME } else HOME
-            webView.loadUrl(lastUrl)
+        // Do not persist browser history / OAuth state in framework instance-state Bundles.
+        // Orientation is handled through configChanges; after process death restore only
+        // an explicitly enabled and sanitized first-party content URL.
+        lastUrl = if (store.resumePage) store.lastVisited.ifBlank { HOME } else HOME
+        webView.loadUrl(lastUrl)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            modernBackCallback = OnBackInvokedCallback { navigateBack() }
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(
+                OnBackInvokedDispatcher.PRIORITY_DEFAULT, modernBackCallback!!)
         }
-        else lastUrl = webView.url?.takeIf(UrlPolicy::isInternal) ?: HOME
     }
 
     private fun configureWebView(view: WebView) {
@@ -141,7 +149,8 @@ class MainActivity : Activity() {
             domStorageEnabled = true
             databaseEnabled = true
             allowFileAccess = false
-            allowContentAccess = true // Platform document picker only
+            // FileChooserParams uses the platform picker; web pages never need content:// access.
+            allowContentAccess = false
             allowFileAccessFromFileURLs = false
             allowUniversalAccessFromFileURLs = false
             javaScriptCanOpenWindowsAutomatically = false
@@ -267,17 +276,27 @@ class MainActivity : Activity() {
             }
         }
         view.setDownloadListener(DownloadListener { url, agent, disposition, mime, _ ->
-            if (!UrlPolicy.isHttps(url)) return@DownloadListener
             val safeUrl = url ?: return@DownloadListener
-            val name = SafeFilename.from(URLUtil.guessFileName(safeUrl, disposition, mime))
-            val host = Uri.parse(safeUrl).host ?: return@DownloadListener
-            AlertDialog.Builder(this)
-                .setTitle(R.string.download_confirm_title)
-                .setMessage(getString(R.string.download_confirm_message, name, host))
-                .setNegativeButton(R.string.cancel, null)
-                .setPositiveButton(R.string.confirm) { _, _ ->
-                    enqueueDownload(safeUrl, agent, disposition, mime)
-                }.show()
+            when (DownloadPolicy.classify(safeUrl)) {
+                DownloadPolicy.Kind.REJECT -> showToast(getString(R.string.download_url_rejected))
+                DownloadPolicy.Kind.BROWSER_ONLY -> AlertDialog.Builder(this)
+                    .setTitle(R.string.download_confirm_title)
+                    .setMessage(R.string.download_browser_only_message)
+                    .setNegativeButton(R.string.cancel, null)
+                    .setPositiveButton(R.string.open_browser) { _, _ -> openExternal(safeUrl) }
+                    .show()
+                DownloadPolicy.Kind.SAFE_SYSTEM -> {
+                    val name = SafeFilename.from(URLUtil.guessFileName(safeUrl, disposition, mime))
+                    val host = Uri.parse(safeUrl).host ?: return@DownloadListener
+                    AlertDialog.Builder(this)
+                        .setTitle(R.string.download_confirm_title)
+                        .setMessage(getString(R.string.download_confirm_message, name, host))
+                        .setNegativeButton(R.string.cancel, null)
+                        .setPositiveButton(R.string.confirm) { _, _ ->
+                            enqueueDownload(safeUrl, agent, disposition, mime)
+                        }.show()
+                }
+            }
         })
     }
 
@@ -735,14 +754,21 @@ class MainActivity : Activity() {
         }, IMPORT_SETTINGS)
     }
 
-    @Deprecated("Compatibility with Android framework navigation")
+    private fun navigateBack() {
+        when {
+            fullscreenView != null -> leaveFullscreen()
+            webView.canGoBack() -> webView.goBack()
+            else -> finish()
+        }
+    }
+
+    @Deprecated("Compatibility with Android framework navigation below API 33")
     override fun onBackPressed() {
-        if (fullscreenView != null) leaveFullscreen()
-        else if (webView.canGoBack()) webView.goBack()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) navigateBack()
         else super.onBackPressed()
     }
     override fun onSaveInstanceState(outState: Bundle) {
-        webView.saveState(outState)
+        // No WebView.saveState(): do not place browsing history or auth URLs in a Bundle.
         super.onSaveInstanceState(outState)
     }
     override fun onPause() {
@@ -753,6 +779,10 @@ class MainActivity : Activity() {
     override fun onResume() { super.onResume(); webView.onResume() }
     override fun onDestroy() {
         destroyed = true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            modernBackCallback?.let { onBackInvokedDispatcher.unregisterOnBackInvokedCallback(it) }
+            modernBackCallback = null
+        }
         leaveFullscreen()
         denyPendingMedia()
         chooser?.onReceiveValue(null); chooser = null

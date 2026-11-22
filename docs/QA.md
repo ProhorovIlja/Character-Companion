@@ -1,8 +1,8 @@
-# Quality assurance · 2026-11-22 · v0.5.0
+# Quality assurance · 2026-11-22 · v0.6.0
 
 ## Completed in offline environment
 
-- `bash scripts/test-offline.sh` passed: **16 Python structural tests** and **104 Kotlin assertions**.
+- `bash scripts/test-offline.sh` passed: **17 Python structural tests** and **119 Kotlin assertions**.
 - Kotlin checks cover HTTPS and hostname boundaries, rejecting domain spoofing, protected service hosts, strict filter rules/overrides, URL query sanitization, identity URL discrimination, request counts and bounded Reader behavior.
 - Static checks cover XML parsing, RU/EN parity, privacy manifest defaults, no scheduled jobs, HTTPS-only surface, atomic settings import, conservative domain rules and no Javascript bridge.
 - New offline cases cover URL sharing sanitization (including encoded auth paths), four browser profiles, UI code contracts for external-link and download confirmation, fullscreen, permission cleanup, and legacy storage sanitization.
@@ -38,3 +38,12 @@
 - 104 pure Kotlin policy assertions passed with the installed Kotlin 1.9 CLI; including 1000 concurrent blocked requests (four short-lived threads), unsafe filename/path regressions, exception precedence and stats reset.
 - Android SDK, Gradle, adb and real Android runtime are missing; the Android app did not compile in this environment. Kotlin 1.9 standalone checks do not prove AGP 8.13 / AndroidX WebKit 1.18 project compilation.
 - The UI still needs a real Android build, accessibility inspection, sign-in tests and device performance measurements. Do not distribute this as a verified APK.
+
+## v0.6 targeted device checks — PENDING
+
+- Android API 29, 33, 35 and 36: back gesture should exit fullscreen, then navigate history, then finish Activity. Ensure the callback unregisters on destruction.
+- Verify Android document picker uploads after disabling `allowContentAccess`. Denied local `content://` page navigation should not break selected files.
+- Verify direct HTTPS file download with no query; verify signed/query-bearing links show an external-browser consent dialog; reject `http:`, `blob:`, credential URLs and unexpected TLS ports.
+- Test process recreation after login navigation and with opt-in resume. No complete WebView navigation state should be restored; no auth URL should be persisted.
+- Test long encoded auth-like path and embedded private search query values do not appear in exported settings or shared links.
+- Monitor API 33/34 predictive-back behavior and IME coexistence on actual hardware.

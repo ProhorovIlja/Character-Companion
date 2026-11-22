@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.6.0 — 2026-11-22 (source only)
+
+- Download policy: refuse non-HTTPS or invalid URLs; route query/fragment/auth/signed links to an explicitly confirmed external browser instead of DownloadManager, which can follow cross-origin redirects.
+- Disable WebView `content://` access while preserving standard Android System File Picker support.
+- Android 13+ back-dispatcher handling and cleanup for fullscreen/history navigation.
+- Do not save WebView state, including potentially sensitive history and login redirects, into Activity instance-state Bundles; optional resume remains a sanitized first-party URL.
+- Restrict bookmark/share query keys and values and reject deeper nested encoded paths.
+- 17 offline Python tests and 119 Kotlin assertions pass; APK compilation and live-site compatibility remain unverified.
+
 ## v0.5.0 — 2026-11-22 (source only)
 
 - Faster O(host-labels) adblock matching with correctly prioritized allowlist exceptions, no O(rule-count) scan on every resource request.

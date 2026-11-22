@@ -12,7 +12,8 @@ object UrlPolicy {
     private val sensitivePathParts = setOf("oauth", "authorize", "auth", "login", "signin",
         "sign-in", "callback", "verify", "token", "session", "logout", "reset-password",
         "account", "settings", "api", "password")
-    private val bookmarkQueryKeys = setOf("char", "id", "q", "query", "search", "page", "tab", "sort", "view", "filter")
+    private val bookmarkQueryKeys = setOf("char", "id")
+    private val bookmarkValue = Regex("^[A-Za-z0-9_-]{1,128}$")
 
     private fun parsedHttps(url: String?): URI? {
         if (url == null) return null
@@ -45,10 +46,12 @@ object UrlPolicy {
         var decodedPath = uri.path.orEmpty()
         // Decode layered escapes: %252Fauth%252Fcallback must never bypass path checks.
         // URLDecoder treats '+' as a space; preserve literal '+' for path inspection.
-        repeat(2) {
+        repeat(6) {
             decodedPath = try { URLDecoder.decode(decodedPath.replace("+", "%2B"), "UTF-8") }
                 catch (_: IllegalArgumentException) { return null }
         }
+        // Deeply nested percent-escapes can hide paths even after repeated decoding.
+        if (Regex("%[0-9a-fA-F]{2}").containsMatchIn(decodedPath)) return null
         if (decodedPath.length > 1500 || decodedPath.any { it.isISOControl() || it == '\\' } ||
             decodedPath.split('/').any {
                 val segment = it.lowercase(Locale.ROOT)
@@ -57,7 +60,8 @@ object UrlPolicy {
         val query = uri.rawQuery?.takeIf { raw ->
             raw.length <= 1024 && raw.split('&').all { item ->
                 val key = item.substringBefore('=')
-                key in bookmarkQueryKeys
+                val value = item.substringAfter('=', "")
+                key in bookmarkQueryKeys && bookmarkValue.matches(value)
             }
         }
         val host = uri.host.lowercase(Locale.ROOT)

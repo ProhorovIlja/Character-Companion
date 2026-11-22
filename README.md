@@ -1,8 +1,17 @@
 # Character Companion — Android
 
-**v0.5.0 source preview · 22 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
+**v0.6.0 source preview · 22 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
 
-**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (16 structural Python tests + 104 Kotlin assertions). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
+**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (17 structural Python tests + 119 Kotlin assertions). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
+
+## v0.6.0 update (22 November 2026)
+
+- Safe-download routing: any download URL with query strings, fragments, identity-provider hostnames or decoded authentication path segments stays out of Android DownloadManager. The user can explicitly open those links in an external browser; invalid/non-HTTPS URLs are rejected. This reduces credential leakage, but authenticated downloads remain unverified.
+- WebView no longer has `content://` access (`allowContentAccess=false`); Android's system file picker is a separate mechanism and remains enabled.
+- Added Android 13+ system back-dispatcher support. Fullscreen exits first, then in-app history navigation; on older Android versions the legacy back callback remains.
+- Stopped saving/restoring WebView browser state to system Bundles. Optional resume uses only a sanitized first-party URL; no browsing history or OAuth redirect is put into the Bundle.
+- Further restricted bookmarks and link sharing to opaque `char` / `id` query values and reject deeply encoded sensitive paths. Private search query strings are not exported.
+- Offline verification: 17 Python structure checks + 119 standalone Kotlin assertions passed. **No APK was built or tested on Android**, due to missing SDK and Gradle in this runtime.
 
 ## v0.5.0 update (22 November 2026)
 
@@ -30,7 +39,7 @@
 | Service workers | WebView and supported service-worker request interception | Does not block all first-party ads or WebSocket traffic |
 | Privacy | WebView cookies/storage on device, configurable third-party cookies | No application analytics, VPN, device-wide traffic interception or background jobs |
 | Media | Camera/mic denied by default; trusted origin + per-request confirmation | Requires Android runtime permission; site voice support is unverified |
-| Files | Android system file picker; manual confirmation of HTTPS downloads | No WebView cookies sent to DownloadManager; authenticated file download may fail |
+| Files | Android system file picker; manual confirmation of HTTPS downloads | Query-bearing or auth-related URLs open externally; no WebView cookies sent to DownloadManager |
 | Compatibility | Renderer-crash replacement, TLS rejection, retry overlay | Site updates and external Google OAuth may still cause failures |
 | Performance | Optional image download saver; compact chrome; text scale; media gesture | No measured performance claims without device benchmarks |
 | Session | Optional resume last visited first-party page | OFF by default; stores sanitized URL locally, not in exported backups |

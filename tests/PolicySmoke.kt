@@ -4,6 +4,7 @@ import dev.caicompanion.app.FilterEngine
 import dev.caicompanion.app.BoundedText
 import dev.caicompanion.app.BrowserProfiles
 import dev.caicompanion.app.SafeFilename
+import dev.caicompanion.app.DownloadPolicy
 import dev.caicompanion.app.BrowserProfile
 import java.io.StringReader
 
@@ -114,6 +115,21 @@ fun main() {
     check(UrlPolicy.sanitizeBookmark("https://character.ai/chat/%5caccount") == null)
     check(UrlPolicy.sanitizeBookmark("https://character.ai/chat/%0afoo") == null)
     check(UrlPolicy.sanitizeBookmark("https://character.ai/chat/normal") == "https://character.ai/chat/normal")
+    check(DownloadPolicy.classify("https://cdn.character.ai/image.png") == DownloadPolicy.Kind.SAFE_SYSTEM)
+    check(DownloadPolicy.classify("https://cdn.example.org/file.zip") == DownloadPolicy.Kind.SAFE_SYSTEM)
+    check(DownloadPolicy.classify("https://cdn.example.org/file.zip?signature=abc") == DownloadPolicy.Kind.BROWSER_ONLY)
+    check(DownloadPolicy.classify("https://cdn.example.org/file.zip#fragment") == DownloadPolicy.Kind.BROWSER_ONLY)
+    check(DownloadPolicy.classify("https://accounts.google.com/hello") == DownloadPolicy.Kind.BROWSER_ONLY)
+    check(DownloadPolicy.classify("https://character.ai/oauth/token") == DownloadPolicy.Kind.BROWSER_ONLY)
+    check(DownloadPolicy.classify("https://character.ai/%2561uth%252Fcallback") == DownloadPolicy.Kind.BROWSER_ONLY)
+    check(DownloadPolicy.classify("http://example.org/file.zip") == DownloadPolicy.Kind.REJECT)
+    check(DownloadPolicy.classify("https://u:p@example.org/file.zip") == DownloadPolicy.Kind.REJECT)
+    check(DownloadPolicy.classify("https://example.org:444/file.zip") == DownloadPolicy.Kind.REJECT)
+    check(DownloadPolicy.classify("blob:https://character.ai/b") == DownloadPolicy.Kind.REJECT)
+    check(UrlPolicy.sanitizeBookmark("https://character.ai/chat/1?q=secret") == "https://character.ai/chat/1")
+    check(UrlPolicy.sanitizeBookmark("https://character.ai/chat/1?char=abc-123") == "https://character.ai/chat/1?char=abc-123")
+    check(UrlPolicy.sanitizeBookmark("https://character.ai/chat/1?char=secret%2526token") == "https://character.ai/chat/1")
+    check(UrlPolicy.sanitizeBookmark("https://character.ai/%2525252525252Fauth/callback") == null)
     check(SafeFilename.from(null) == "download")
     check(SafeFilename.from("../../weird\nname?.zip") == "_.._weird_name_.zip")
     check(SafeFilename.from("test\u202Eexe.png") == "test_exe.png")

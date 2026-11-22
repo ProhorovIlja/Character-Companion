@@ -106,4 +106,6 @@
     <string name="status_blocked_accessibility">%1$d requests blocked this session</string>
     <string name="about_details">Character Companion v%1$s · Android only\nUnofficial browser client; no affiliation with Character.AI. No private API or account-data interception.\n\nBlocked this session: %2$d requests.</string>
     <string name="close">Close</string>
+    <string name="download_url_rejected">This link cannot be downloaded safely. Use the website in a trusted browser.</string>
+    <string name="download_browser_only_message">This download URL may contain sign-in details or a time-limited signature. For privacy, the system downloader will not receive it. Open it in your browser instead?</string>
 </resources>

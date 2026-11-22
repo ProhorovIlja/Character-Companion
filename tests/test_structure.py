@@ -125,6 +125,18 @@ class Structure(unittest.TestCase):
         self.assertIn('contentDescription = "$name. $description"', activity)
         self.assertTrue((ROOT/'app/src/main/res/drawable/settings_action.xml').exists())
 
+    def test_download_and_back_navigation_safety(self):
+        activity=(ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
+        policy=(ROOT/'app/src/main/java/dev/caicompanion/app/DownloadPolicy.kt').read_text()
+        self.assertIn('allowContentAccess = false', activity)
+        self.assertIn('DownloadPolicy.classify(safeUrl)', activity)
+        self.assertIn('onBackInvokedDispatcher.registerOnBackInvokedCallback', activity)
+        self.assertIn('onBackInvokedDispatcher.unregisterOnBackInvokedCallback', activity)
+        self.assertNotIn('webView.restoreState(savedInstanceState)', activity)
+        self.assertNotIn('webView.saveState(outState)', activity)
+        self.assertIn('uri.rawQuery != null', policy)
+        self.assertIn('Kind.BROWSER_ONLY', policy)
+
     def test_conservative_host_rules(self):
         lines=(ROOT/'app/src/main/assets/blocked-hosts.txt').read_text().splitlines()
         rules=[s.strip() for s in lines if s.strip() and not s.startswith('#')]
