@@ -2,7 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root" android:layout_width="match_parent"
     android:layout_height="match_parent" android:orientation="vertical"
-    android:fitsSystemWindows="true" android:background="#111219">
+    android:background="#111219">
     <LinearLayout android:id="@+id/chrome_header" android:orientation="vertical"
         android:layout_width="match_parent" android:layout_height="wrap_content"
         android:background="#171923">
@@ -25,10 +25,10 @@
             <TextView android:id="@+id/status_badge" android:layout_width="wrap_content"
                 android:layout_height="35dp" android:minWidth="50dp" android:gravity="center"
                 android:paddingStart="8dp" android:paddingEnd="8dp"
-                android:background="@drawable/pill_background" android:text="•••"
+                android:background="@drawable/pill_background" android:contentDescription="@string/diagnostics" android:text="•••"
                 android:textSize="11sp" android:textColor="#D9C29B" />
         </LinearLayout>
-        <LinearLayout android:layout_width="match_parent" android:layout_height="46dp"
+        <LinearLayout android:layout_width="match_parent" android:layout_height="55dp"
             android:paddingStart="12dp" android:paddingEnd="12dp" android:paddingBottom="7dp"
             android:orientation="horizontal" android:gravity="center_vertical">
             <TextView android:id="@+id/back" style="@style/NavButton" android:text="‹" android:contentDescription="@string/back" />
@@ -67,10 +67,10 @@
     <LinearLayout android:id="@+id/chrome_footer" android:layout_width="match_parent"
         android:layout_height="68dp" android:gravity="center" android:orientation="horizontal"
         android:paddingStart="6dp" android:paddingEnd="6dp" android:background="#171923">
-        <TextView android:id="@+id/home" style="@style/FooterButton" android:text="⌂\nHome" android:contentDescription="@string/home" />
-        <TextView android:id="@+id/bookmarks" style="@style/FooterButton" android:text="☆\nSaved" android:contentDescription="@string/bookmarks" />
-        <TextView android:id="@+id/share" style="@style/FooterButton" android:text="↗\nShare" android:contentDescription="@string/share" />
-        <TextView android:id="@+id/filter" style="@style/FooterButton" android:text="◈\nShield" android:contentDescription="@string/filter" />
-        <TextView android:id="@+id/settings" style="@style/FooterButton" android:text="⚙\nSettings" android:contentDescription="@string/settings" />
+        <TextView android:id="@+id/home" style="@style/FooterButton" android:text="@string/footer_home" android:contentDescription="@string/home" />
+        <TextView android:id="@+id/bookmarks" style="@style/FooterButton" android:text="@string/footer_bookmarks" android:contentDescription="@string/bookmarks" />
+        <TextView android:id="@+id/share" style="@style/FooterButton" android:text="@string/footer_share" android:contentDescription="@string/share" />
+        <TextView android:id="@+id/filter" style="@style/FooterButton" android:text="@string/footer_filter" android:contentDescription="@string/filter" />
+        <TextView android:id="@+id/settings" style="@style/FooterButton" android:text="@string/footer_settings" android:contentDescription="@string/settings" />
     </LinearLayout>
 </LinearLayout>

@@ -1,0 +1,22 @@
+# Optional strict mode, OFF by default. Can disrupt third-party sign-in or embeds.
+# These are extra generic trackers, not verified Character.AI ad hosts.
+bat.bing.com
+px.ads.linkedin.com
+analytics.tiktok.com
+tr.snapchat.com
+statsigapi.net
+hotjar.com
+hotjar.io
+mixpanel.com
+amplitude.com
+segment.io
+segment.com
+appsflyer.com
+branch.io
+adjust.com
+onesignal.com
+sentry.io
+newrelic.com
+nr-data.net
+optimizely.com
+heap.io

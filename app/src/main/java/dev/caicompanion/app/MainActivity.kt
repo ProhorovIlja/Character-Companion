@@ -11,6 +11,10 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
+import android.os.Build
+import android.view.WindowInsets
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.os.Bundle
 import android.os.Environment
 import android.view.View
@@ -40,6 +44,7 @@ import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
+import java.lang.Runtime
 import java.io.ByteArrayInputStream
 import androidx.webkit.ServiceWorkerClientCompat
 import androidx.webkit.ServiceWorkerControllerCompat
@@ -74,14 +79,17 @@ class MainActivity : Activity() {
     private var defaultAgent = ""
     private var pendingMediaResources: Array<String> = emptyArray()
     private var destroyed = false
-    private var lastErrorMainFrame = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WebView.setWebContentsDebuggingEnabled(false)
         store = SettingsStore(this)
         val base = assets.open("blocked-hosts.txt").bufferedReader().use { it.readLines() }
-        filter = FilterEngine(base).also { it.enabled = store.blocking; it.replace(store.customRules, store.excludeRules) }
+        val strictRules = assets.open("strict-hosts.txt").bufferedReader().use { it.readLines() }
+        filter = FilterEngine(base, strictRules).also {
+            it.enabled = store.blocking; it.strict = store.strictBlocking
+            it.replace(store.customRules, store.excludeRules)
+        }
         setContentView(R.layout.activity_main)
         container = findViewById(R.id.web_container)
         errorOverlay = findViewById(R.id.error_overlay)
@@ -96,14 +104,30 @@ class MainActivity : Activity() {
         configureWebView(webView)
         bindControls()
         applySettings(reload = false)
-        // Respect the IME by hiding footer while typing in the website.
+        // Android 15/16 enforce edge-to-edge. Keep native controls outside system bars.
         val root = findViewById<View>(R.id.root)
+        root.setOnApplyWindowInsetsListener { target, insets ->
+            if (Build.VERSION.SDK_INT >= 30) {
+                val bars = insets.getInsets(WindowInsets.Type.systemBars())
+                target.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            } else {
+                @Suppress("DEPRECATION")
+                target.setPadding(insets.systemWindowInsetLeft, insets.systemWindowInsetTop,
+                    insets.systemWindowInsetRight, insets.systemWindowInsetBottom)
+            }
+            insets
+        }
+        root.requestApplyInsets()
+        // Respect the IME by hiding footer while typing in the website.
         root.viewTreeObserver.addOnGlobalLayoutListener {
             val visible = android.graphics.Rect().also { root.getWindowVisibleDisplayFrame(it) }
             val keyboardVisible = root.rootView.height - visible.bottom > 180 * resources.displayMetrics.density
             footer.visibility = if (keyboardVisible) View.GONE else View.VISIBLE
         }
-        if (savedInstanceState == null || webView.restoreState(savedInstanceState) == null) webView.loadUrl(HOME)
+        if (savedInstanceState == null || webView.restoreState(savedInstanceState) == null) {
+            lastUrl = if (store.resumePage) store.lastVisited.ifBlank { HOME } else HOME
+            webView.loadUrl(lastUrl)
+        }
         else lastUrl = webView.url?.takeIf(UrlPolicy::isInternal) ?: HOME
     }
 
@@ -129,6 +153,7 @@ class MainActivity : Activity() {
             useWideViewPort = store.desktopMode
             loadWithOverviewMode = store.desktopMode
             cacheMode = WebSettings.LOAD_DEFAULT
+            loadsImagesAutomatically = !store.reduceImages
             userAgentString = if (store.desktopMode) desktopAgent() else defaultAgent
         }
         CookieManager.getInstance().setAcceptCookie(true)
@@ -148,26 +173,27 @@ class MainActivity : Activity() {
                 return filterResponse(request.url.toString())
             }
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
-                lastErrorMainFrame = false
                 errorOverlay.visibility = View.GONE
                 if (UrlPolicy.isInternal(url)) lastUrl = url!!
                 status.setText(R.string.status_loading)
             }
             override fun onPageFinished(view: WebView?, url: String?) {
                 titleLabel.text = view?.title?.take(65)?.ifBlank { "character.ai" } ?: "character.ai"
+                if (store.resumePage && UrlPolicy.safeBookmark(url)) store.lastVisited = url.orEmpty()
                 updateStatus()
                 CookieManager.getInstance().flush()
                 refreshBackForward()
             }
             override fun onReceivedError(view: WebView?, request: WebResourceRequest, error: WebResourceError) {
                 if (request.isForMainFrame && !destroyed) {
-                    lastErrorMainFrame = true
                     showError(error.description?.toString() ?: getString(R.string.error_loading))
                 }
             }
             override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler, error: android.net.http.SslError?) {
                 handler.cancel() // Never ignore a certificate error.
-                showError("TLS certificate verification failed")
+                // A third-party image/ad TLS error must not replace a healthy main page.
+                if (error != null && UrlPolicy.isInternal(error.url) &&
+                    UrlPolicy.isInternal(view?.url)) showError(getString(R.string.error_tls))
             }
             override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
                 // Old WebView is unusable. Replace it; don't crash the whole application.
@@ -183,7 +209,7 @@ class MainActivity : Activity() {
                 container.addView(webView, index.coerceAtLeast(0), FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
                 configureWebView(webView)
-                showToast("Browser renderer restarted")
+                showToast(getString(R.string.browser_restarted))
                 webView.loadUrl(lastUrl.takeIf(UrlPolicy::isInternal) ?: HOME)
                 return true
             }
@@ -239,7 +265,7 @@ class MainActivity : Activity() {
                     CookieManager.getInstance().getCookie(safeUrl)?.let { request.addRequestHeader("Cookie", it) }
                 }
                 (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
-                showToast("Download requested")
+                showToast(getString(R.string.download_requested))
             } catch (_: Exception) { showToast(getString(R.string.error_download)) }
         })
     }
@@ -321,11 +347,16 @@ class MainActivity : Activity() {
         findViewById<View>(R.id.home).setOnClickListener { webView.loadUrl(HOME) }
         findViewById<View>(R.id.open_browser).setOnClickListener { openExternal(webView.url ?: HOME) }
         findViewById<View>(R.id.share).setOnClickListener { sharePage() }
+        findViewById<View>(R.id.share).setOnLongClickListener { copyPageLink(); true }
+        findViewById<View>(R.id.reload).setOnLongClickListener {
+            webView.clearCache(true); webView.reload(); showToast(getString(R.string.cache_refreshed)); true
+        }
+        findViewById<View>(R.id.status_badge).setOnClickListener { showDiagnostics() }
         findViewById<View>(R.id.bookmarks).setOnClickListener { showBookmarks() }
         findViewById<View>(R.id.filter).setOnClickListener {
             store.blocking = !store.blocking
             applySettings(reload = true)
-            showToast(if (store.blocking) "Privacy shield enabled" else "Privacy shield disabled")
+            showToast(if (store.blocking) getString(R.string.shield_enabled) else getString(R.string.shield_disabled))
         }
         findViewById<View>(R.id.filter).setOnLongClickListener { showFilterRules(); true }
         findViewById<View>(R.id.settings).setOnClickListener { showSettings() }
@@ -339,6 +370,24 @@ class MainActivity : Activity() {
             startActivity(intent)
         } catch (_: ActivityNotFoundException) { showToast(getString(R.string.error_browser)) }
     }
+    private fun copyPageLink() {
+        val url = webView.url?.takeIf(UrlPolicy::isHttps) ?: HOME
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("Character Companion link", url))
+        showToast(getString(R.string.link_copied))
+    }
+    private fun showDiagnostics() {
+        val packageInfo = if (Build.VERSION.SDK_INT >= 26) WebView.getCurrentWebViewPackage() else null
+        val runtime = Runtime.getRuntime()
+        val appMegabytes = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024)
+        val text = getString(R.string.diagnostics_details,
+            Build.VERSION.SDK_INT, packageInfo?.packageName ?: "unknown",
+            packageInfo?.versionName ?: "unknown", appMegabytes,
+            filter.ruleCount(), filter.blockedRequestCount.get(),
+            if (store.blocking) getString(R.string.enabled) else getString(R.string.disabled))
+        AlertDialog.Builder(this).setTitle(R.string.diagnostics).setMessage(text)
+            .setPositiveButton(R.string.confirm, null).show()
+    }
     private fun sharePage() {
         val url = webView.url?.takeIf(UrlPolicy::isHttps) ?: HOME
         startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
@@ -347,7 +396,7 @@ class MainActivity : Activity() {
     }
     private fun updateStatus() {
         val blocked = filter.blockedRequestCount.get()
-        status.text = if (store.blocking && blocked > 0) "◈ $blocked" else if (store.blocking) "◈ ON" else "○ OFF"
+        status.text = if (store.blocking && blocked > 0) "◈ $blocked" else if (store.blocking) getString(R.string.shield_on) else getString(R.string.shield_off)
         status.contentDescription = if (store.blocking) "$blocked blocked requests this session" else "Filter disabled"
         findViewById<TextView>(R.id.filter).setTextColor(if (store.blocking) ACCENT else MUTED)
     }
@@ -364,11 +413,13 @@ class MainActivity : Activity() {
 
     private fun applySettings(reload: Boolean) {
         filter.enabled = store.blocking
+        filter.strict = store.strictBlocking
         filter.replace(store.customRules, store.excludeRules)
         header.visibility = if (store.compactChrome) View.GONE else View.VISIBLE
         if (::webView.isInitialized) {
             webView.setBackgroundColor(if (store.darkCanvas) Color.rgb(17, 18, 25) else Color.WHITE)
             webView.settings.textZoom = store.textZoom
+            webView.settings.loadsImagesAutomatically = !store.reduceImages
             webView.settings.mediaPlaybackRequiresUserGesture = store.mediaRequiresGesture
             webView.settings.useWideViewPort = store.desktopMode
             webView.settings.loadWithOverviewMode = store.desktopMode
@@ -381,15 +432,15 @@ class MainActivity : Activity() {
     }
 
     private fun showBookmarks() {
-        val url = webView.url?.takeIf(UrlPolicy::safeBookmark) ?: HOME
+        val url = UrlPolicy.sanitizeBookmark(webView.url) ?: HOME
         val saved = store.listBookmarks()
-        val options = mutableListOf("+ Save current page", "− Remove current page")
+        val options = mutableListOf(getString(R.string.bookmark_add), getString(R.string.bookmark_remove))
         options += saved.map { "☆ ${it.first}" }
         AlertDialog.Builder(this).setTitle(getString(R.string.bookmarks))
             .setItems(options.toTypedArray()) { _, selected ->
                 when (selected) {
-                    0 -> { if (store.addBookmark(webView.title ?: "Character.AI", url)) showToast("Bookmark saved") }
-                    1 -> { store.removeBookmark(url); showToast("Bookmark removed") }
+                    0 -> { if (store.addBookmark(webView.title ?: "Character.AI", url)) showToast(getString(R.string.bookmark_saved)) }
+                    1 -> { store.removeBookmark(url); showToast(getString(R.string.bookmark_removed)) }
                     else -> saved.getOrNull(selected - 2)?.second?.let { webView.loadUrl(it) }
                 }
             }.setNegativeButton(R.string.cancel, null).show()
@@ -399,20 +450,20 @@ class MainActivity : Activity() {
         val scroll = ScrollView(this)
         val layout = settingsColumn()
         scroll.addView(layout)
-        layout.addView(infoLabel("Rules: one domain per line. No URLs, wildcards or regex. Exact host and subdomains only."))
+        layout.addView(infoLabel(getString(R.string.filter_instructions)))
         val custom = EditText(this).apply {
             setText(store.customRules); setTextColor(TEXT); setHintTextColor(MUTED)
             hint = "example.org"; minLines = 4; maxLines = 8
         }
-        layout.addView(sectionLabel("Block domains")); layout.addView(custom)
+        layout.addView(sectionLabel(getString(R.string.filter_block_domains))); layout.addView(custom)
         val exclusions = EditText(this).apply {
             setText(store.excludeRules); setTextColor(TEXT); setHintTextColor(MUTED)
             hint = "needed-cdn.example.com"; minLines = 3; maxLines = 6
         }
-        layout.addView(sectionLabel("Allow domains")); layout.addView(exclusions)
-        AlertDialog.Builder(this).setTitle("Filter rules · ${filter.ruleCount()} domains")
+        layout.addView(sectionLabel(getString(R.string.filter_allow_domains))); layout.addView(exclusions)
+        AlertDialog.Builder(this).setTitle(getString(R.string.filter_title, filter.ruleCount()))
             .setView(scroll).setNegativeButton(R.string.cancel, null)
-            .setPositiveButton("Apply") { _, _ ->
+            .setPositiveButton(R.string.apply) { _, _ ->
                 store.customRules = custom.text.toString()
                 store.excludeRules = exclusions.text.toString()
                 applySettings(reload = true)
@@ -423,31 +474,42 @@ class MainActivity : Activity() {
         val scroll = ScrollView(this).apply { setBackgroundColor(Color.rgb(21,22,30)) }
         val layout = settingsColumn()
         scroll.addView(layout)
-        layout.addView(sectionLabel("PRIVACY & PROTECTION"))
-        addToggle(layout, "Block known ad and tracking domains", "Local list + custom rules; not a subscription bypass", store.blocking) {
+        layout.addView(sectionLabel(getString(R.string.section_privacy)))
+        addToggle(layout, getString(R.string.toggle_filter), getString(R.string.toggle_filter_desc), store.blocking) {
             store.blocking = it; applySettings(reload = true)
         }
-        addToggle(layout, "Allow third-party cookies", "May help sign-in; reduces tracking protection", store.cookies) {
+        addToggle(layout, getString(R.string.toggle_strict), getString(R.string.toggle_strict_desc), store.strictBlocking) {
+            store.strictBlocking = it; applySettings(reload = true)
+        }
+        addToggle(layout, getString(R.string.toggle_cookies), getString(R.string.toggle_cookies_desc), store.cookies) {
             store.cookies = it; applySettings(reload = true)
         }
-        addToggle(layout, "Allow microphone / camera requests", "Each request additionally needs your approval", store.mediaAllowed) {
+        addToggle(layout, getString(R.string.toggle_media), getString(R.string.toggle_media_desc), store.mediaAllowed) {
             store.mediaAllowed = it
         }
-        addButton(layout, "Edit blocked and allowed domains") { showFilterRules() }
-        layout.addView(sectionLabel("APPEARANCE & PERFORMANCE"))
-        addToggle(layout, "Compact navigation", "Hide upper navigation toolbar", store.compactChrome) {
+        addButton(layout, getString(R.string.filter_edit)) { showFilterRules() }
+        addButton(layout, getString(R.string.diagnostics)) { showDiagnostics() }
+        layout.addView(sectionLabel(getString(R.string.section_appearance)))
+        addToggle(layout, getString(R.string.toggle_compact), getString(R.string.toggle_compact_desc), store.compactChrome) {
             store.compactChrome = it; applySettings(reload = false)
         }
-        addToggle(layout, "Dark loading background", "Changes the browser canvas, not the site's theme", store.darkCanvas) {
+        addToggle(layout, getString(R.string.toggle_dark), getString(R.string.toggle_dark_desc), store.darkCanvas) {
             store.darkCanvas = it; applySettings(reload = false)
         }
-        addToggle(layout, "Desktop site mode", "May break responsive web features", store.desktopMode) {
+        addToggle(layout, getString(R.string.toggle_images), getString(R.string.toggle_images_desc), store.reduceImages) {
+            store.reduceImages = it; applySettings(reload = true)
+        }
+        addToggle(layout, getString(R.string.toggle_desktop), getString(R.string.toggle_desktop_desc), store.desktopMode) {
             store.desktopMode = it; applySettings(reload = true)
         }
-        addToggle(layout, "Require gesture to play media", "Prevents some automatic playback", store.mediaRequiresGesture) {
+        addToggle(layout, getString(R.string.toggle_gesture), getString(R.string.toggle_gesture_desc), store.mediaRequiresGesture) {
             store.mediaRequiresGesture = it; applySettings(reload = false)
         }
-        layout.addView(infoLabel("Text scaling: ${store.textZoom}% (75%–175%)"))
+        addToggle(layout, getString(R.string.toggle_resume), getString(R.string.toggle_resume_desc), store.resumePage) {
+            store.resumePage = it
+            if (!it) store.lastVisited = ""
+        }
+        layout.addView(infoLabel(getString(R.string.text_scaling, store.textZoom)))
         val zoomValue = TextView(this).apply { text = "${store.textZoom}%"; setTextColor(ACCENT) }
         layout.addView(zoomValue)
         val zoomBar = SeekBar(this).apply {
@@ -462,13 +524,13 @@ class MainActivity : Activity() {
             })
         }
         layout.addView(zoomBar)
-        layout.addView(sectionLabel("DATA & BACKUPS"))
-        addButton(layout, "Export settings and bookmarks (JSON)") { exportSettings() }
-        addButton(layout, "Import settings and bookmarks (JSON)") { importSettings() }
-        addButton(layout, "Clear WebView cache") { confirmClearCache() }
-        addButton(layout, "Sign out / delete local site data") { confirmClearSiteData() }
-        layout.addView(sectionLabel("ABOUT"))
-        layout.addView(infoLabel("Character Companion v0.2.0 · Android only\nUnofficial client. No Character.AI affiliation, API, bypass of premium features, chat interception or background tasks.\n\nFilter intercepted: ${filter.blockedRequestCount.get()} requests this session."))
+        layout.addView(sectionLabel(getString(R.string.section_data)))
+        addButton(layout, getString(R.string.export_settings)) { exportSettings() }
+        addButton(layout, getString(R.string.import_settings)) { importSettings() }
+        addButton(layout, getString(R.string.clear_cache)) { confirmClearCache() }
+        addButton(layout, getString(R.string.clear_data)) { confirmClearSiteData() }
+        layout.addView(sectionLabel(getString(R.string.section_about)))
+        layout.addView(infoLabel("Character Companion v0.3.0 · Android only\nUnofficial client. No Character.AI affiliation, API, bypass of premium features, chat interception or background tasks.\n\nFilter intercepted: ${filter.blockedRequestCount.get()} requests this session."))
         AlertDialog.Builder(this).setView(scroll).setPositiveButton("Done", null).show()
     }
 
@@ -506,24 +568,25 @@ class MainActivity : Activity() {
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     private fun confirmClearCache() {
-        AlertDialog.Builder(this).setMessage("Delete only the WebView's HTTP cache?")
+        AlertDialog.Builder(this).setMessage(getString(R.string.cache_clear_message))
             .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.confirm) { _, _ -> webView.clearCache(true); showToast("Cache cleared") }
+            .setPositiveButton(R.string.confirm) { _, _ -> webView.clearCache(true); showToast(getString(R.string.cache_cleared)) }
             .show()
     }
     private fun confirmClearSiteData() {
-        AlertDialog.Builder(this).setTitle("Delete local site data?")
-            .setMessage("Cookies, local storage, form data and browsing history will be deleted. Remote Character.AI chats are not deleted.")
+        AlertDialog.Builder(this).setTitle(getString(R.string.data_clear_title))
+            .setMessage(getString(R.string.data_clear_message))
             .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton("Delete") { _, _ ->
+            .setPositiveButton(getString(R.string.delete)) { _, _ ->
                 // Cookie removal is asynchronous. Do not reload before it completes.
                 CookieManager.getInstance().removeAllCookies {
                     runOnUiThread {
                         CookieManager.getInstance().flush()
                         WebStorage.getInstance().deleteAllData()
                         webView.clearCache(true); webView.clearHistory(); webView.clearFormData()
+                        store.lastVisited = ""
                         webView.loadUrl(HOME)
-                        showToast("Local site data cleared")
+                        showToast(getString(R.string.data_cleared))
                     }
                 }
             }.show()
@@ -576,16 +639,18 @@ class MainActivity : Activity() {
             EXPORT_SETTINGS -> if (resultCode == RESULT_OK) data?.data?.let { uri ->
                 try {
                     contentResolver.openOutputStream(uri, "w")?.bufferedWriter()?.use { it.write(store.exportJson()) }
-                    showToast("Settings exported")
-                } catch (_: Exception) { showToast("Export failed") }
+                    showToast(getString(R.string.export_success))
+                } catch (_: Exception) { showToast(getString(R.string.export_failure)) }
             }
             IMPORT_SETTINGS -> if (resultCode == RESULT_OK) data?.data?.let { uri ->
                 try {
-                    val contents = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText().take(200_001) }
+                    val contents = contentResolver.openInputStream(uri)?.bufferedReader()?.use {
+                        BoundedText.read(it, 200_000)
+                    }
                     if (contents != null && store.importJson(contents)) {
-                        applySettings(reload = true); showToast("Settings imported")
-                    } else showToast("Unsupported settings file")
-                } catch (_: Exception) { showToast("Import failed") }
+                        applySettings(reload = true); showToast(getString(R.string.import_success))
+                    } else showToast(getString(R.string.import_unsupported))
+                } catch (_: Exception) { showToast(getString(R.string.import_failure)) }
             }
         }
     }

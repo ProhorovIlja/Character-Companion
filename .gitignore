@@ -9,3 +9,8 @@ local.properties
 *.jks
 *.keystore
 .DS_Store
+
+# Local tool/test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/

@@ -7,6 +7,12 @@ import org.json.JSONObject
 /** Stores only browser shell configuration and user bookmarks, never messages or credentials. */
 class SettingsStore(context: Context) {
     private val prefs = context.getSharedPreferences("character_companion_v2", Context.MODE_PRIVATE)
+    var strictBlocking: Boolean
+        get() = prefs.getBoolean("strict_blocking", false)
+        set(v) = prefs.edit().putBoolean("strict_blocking", v).apply()
+    var reduceImages: Boolean
+        get() = prefs.getBoolean("reduce_images", false)
+        set(v) = prefs.edit().putBoolean("reduce_images", v).apply()
     var blocking: Boolean
         get() = prefs.getBoolean("blocking", true)
         set(v) = prefs.edit().putBoolean("blocking", v).apply()
@@ -22,6 +28,15 @@ class SettingsStore(context: Context) {
     var desktopMode: Boolean
         get() = prefs.getBoolean("desktop_mode", false)
         set(v) = prefs.edit().putBoolean("desktop_mode", v).apply()
+    var resumePage: Boolean
+        get() = prefs.getBoolean("resume_page", false)
+        set(v) = prefs.edit().putBoolean("resume_page", v).apply()
+    var lastVisited: String
+        get() = prefs.getString("last_visited", "").orEmpty().takeIf(UrlPolicy::safeBookmark).orEmpty()
+        set(v) {
+            val sanitized = UrlPolicy.sanitizeBookmark(v).orEmpty()
+            prefs.edit().putString("last_visited", sanitized).apply()
+        }
     var compactChrome: Boolean
         get() = prefs.getBoolean("compact_chrome", false)
         set(v) = prefs.edit().putBoolean("compact_chrome", v).apply()
@@ -47,17 +62,17 @@ class SettingsStore(context: Context) {
         for (i in 0 until data.length()) {
             val entry = data.optJSONObject(i) ?: continue
             val url = entry.optString("url")
-            if (UrlPolicy.safeBookmark(url)) add(entry.optString("title").take(90) to url)
+            UrlPolicy.sanitizeBookmark(url)?.let { add(entry.optString("title").take(90) to it) }
         }
     }
     fun addBookmark(title: String, url: String): Boolean {
-        if (!UrlPolicy.safeBookmark(url)) return false
-        val data = listBookmarks().filterNot { it.second == url }.takeLast(99).toMutableList()
-        data.add(title.take(90).ifBlank { "Character.AI" } to url)
+        val safeUrl = UrlPolicy.sanitizeBookmark(url) ?: return false
+        val data = listBookmarks().filterNot { it.second == safeUrl }.takeLast(99).toMutableList()
+        data.add(title.take(90).ifBlank { "Character.AI" } to safeUrl)
         writeBookmarks(data)
         return true
     }
-    fun removeBookmark(url: String) = writeBookmarks(listBookmarks().filterNot { it.second == url })
+    fun removeBookmark(url: String) = writeBookmarks(listBookmarks().filterNot { it.second == UrlPolicy.sanitizeBookmark(url) })
     private fun writeBookmarks(items: List<Pair<String, String>>) {
         val array = JSONArray()
         items.takeLast(100).forEach { (title, url) ->
@@ -71,10 +86,13 @@ class SettingsStore(context: Context) {
         put("schema", 1)
         put("application", "Character Companion for Android")
         put("blocking", blocking)
+        put("strictBlocking", strictBlocking)
+        put("reduceImages", reduceImages)
         put("thirdPartyCookies", cookies)
         put("mediaRequiresGesture", mediaRequiresGesture)
         put("mediaAllowed", mediaAllowed)
         put("desktopMode", desktopMode)
+        put("resumePage", resumePage)
         put("compactChrome", compactChrome)
         put("darkCanvas", darkCanvas)
         put("textZoom", textZoom)
@@ -94,19 +112,29 @@ class SettingsStore(context: Context) {
         for (i in 0 until minOf(array.length(), 100)) {
             val obj = array.optJSONObject(i) ?: continue
             val u = obj.optString("url")
-            if (UrlPolicy.safeBookmark(u)) saved.add(obj.optString("title").take(90) to u)
+            UrlPolicy.sanitizeBookmark(u)?.let { saved.add(obj.optString("title").take(90) to it) }
         }
-        blocking = parsed.optBoolean("blocking", true)
-        cookies = parsed.optBoolean("thirdPartyCookies", true)
-        mediaRequiresGesture = parsed.optBoolean("mediaRequiresGesture", true)
-        mediaAllowed = parsed.optBoolean("mediaAllowed", false)
-        desktopMode = parsed.optBoolean("desktopMode", false)
-        compactChrome = parsed.optBoolean("compactChrome", false)
-        darkCanvas = parsed.optBoolean("darkCanvas", true)
-        textZoom = parsed.optInt("textZoom", 100)
-        customRules = parsed.optString("customRules").take(12_000)
-        excludeRules = parsed.optString("excludeRules").take(12_000)
-        writeBookmarks(saved)
+        // Publish one atomic preference transaction: a crash cannot leave a half-imported profile.
+        val bookmarkArray = JSONArray()
+        saved.takeLast(100).forEach { (title, url) ->
+            bookmarkArray.put(JSONObject().put("title", title).put("url", url))
+        }
+        prefs.edit()
+            .putBoolean("blocking", parsed.optBoolean("blocking", true))
+            .putBoolean("strict_blocking", parsed.optBoolean("strictBlocking", false))
+            .putBoolean("reduce_images", parsed.optBoolean("reduceImages", false))
+            .putBoolean("third_party_cookies", parsed.optBoolean("thirdPartyCookies", true))
+            .putBoolean("media_gesture", parsed.optBoolean("mediaRequiresGesture", true))
+            .putBoolean("media_allowed", parsed.optBoolean("mediaAllowed", false))
+            .putBoolean("desktop_mode", parsed.optBoolean("desktopMode", false))
+            .putBoolean("resume_page", parsed.optBoolean("resumePage", false))
+            .putBoolean("compact_chrome", parsed.optBoolean("compactChrome", false))
+            .putBoolean("dark_canvas", parsed.optBoolean("darkCanvas", true))
+            .putInt("text_zoom", parsed.optInt("textZoom", 100).coerceIn(75, 175))
+            .putString("custom_rules", parsed.optString("customRules").take(12_000))
+            .putString("exclude_rules", parsed.optString("excludeRules").take(12_000))
+            .putString("bookmarks", bookmarkArray.toString())
+            .apply()
         return true
     }
 }

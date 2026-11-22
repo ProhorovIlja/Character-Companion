@@ -1,6 +1,8 @@
 import dev.caicompanion.app.HostBlocker
 import dev.caicompanion.app.UrlPolicy
 import dev.caicompanion.app.FilterEngine
+import dev.caicompanion.app.BoundedText
+import java.io.StringReader
 
 fun main() {
     val filters = HostBlocker(
@@ -37,6 +39,28 @@ fun main() {
     check(HostBlocker.normalizeRule("-invalid.example") == null)
     check(!UrlPolicy.isTrustedMediaOrigin("https://accounts.google.com"))
     check(UrlPolicy.safeBookmark("https://foo.c.ai/"))
+    check(UrlPolicy.sanitizeBookmark("https://character.ai/chat/abc?char=123#fragment") ==
+        "https://character.ai/chat/abc?char=123")
+    check(UrlPolicy.sanitizeBookmark("https://character.ai/chat/abc?access_token=secret") ==
+        "https://character.ai/chat/abc")
+    check(UrlPolicy.sanitizeBookmark("https://character.ai/chat/abc?c%6fde=123") ==
+        "https://character.ai/chat/abc")
+    check(UrlPolicy.sanitizeBookmark("https://accounts.google.com/?code=123") == null)
+    check(UrlPolicy.sanitizeBookmark("https://character.ai:8443/chat") == null)
+    check(!UrlPolicy.isHttps("https://character.ai:9999/"))
+    check(UrlPolicy.isIdentityUrl("https://accounts.google.com/o/oauth2/auth"))
+    check(!UrlPolicy.isIdentityUrl("https://accounts.google.com.evil.org"))
+    check(BoundedText.read(StringReader("test"), 4) == "test")
+    check(BoundedText.read(StringReader("test"), 3) == null)
+    check(BoundedText.read(StringReader(""), 4) == "")
+    val strictEngine = FilterEngine(listOf("doubleclick.net"), listOf("sentry.io"))
+    check(!strictEngine.shouldBlock("https://sentry.io/"))
+    strictEngine.strict = true
+    strictEngine.replace("", "")
+    check(strictEngine.shouldBlock("https://sentry.io/"))
+    strictEngine.replace("", "sentry.io")
+    check(!strictEngine.shouldBlock("https://sentry.io/"))
+    check(strictEngine.shouldBlock("https://doubleclick.net/"))
     val engine = FilterEngine(listOf("doubleclick.net"))
     check(engine.shouldBlock("https://a.doubleclick.net/x"))
     check(engine.blockedRequestCount.get() == 1L)
@@ -46,5 +70,5 @@ fun main() {
     engine.replace("tracker.test", "a.doubleclick.net")
     check(!engine.shouldBlock("https://a.doubleclick.net/x"))
     check(engine.shouldBlock("https://tracker.test/x"))
-    println("PolicySmoke: 34 assertions passed")
+    println("PolicySmoke: 49 assertions passed")
 }

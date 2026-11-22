@@ -1,13 +1,13 @@
-# Security and privacy
+# Security and privacy model · v0.3.0
 
-The client is a browser shell, **not** a Character.AI API client. It never accepts user passwords in a native form, does not inject JavaScript bridges, doesn't save chat text, and doesn't proxy WebView traffic to a third-party server. HTTPS enforced for top-level navigation and downloads; TLS failures are canceled. All intent and origin handling is defensive, but it has not undergone formal security review.
+The Android client is a native wrapper that loads first-party Character.AI content. No native password form, Character.AI token extraction, private API calls, JS credential bridge, proxy/VPN, analytics SDK, automated tasks or content storage exist. The UI communicates via the official `WebView`; the website remains under Character.AI's control.
 
-Browser data stays in the Android WebView profile. `allowBackup=false` and Android 12+ data extraction rules exclude backups. The system itself or Character.AI may still process data under their own policies. No analytics dependency, scheduled jobs, work manager, wake locks, foreground service or system-wide VPN is used.
-
-The host filter matches exact domains or subdomains. It cannot inspect encrypted app traffic beyond WebView's exposed request URLs; server-side, first-party, WebSocket, blobs and redirect chains can evade it. The conservative bundled rules are not a guarantee that Character.AI or other entities cannot track usage.
-
-Mic and camera are disabled by default and, when enabled, require an in-app confirmation for requests from trusted first-party origins as well as Android runtime permission. Files are selected by Android system picker; downloads are delegated to Android DownloadManager. Cookies are only forwarded to a download for first-party service hosts.
-
-JSON exports include preferences, user-created domain rules and bookmarks, not browser cookies/tokens, chat messages or credentials. Exports are written only when the user chooses a destination; protect those files if bookmarks are sensitive.
-
-Future audit: OAuth and pop-up flows, multiwindow support, WebRTC call compatibility, remote navigation edge cases, Android 16 edge-to-edge/UI layout, actual HTTPS/download authorization and Network Security Config. Never circumvent Google embedded OAuth restrictions by spoofing credentials.
+- **Navigations:** top-level links load in-app only for HTTPS Character.AI/c.ai and a small list of external identity origins. Other HTTPS hosts open in the system browser. HTTP, `intent:`, `javascript:` and `file:` navigation are refused. Standard HTTPS port only. Provider OAuth may still refuse embedded login.
+- **TLS:** SSL handler always cancels certificate errors. Only trusted in-app page TLS errors trigger the full-page overlay; errors in unrelated subresources should not hide a valid chat page.
+- **Media:** mic/camera denied by default. When allowed in settings, require trusted HTTPS origin, confirmation prompt and Android runtime permission for each request. No persistent site-level grants.
+- **Browser:** `allowFileAccess=false`, file-to-file and universal file URLs disabled, no mixed content, safe browsing enabled, no developer WebView debugging.
+- **Filtering:** exact host/subdomain rules. Built-in set has 21 domains; optional strict set has 20 more. Custom rules bounded to 500 lines each; allowlist overrides blocked entries and first-party service hosts cannot be blocked. No subscription circumvention or traffic decryption.
+- **Bookmarks:** only first-party HTTPS URLs; remove fragments and unrecognized query parameters that could include tokens/state codes. JSON settings export does not include chat content, credentials, OAuth state, last page, or cookies.
+- **Import:** read limit 200,000 decoded characters; reject invalid schema; store a complete imported profile using one SharedPreferences edit transaction.
+- **Backup/storage:** application backups disabled in manifest and data-extraction XML. Browser cookies remain in Android WebView storage; manual settings export is user-controlled. Operating system and Character.AI still have their own privacy policies.
+- **Limitations:** other apps/browsers may track independently, server-side first-party ads are not necessarily blocked, and Android WebView vulnerabilities/bugs depend on the installed provider version. No formal security audit or penetration test has been performed.

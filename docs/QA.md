@@ -1,25 +1,29 @@
-# Quality gates · 2026-11-22
+# Quality assurance · 2026-11-22 · v0.3.0
 
-**Offline completed:** XML resource and manifest parse, Android-only package, privacy manifest defaults, absence of scheduled/background jobs, permissions inventory, blocked-host list sanity, pure Kotlin policy + domain-filter smoke tests.
+## Completed in offline environment
 
-**Not completed:** Android/Gradle compilation, Android instrumentation, device UI screenshots, login with Character.AI, Google/Apple OAuth, Android System WebView compatibility, voice calls and microphone/camera, file uploads/downloads, performance/memory profiling, Pixel/Samsung/OEM testing and Google Play policy review.
+- `bash scripts/test-offline.sh` passed: **9 Python structural tests** and **49 Kotlin assertions**.
+- Kotlin checks cover HTTPS and hostname boundaries, rejecting domain spoofing, protected service hosts, strict filter rules/overrides, URL query sanitization, identity URL discrimination, request counts and bounded Reader behavior.
+- Static checks cover XML parsing, RU/EN parity, privacy manifest defaults, no scheduled jobs, HTTPS-only surface, atomic settings import, conservative domain rules and no Javascript bridge.
+- No APK compilation, device profiling or live Character.AI login was possible; an offline unit test **does not establish functional Android compatibility**.
 
-## Manual smoke test matrix
+## Device release gates — NOT completed
 
-1. Android 10, 13, 15, 16 with current Android System WebView: open, navigate, back/forward, home, reload, keyboard, orientation and app resume.
-2. Character.AI unauthenticated pages; sign-in routes including email, Google/Apple; verify no app password collection. If Google SSO fails in WebView, use system browser; **do not claim that its browser login signs the user into WebView**.
-3. Chat typing and history, images, site menus, character search, voice and microphone if available on website. Validate on a real account only with owner's consent.
-4. Enable/disable filter; ensure chat, sign-in and payments still work with static blocklist; test custom exclusions and service-worker resource loads.
-5. Bookmark current URL, open saved URL, remove; export and import JSON through SAF. Reject malformed and oversized files.
-6. Download HTTPS file, upload via document picker. Confirm cookies are not sent to third-party download hosts.
-7. Trigger network failure, bad TLS, renderer death (`chrome://crash` in a dedicated test harness), rotation and low-memory restoration. Confirm no credential leak.
-8. Profile cold-start, RAM after long session, page load times, jank, battery drain and media playback on real phones. No performance claims before measurement.
-9. Accessibility: TalkBack labels, large text, landscape, color contrast, keyboard and navigation buttons.
+1. Build debug APK with Android SDK 36 + AGP 8.13.0 + Kotlin 2.2.0 and check manifest and install on API 29 / 33 / 35 / 36.
+2. Test page load and chat (with a user-owned test account), link navigation, pop-ups, real sign-in, Chat/Character search, history, settings, share and bookmarks. Treat any embedded Google/Apple OAuth failure as a known external limitation, not a bypass target.
+3. Verify voice/audio capabilities *actually exposed by the website*, whether mic permission prompts function, and whether camera prompts are accurate. Never claim mobile app-only functions are available.
+4. Compare baseline blocking, strict blocking and exclusions with site sign-in, downloads, ads, voice and payments. Report the domains that break functionality before increasing the default list.
+5. Use the Android document picker for uploads and JSON imports (including a 1 MiB malformed input), make sure bounded read returns failure without freezing the UI. Test JSON round-trip and rejection of Google OAuth bookmarks.
+6. Trigger network loss, TLS errors and renderer termination; verify recovery and that failures of noncritical third-party assets do not cover the page.
+7. Test Android 15/16 edge-to-edge, portrait/landscape, keyboard resize, Android TalkBack, font scaling, 320dp narrow screens, cutouts, tablets and foldables.
+8. Profile cold start / time-to-interactive, RSS, battery and data use with standard and strict modes on representative hardware. Report measured values with device model, WebView version and network type; no unmeasured claims.
+9. Review release signing, support process, brand/trademark disclosure, app store policies, and dependency supply chain. No automatic release workflows or scheduling permitted.
 
-## Known issues / next fixes
+## Known issues / limitations
 
-- Embedded Google OAuth may be rejected by Google itself (platform restriction).
-- Embedded WebView may lack certain Character.AI native Android features, or render some calls differently.
-- RU/EN base strings are present, advanced dynamic settings labels currently English.
-- Advanced multi-window OAuth and in-page cosmetic ad hiding are intentionally not implemented until compatibility/legal review.
-- Settings dialog native styling and edge-to-edge handling require device-based visual polish.
+- Character.AI can change the website at any time. No public API is available.
+- Google embedded OAuth is frequently blocked by provider policy. External browser login will **not** import cookies into WebView.
+- The official help center identifies Character Calls as a mobile app feature, so browser voice cannot be assumed.
+- Blocklists do not cover in-page first-party ads, WebSockets, encrypted payload contents, redirect destinations or all service-worker behavior; aggressive blocklists can cause regressions.
+- Strict ad/tracker rules and image saving modes are deliberately disabled by default.
+- No screenshot or APK is supplied because an actual device or emulator runtime and SDK are absent.

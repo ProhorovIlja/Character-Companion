@@ -39,6 +39,26 @@ class Structure(unittest.TestCase):
         permissions=set(re.findall(r'android.permission.[A-Z_]+',manifest))
         self.assertEqual(permissions, {'android.permission.INTERNET','android.permission.RECORD_AUDIO','android.permission.CAMERA'})
 
+    def test_import_memory_bound_and_atomicity(self):
+        activity=(ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
+        store=(ROOT/'app/src/main/java/dev/caicompanion/app/SettingsStore.kt').read_text()
+        self.assertIn('BoundedText.read(it, 200_000)', activity)
+        self.assertNotIn('it.readText().take(200_001)', activity)
+        self.assertIn('prefs.edit()\n            .putBoolean("blocking"', store)
+        self.assertIn('UrlPolicy.sanitizeBookmark(u)', store)
+
+    def test_translations_cover_default_strings(self):
+        en=ET.parse(ROOT/'app/src/main/res/values/strings.xml').getroot()
+        ru=ET.parse(ROOT/'app/src/main/res/values-ru/strings.xml').getroot()
+        self.assertEqual({n.attrib.get('name') for n in en.findall('string')},
+                         {n.attrib.get('name') for n in ru.findall('string')})
+
+    def test_strict_rules_do_not_block_service(self):
+        lines=(ROOT/'app/src/main/assets/strict-hosts.txt').read_text().splitlines()
+        rules=[s.strip() for s in lines if s.strip() and not s.startswith('#')]
+        self.assertGreaterEqual(len(rules), 15)
+        self.assertFalse(any('character.ai' in r or 'c.ai' in r for r in rules))
+
     def test_conservative_host_rules(self):
         lines=(ROOT/'app/src/main/assets/blocked-hosts.txt').read_text().splitlines()
         rules=[s.strip() for s in lines if s.strip() and not s.startswith('#')]
