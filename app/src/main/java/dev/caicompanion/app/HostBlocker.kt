@@ -15,7 +15,7 @@ class HostBlocker(
     /** Returns the matched rule for statistics. Never returns full URLs. */
     fun matchedBlockedDomain(rawUrl: String?): String? {
         val host = hostFromUrl(rawUrl) ?: return null
-        if (isServiceHost(host)) return null
+        if (isCriticalHost(host)) return null
         var suffix = host
         var matched: String? = null
         while (true) {
@@ -49,5 +49,9 @@ class HostBlocker(
             host.equals(domain, true) || host.endsWith(".$domain", true)
         fun isServiceHost(host: String): Boolean =
             isDomain(host, "character.ai") || isDomain(host, "c.ai")
+        /** Identity requests must not be broken even by imported third-party lists. */
+        fun isCriticalHost(host: String): Boolean = isServiceHost(host) ||
+            isDomain(host, "accounts.google.com") || isDomain(host, "appleid.apple.com") ||
+            isDomain(host, "id.apple.com")
     }
 }

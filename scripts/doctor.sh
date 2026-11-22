@@ -9,7 +9,9 @@ if command -v java >/dev/null 2>&1; then
 else
   echo 'JAVA_FOUND=NO'; fail=1
 fi
-if command -v gradle >/dev/null 2>&1; then
+if [[ -f gradle/wrapper/gradle-wrapper.jar && -x ./gradlew ]]; then
+  echo 'GRADLE_WRAPPER_FOUND=YES'
+elif command -v gradle >/dev/null 2>&1; then
   echo 'GRADLE_FOUND=YES'
   gradle --version | sed -n '/^Gradle /p' | head -1
 else

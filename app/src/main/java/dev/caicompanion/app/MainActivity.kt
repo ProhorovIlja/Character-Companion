@@ -61,6 +61,7 @@ class MainActivity : Activity() {
         private const val MEDIA_PERMISSION = 702
         private const val EXPORT_SETTINGS = 703
         private const val IMPORT_SETTINGS = 704
+        private const val IMPORT_FILTER_LIST = 705
         private val TEXT = Color.rgb(235, 225, 211)
         private val MUTED = Color.rgb(177, 175, 189)
         private val ACCENT = Color.rgb(201, 169, 113)
@@ -69,6 +70,8 @@ class MainActivity : Activity() {
     private lateinit var webView: WebView
     private lateinit var store: SettingsStore
     private lateinit var filter: FilterEngine
+    private lateinit var importedRuleStore: ImportedRuleStore
+    private var importedRules: RuleListParser.Rules = RuleListParser.Rules()
     private lateinit var container: FrameLayout
     private lateinit var errorOverlay: View
     private lateinit var progress: ProgressBar
@@ -90,11 +93,13 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         WebView.setWebContentsDebuggingEnabled(false)
         store = SettingsStore(this)
+        importedRuleStore = ImportedRuleStore(this)
+        importedRules = importedRuleStore.load()
         val base = assets.open("blocked-hosts.txt").bufferedReader().use { it.readLines() }
         val strictRules = assets.open("strict-hosts.txt").bufferedReader().use { it.readLines() }
         filter = FilterEngine(base, strictRules).also {
             it.enabled = store.blocking; it.strict = store.strictBlocking
-            it.replace(store.customRules, store.excludeRules)
+            it.replace(store.customRules, store.excludeRules, importedRules)
         }
         setContentView(R.layout.activity_main)
         container = findViewById(R.id.web_container)
@@ -538,7 +543,7 @@ class MainActivity : Activity() {
         if (!store.mediaAllowed) denyPendingMedia()
         filter.enabled = store.blocking
         filter.strict = store.strictBlocking
-        filter.replace(store.customRules, store.excludeRules)
+        filter.replace(store.customRules, store.excludeRules, importedRules)
         header.visibility = if (store.compactChrome || fullscreenView != null) View.GONE else View.VISIBLE
         if (::webView.isInitialized) {
             webView.setBackgroundColor(if (store.darkCanvas) Color.rgb(17, 18, 25) else Color.WHITE)
@@ -630,6 +635,11 @@ class MainActivity : Activity() {
             store.mediaAllowed = it
         }
         addButton(layout, getString(R.string.filter_edit)) { showFilterRules() }
+        addButton(layout, getString(R.string.import_filter_list)) { chooseFilterList() }
+        layout.addView(infoLabel(getString(R.string.filter_import_info, importedRules.size)))
+        if (importedRules.size > 0) {
+            addButton(layout, getString(R.string.clear_imported_filter)) { confirmClearImportedList() }
+        }
         addButton(layout, getString(R.string.diagnostics)) { showDiagnostics() }
         addButton(layout, getString(R.string.privacy_stats)) { showPrivacyStats() }
         layout.addView(sectionLabel(getString(R.string.section_appearance)))
@@ -740,6 +750,67 @@ class MainActivity : Activity() {
                 }
             }.show()
     }
+    private fun chooseFilterList() {
+        startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("text/plain", "application/octet-stream"))
+        }, IMPORT_FILTER_LIST)
+    }
+
+    /** Parse a user-selected file off the UI thread. The old list stays in effect until confirmed. */
+    private fun importFilterList(uri: Uri) {
+        Thread({
+            val result = runCatching {
+                val text = contentResolver.openInputStream(uri)?.use { stream ->
+                    stream.bufferedReader(Charsets.UTF_8).use { reader ->
+                        BoundedText.read(reader, RuleListParser.MAX_CHARACTERS)
+                    }
+                } ?: throw IllegalArgumentException("empty or oversized list")
+                RuleListParser.parse(text) ?: throw IllegalArgumentException("unsupported rule list")
+            }
+            runOnUiThread {
+                if (destroyed) return@runOnUiThread
+                result.onSuccess { parsed ->
+                    AlertDialog.Builder(this)
+                        .setTitle(R.string.filter_import_preview_title)
+                        .setMessage(getString(R.string.filter_import_preview,
+                            parsed.blocked.size, parsed.allowed.size, parsed.unsupported))
+                        .setNegativeButton(R.string.cancel, null)
+                        .setPositiveButton(R.string.apply) { _, _ -> saveImportedRules(parsed) }
+                        .show()
+                }.onFailure { showToast(getString(R.string.filter_import_failure)) }
+            }
+        }, "manual-filter-parse").start()
+    }
+
+    /** Save only after explicit approval; AtomicFile preserves the old list if writing fails. */
+    private fun saveImportedRules(parsed: RuleListParser.Rules) {
+        Thread({
+            val saved = runCatching { importedRuleStore.save(parsed) }.isSuccess
+            runOnUiThread {
+                if (destroyed) return@runOnUiThread
+                if (saved) {
+                    importedRules = parsed
+                    applySettings(reload = true)
+                    showToast(getString(R.string.filter_import_success,
+                        parsed.size, parsed.unsupported))
+                } else showToast(getString(R.string.filter_import_failure))
+            }
+        }, "manual-filter-save").start()
+    }
+
+    private fun confirmClearImportedList() {
+        AlertDialog.Builder(this).setMessage(R.string.filter_remove_confirm)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.delete) { _, _ ->
+                importedRuleStore.clear()
+                importedRules = RuleListParser.Rules()
+                applySettings(reload = true)
+                showToast(getString(R.string.filter_removed))
+            }.show()
+    }
+
     private fun exportSettings() {
         startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -804,6 +875,9 @@ class MainActivity : Activity() {
                     contentResolver.openOutputStream(uri, "w")?.bufferedWriter()?.use { it.write(store.exportJson()) }
                     showToast(getString(R.string.export_success))
                 } catch (_: Exception) { showToast(getString(R.string.export_failure)) }
+            }
+            IMPORT_FILTER_LIST -> if (resultCode == RESULT_OK) data?.data?.let { uri ->
+                importFilterList(uri)
             }
             IMPORT_SETTINGS -> if (resultCode == RESULT_OK) data?.data?.let { uri ->
                 try {

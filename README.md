@@ -1,8 +1,17 @@
 # Character Companion — Android
 
-**v0.6.0 source preview · 22 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
+**v0.7.0 source preview · 22 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
 
-**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (17 structural Python tests + 119 Kotlin assertions). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
+**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (20 structural Python tests + 149 Kotlin assertions). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
+
+## v0.7.0 update (22 November 2026)
+
+- User-triggered local import of ad-host blocklists from Android's document picker. Supports bare hostnames, `hosts` entries (`0.0.0.0`/`127.0.0.1`/`::1`) and domain-only Adblock Plus `||host^` / `@@||host^` rules. This is intentionally **not** a full EasyList, cosmetic hiding, regex or URL-path filtering engine.
+- Imports are bounded to 2,000,000 decoded characters, 100,000 lines and 40,000 distinct rules. Unsupported lines are counted and shown before the user confirms replacement. Invalid/oversized files never replace the old list.
+- Rules are canonicalized and saved with Android `AtomicFile` in private local storage. They are **not** exported in the small settings JSON; transfer the original blocklist separately. No auto-updates or remote rule downloads.
+- Filter snapshots are reused when settings do not affect the rules, so dragging the text-size slider no longer rebuilds a large ruleset. First-party Character.AI and core Google/Apple sign-in origins cannot be blocked through imported rules.
+- Complete GitHub repository now includes the official Gradle 8.13 Wrapper binary verified against Gradle's published SHA-256, plus a pinned Gradle distribution SHA-256. The lightweight downloadable source ZIP deliberately omits that binary: clone GitHub for a complete wrapper, or use a verified installed Gradle 8.13.
+- Offline validation: **20 structure tests and 149 standalone Kotlin assertions**. These do not establish a working APK, sign-in or Android device compatibility.
 
 ## v0.6.0 update (22 November 2026)
 
@@ -35,7 +44,7 @@
 | Navigation safety | External-link confirmation, safe share/copy | Background redirects cannot launch external apps; OAuth/account URLs not shared |
 | Fullscreen | Native WebChromeClient HTML-media fullscreen | Website support depends on its own HTML and WebView; device test outstanding |
 | Languages | English / Russian native resources | Website language remains controlled by Character.AI |
-| Blocking | 21 conservative host rules + optional extra 20-host strict mode | User block/allow domains, in-memory per-rule filter stats; strict mode may break widgets |
+| Blocking | 21 conservative host rules + optional extra 20-host strict mode | User block/allow domains, one-off manual hostlist import, in-memory per-rule filter stats; strict mode may break widgets |
 | Service workers | WebView and supported service-worker request interception | Does not block all first-party ads or WebSocket traffic |
 | Privacy | WebView cookies/storage on device, configurable third-party cookies | No application analytics, VPN, device-wide traffic interception or background jobs |
 | Media | Camera/mic denied by default; trusted origin + per-request confirmation | Requires Android runtime permission; site voice support is unverified |
@@ -50,11 +59,11 @@
 
 ## Build (Android Studio)
 
-Requirements: Android Studio compatible with AGP **8.13.0**, JDK **17**, **Android SDK 36**, Gradle **8.13**, Kotlin plugin **2.2.0**, AndroidX WebKit **1.18.0**. Application target is API 36; minimum Android version API 29 (Android 10). All external dependencies are downloaded by the build tool when networking is available. Source does **not** include executable Gradle wrapper binaries or third-party JARs.
+Requirements: Android Studio compatible with AGP **8.13.0**, JDK **17**, **Android SDK 36**, Gradle **8.13**, Kotlin plugin **2.2.0**, AndroidX WebKit **1.18.0**. Application target is API 36; minimum Android version API 29 (Android 10). All external dependencies are downloaded by the build tool when networking is available. The full GitHub repository includes the official verified Gradle 8.13 Wrapper JAR and a POSIX launcher. The lightweight source ZIP omits the binary JAR; use a full GitHub clone or a verified installed Gradle 8.13.
 
-1. Clone/download the repository. Open its root in Android Studio and set Gradle to **8.13** using the IDE or a verified local Gradle distribution. `gradle/wrapper/gradle-wrapper.properties` records the intended distribution, but a `gradlew` executable and wrapper JAR are not shipped.
+1. Clone the **full GitHub repository** (recommended), or extract the source ZIP and supply a local verified Gradle 8.13. The GitHub version includes `gradlew`, `gradle-wrapper.jar` and distribution checksum verification. Open the project root in Android Studio.
 2. Install SDK Platform 36 and required build tools; accept licenses locally. Sync the project.
-3. Select **Build → Build Bundle(s) / APK(s) → Build APK(s)** or run `gradle :app:assembleDebug` with Gradle 8.13 already installed.
+3. Select **Build → Build Bundle(s) / APK(s) → Build APK(s)**, or run `bash scripts/build-apk.sh` manually. With a full clone you can also run `./gradlew --no-daemon :app:assembleDebug`.
 4. **Only after the build succeeds**, the debug APK will normally be at `app/build/outputs/apk/debug/app-debug.apk`. Debug APKs are for personal testing; publish a release only after signed builds and device tests.
 5. Install and verify an updated Android System WebView, then run the checks in [docs/QA.md](docs/QA.md) with a test account and real device.
 
@@ -74,6 +83,7 @@ These checks validate policy logic and source structure, **not** Android compila
 - External link and download confirmation reduces accidental redirects, but a website can still change its markup and flows at any time. Compatibility mode disables domain blocking when troubleshooting.
 - Google OAuth commonly rejects authentication in embedded WebView with `disallowed_useragent`. Opening the site in the system browser is supported, but **system-browser cookies will not transfer to WebView**. We do not spoof OAuth claims or extract tokens.
 - Character Calls are documented by Character.AI as a mobile-app feature; they may not exist on the browser site or work in WebView. This app does not offer independent voice-call capability.
+- Manually imported lists accept only a small domain-rule subset, without cosmetic hiding, path matching or ABP options. Aggressive lists may break chat/CDN dependencies; choose Compatibility mode or remove the import if needed.
 - Domain blocking is best-effort. It does not unlock premium subscriptions, remove all first-party advertisement, interfere with payment/account protections, or rewrite traffic beyond supported WebView interceptors.
 - Use an updated Android System WebView and test after any Character.AI frontend change.
 

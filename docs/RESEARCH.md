@@ -33,3 +33,9 @@ Reasons not to merge arbitrary forks: license obligations, outdated endpoint ass
 - brave/adblock-rust (MPL-2.0): https://github.com/brave/adblock-rust — much more capable engine, but integrating Rust/JNI, maintaining binary ABIs and filters is a separate validated milestone. Not included.
 
 The site itself, not this wrapper, owns account authentication and available chat/call functions. Do not equate complex filter engines with higher reliability: excessive blocking breaks sign-in and chat dependencies. No external source code was merged in this version.
+
+## v0.7 source and supply chain review
+
+- [Gradle 8.13 checksums](https://gradle.org/release-checksums/): the project's wrapper JAR was verified against `81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f`; Gradle ZIP pinned to `20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78`.
+- The wrapper JAR is from `gradle/gradle` release tag `v8.13.0`, Apache-2.0 licensed. No event-driven GitHub workflow was added.
+- [Edsuns/AdblockAndroid](https://github.com/Edsuns/AdblockAndroid), [AmniX/AdBlockedWebView-Android](https://github.com/AmniX/AdBlockedWebView-Android), and [brave/adblock-rust](https://github.com/brave/adblock-rust) remain design references only. The new parser is original, intentionally limited, and does not import upstream licensed filter-engine code.

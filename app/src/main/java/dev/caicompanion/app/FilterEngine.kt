@@ -14,11 +14,30 @@ class FilterEngine(private val defaults: List<String>, private val strictRules: 
     private val statsLock = Any()
     private val counters: MutableMap<String, Long> = mutableMapOf()
 
-    fun replace(customRules: String, exclusions: String) {
-        val newBlocker = HostBlocker(defaults + if (strict) strictRules else emptyList(),
+    private data class RuleConfiguration(
+        val strict: Boolean,
+        val custom: String,
+        val excluded: String,
+        val importedBlocked: Set<String>,
+        val importedAllowed: Set<String>
+    )
+    private var appliedConfiguration: RuleConfiguration? = null
+
+    /** The settings screen calls this frequently; unchanged rules cost no rebuild. */
+    @Synchronized fun replace(
+        customRules: String, exclusions: String,
+        imported: RuleListParser.Rules = RuleListParser.Rules()
+    ) {
+        val configuration = RuleConfiguration(strict, customRules, exclusions,
+            imported.blocked, imported.allowed)
+        if (configuration == appliedConfiguration) return
+        val newBlocker = HostBlocker(
+            defaults + (if (strict) strictRules else emptyList()) + imported.blocked,
             customRules.lineSequence().take(500).toList(),
-            exclusions.lineSequence().take(500).toList())
+            exclusions.lineSequence().take(500).toList() + imported.allowed
+        )
         blocker = newBlocker
+        appliedConfiguration = configuration
     }
 
     fun shouldBlock(url: String): Boolean {

@@ -1,8 +1,8 @@
-# Quality assurance · 2026-11-22 · v0.6.0
+# Quality assurance · 2026-11-22 · v0.7.0
 
 ## Completed in offline environment
 
-- `bash scripts/test-offline.sh` passed: **17 Python structural tests** and **119 Kotlin assertions**.
+- `bash scripts/test-offline.sh` passed: **20 Python structural tests** and **149 Kotlin assertions**.
 - Kotlin checks cover HTTPS and hostname boundaries, rejecting domain spoofing, protected service hosts, strict filter rules/overrides, URL query sanitization, identity URL discrimination, request counts and bounded Reader behavior.
 - Static checks cover XML parsing, RU/EN parity, privacy manifest defaults, no scheduled jobs, HTTPS-only surface, atomic settings import, conservative domain rules and no Javascript bridge.
 - New offline cases cover URL sharing sanitization (including encoded auth paths), four browser profiles, UI code contracts for external-link and download confirmation, fullscreen, permission cleanup, and legacy storage sanitization.
@@ -47,3 +47,12 @@
 - Test process recreation after login navigation and with opt-in resume. No complete WebView navigation state should be restored; no auth URL should be persisted.
 - Test long encoded auth-like path and embedded private search query values do not appear in exported settings or shared links.
 - Monitor API 33/34 predictive-back behavior and IME coexistence on actual hardware.
+
+## v0.7 manual-filter release gates — NOT device-validated
+
+- Import a small hosts list and domain-only ABP subset, verify supported/unsupported preview, then confirm and test blocked resource domains. Cancel must preserve prior rules.
+- Import a malformed list, a >2-million-character file, >100k lines and >40k unique domains; all must fail without replacing prior rules.
+- Test repeated import, rotation during file picker, process death during write and safe atomic recovery. Verify removal retains built-in rules and manual exclusions.
+- Test long sessions and 10k–40k imported rules on a low-memory Android device: measure heap, UI responsiveness and `shouldInterceptRequest` latency. No benchmark claims from offline JVM tests.
+- Verify Character.AI login, chat, image/CDN and WebRTC with filter enabled, then switch to Compatibility mode to troubleshoot. Google OAuth may be blocked independently of filtering.
+- Build using a full clone containing the verified Gradle Wrapper JAR and a local Android SDK 36, then install the resulting APK on a test device.

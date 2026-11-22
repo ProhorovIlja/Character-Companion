@@ -5,6 +5,7 @@ import dev.caicompanion.app.BoundedText
 import dev.caicompanion.app.BrowserProfiles
 import dev.caicompanion.app.SafeFilename
 import dev.caicompanion.app.DownloadPolicy
+import dev.caicompanion.app.RuleListParser
 import dev.caicompanion.app.BrowserProfile
 import java.io.StringReader
 
@@ -154,5 +155,56 @@ fun main() {
     threads.forEach { it.start() }; threads.forEach { it.join() }
     check(concurrent.blockedRequestCount.get() == 1000L)
     check(concurrent.topBlockedRules()[0] == ("ad.test" to 1000L))
+    // A manually imported list is deliberately not a full cosmetic or URL-path adblock engine.
+    val imported = RuleListParser.parse("""
+        ! example list
+        [Adblock Plus 2.0]
+        0.0.0.0 ads.cdn.example
+        ||tracking.example^
+        @@||safe.tracking.example^
+        plain.example
+        ||images.example^${'$'}third-party
+        example.org##.ad-banner
+        ||accounts.google.com^
+        ||character.ai^
+    """.trimIndent())!!
+    check(imported.blocked == setOf("ads.cdn.example", "tracking.example", "plain.example"))
+    check(imported.allowed == setOf("safe.tracking.example"))
+    check(imported.unsupported == 4)
+    check(imported.size == 4)
+    check(RuleListParser.parse(imported.canonicalText())!!.blocked == imported.blocked)
+    check(RuleListParser.parse(imported.canonicalText())!!.allowed == imported.allowed)
+    check(RuleListParser.parse("||bad.example^")!!.blocked == setOf("bad.example"))
+    check(RuleListParser.parse("@@||bad.example^")!!.allowed == setOf("bad.example"))
+    check(RuleListParser.parse("0.0.0.0 localhost") == null)
+    check(RuleListParser.parse("0.0.0.0\tspam.example")!!.blocked == setOf("spam.example"))
+    check(RuleListParser.parse("::1\tspam2.example")!!.blocked == setOf("spam2.example"))
+    check(RuleListParser.parse("0.0.0.0 spam.example another.example") == null)
+    check(RuleListParser.parse("@@||accounts.google.com^") == null)
+    check(RuleListParser.parse("||character.ai^") == null)
+    check(RuleListParser.parse("||c.ai^") == null)
+    check(RuleListParser.parse("https://ads.example/path") == null)
+    check(RuleListParser.parse("example.org##.ad") == null)
+    check(RuleListParser.parse("||a.example^\n".repeat(RuleListParser.MAX_LINES + 1)) == null)
+    check(RuleListParser.parse("x".repeat(RuleListParser.MAX_CHARACTERS + 1)) == null)
+    check(RuleListParser.parse("||ex.example^\n".repeat(3))!!.size == 1)
+    // Oversized rulesets fail as a whole rather than silently truncating protection.
+    val hugeRules = buildString {
+        for (i in 1..RuleListParser.MAX_DOMAINS + 1) append("host$i.example\n")
+    }
+    check(RuleListParser.parse(hugeRules) == null)
+    val importedEngine = FilterEngine(listOf("doubleclick.net"))
+    importedEngine.replace("", "", imported)
+    check(importedEngine.shouldBlock("https://tracking.example/banner"))
+    check(!importedEngine.shouldBlock("https://safe.tracking.example/banner"))
+    check(importedEngine.shouldBlock("https://ads.cdn.example/banner"))
+    check(importedEngine.shouldBlock("https://cdn.plain.example/"))
+    check(!importedEngine.shouldBlock("https://accounts.google.com/auth"))
+    check(!importedEngine.shouldBlock("https://character.ai/login"))
+    importedEngine.replace("", "", imported) // same config: cache must preserve rules/statistics
+    check(importedEngine.blockedRequestCount.get() == 3L)
+    importedEngine.replace("", "")
+    check(!importedEngine.shouldBlock("https://tracking.example/banner"))
+    check(importedEngine.shouldBlock("https://doubleclick.net/x"))
     println("PolicySmoke: browser policy, concurrency, URL safety and local statistics assertions passed")
 }

@@ -108,4 +108,13 @@
     <string name="close">Close</string>
     <string name="download_url_rejected">This link cannot be downloaded safely. Use the website in a trusted browser.</string>
     <string name="download_browser_only_message">This download URL may contain sign-in details or a time-limited signature. For privacy, the system downloader will not receive it. Open it in your browser instead?</string>
+    <string name="import_filter_list">Import a filter list from a file</string>
+    <string name="filter_import_info">Imported: %1$d domains · local only; not included in settings JSON. Supports hosts, bare domains and domain-only ||domain^ rules. Maximum 2 million characters / 40,000 domains. Unsupported syntax is skipped; never automatically updated.</string>
+    <string name="clear_imported_filter">Remove imported filter list</string>
+    <string name="filter_import_success">Imported %1$d rules · skipped %2$d unsupported</string>
+    <string name="filter_import_failure">List is invalid, unsupported or too large. Existing rules are unchanged.</string>
+    <string name="filter_remove_confirm">Remove the manually imported domain list? Built-in rules and your custom exceptions will remain.</string>
+    <string name="filter_removed">Imported domain list removed</string>
+    <string name="filter_import_preview_title">Review imported rules</string>
+    <string name="filter_import_preview">Block: %1$d domains\nAllow: %2$d domains\nUnsupported/skipped: %3$d\n\nOnly domain rules are supported, not cosmetic or URL-path filters. Large or aggressive lists may break site features. Apply this list and replace the previous imported list?</string>
 </resources>

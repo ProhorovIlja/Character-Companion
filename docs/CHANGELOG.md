@@ -1,3 +1,10 @@
+# v0.7.0 — 2026-11-22 (source only)
+
+- Added bounded manual ad-host list import, preview, exceptions and atomic on-device storage; no automatic subscriptions. Supports hosts and simple Adblock Plus domain rules only.
+- Cached filter rule snapshots to avoid unnecessary rebuilds during UI-only settings changes. Protected key identity service hosts.
+- Added verified official Gradle 8.13 Wrapper binary on GitHub, manual POSIX launcher and pinned distribution checksum; lightweight ZIP omits wrapper JAR.
+- 20 Python structural tests and 149 Kotlin policy assertions pass offline. No Android APK compiled or device-validated.
+
 # Changelog
 
 ## v0.6.0 — 2026-11-22 (source only)

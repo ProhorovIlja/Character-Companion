@@ -137,6 +137,42 @@ class Structure(unittest.TestCase):
         self.assertIn('uri.rawQuery != null', policy)
         self.assertIn('Kind.BROWSER_ONLY', policy)
 
+    def test_manual_filter_import_is_user_initiated_and_bounded(self):
+        java = ROOT/'app/src/main/java/dev/caicompanion/app'
+        parser = (java/'RuleListParser.kt').read_text()
+        store = (java/'ImportedRuleStore.kt').read_text()
+        activity = (java/'MainActivity.kt').read_text()
+        engine = (java/'FilterEngine.kt').read_text()
+        script = (ROOT/'scripts/test-offline.sh').read_text()
+        self.assertIn('MAX_CHARACTERS = 2_000_000', parser)
+        self.assertIn('MAX_DOMAINS = 40_000', parser)
+        self.assertIn('MAX_LINES = 100_000', parser)
+        self.assertIn('AtomicFile', store)
+        self.assertIn('file.finishWrite(stream)', store)
+        self.assertIn('file.failWrite(stream)', store)
+        self.assertIn('BoundedText.read(reader, RuleListParser.MAX_CHARACTERS)', activity)
+        self.assertIn('IMPORT_FILTER_LIST ->', activity)
+        self.assertIn('if (configuration == appliedConfiguration) return', engine)
+        self.assertIn('RuleListParser}.kt', script)
+        self.assertNotIn('https://easylist.to/easylist/easylist.txt', activity)
+        self.assertNotIn('PeriodicWorkRequest', activity)
+
+    def test_filter_never_blocks_critical_service_or_identity_hosts(self):
+        blocker = (ROOT/'app/src/main/java/dev/caicompanion/app/HostBlocker.kt').read_text()
+        self.assertIn('isCriticalHost(host)', blocker)
+        self.assertIn('accounts.google.com', blocker)
+        self.assertIn('appleid.apple.com', blocker)
+
+    def test_manual_verified_gradle_wrapper_distribution(self):
+        props=(ROOT/'gradle/wrapper/gradle-wrapper.properties').read_text()
+        provenance=(ROOT/'gradle/wrapper/PROVENANCE.md').read_text()
+        launcher=(ROOT/'gradlew').read_text()
+        self.assertIn('gradle-8.13-bin.zip',props)
+        self.assertIn('distributionSha256Sum=20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78',props)
+        self.assertIn('81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f',provenance)
+        self.assertIn('org.gradle.wrapper.GradleWrapperMain',launcher)
+        self.assertFalse((ROOT/'.github/workflows').exists())
+
     def test_conservative_host_rules(self):
         lines=(ROOT/'app/src/main/assets/blocked-hosts.txt').read_text().splitlines()
         rules=[s.strip() for s in lines if s.strip() and not s.startswith('#')]

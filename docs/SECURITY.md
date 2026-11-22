@@ -1,4 +1,4 @@
-# Security and privacy model · v0.6.0
+# Security and privacy model · v0.7.0
 
 The Android client is a native wrapper that loads first-party Character.AI content. No native password form, Character.AI token extraction, private API calls, JS credential bridge, proxy/VPN, analytics SDK, automated tasks or content storage exist. The UI communicates via the official `WebView`; the website remains under Character.AI's control.
 
@@ -35,3 +35,11 @@ The Android client is a native wrapper that loads first-party Character.AI conte
 - The browser never enables `content://` access. User-selected file picker handles are processed by the Android platform, not by exposing local files to arbitrary remote HTML.
 - No `WebView.saveState()` data is written into Activity Bundles. Restoring browser history would persist URLs that may contain login tokens; optional resume persists only sanitized first-party content routes.
 - Android back navigation is handled on API 33+ through the platform back dispatcher, unregistered when the Activity is destroyed.
+
+## v0.7 manual domain-list ingestion
+
+- Import begins only when the user selects a file through Android SAF; no remote fetches, subscriptions, scheduled refreshes or telemetry. The app supports only simple hostname rules, not full EasyList syntax.
+- Bounded input and number of lines/domains; parse and validate before persisting. Unsupported lines are counted and previewed. AtomicFile replaces a complete list or preserves the prior list after write failure.
+- Stored domains are private app data and excluded from the settings JSON; import the original file on a new device if wanted. No chat or login content is read.
+- The first-party service and key identity domains are protected against accidental blocking, but additional website functionality can still break with aggressive third-party rules. Use Compatibility mode to diagnose.
+- The Gradle Wrapper JAR in GitHub is copied from official Gradle v8.13.0 and SHA-256 checked against the upstream release checksum listing; the Gradle distribution download is also checksum-pinned.
