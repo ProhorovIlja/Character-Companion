@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.4.0 — 2026-11-22 (source only)
+
+- Security: sanitized URL sharing, copying and external-browser opening. Reject account, authorization, callback and session paths. No third-party URL is exported accidentally.
+- Security: sanitize even legacy stored bookmarks at JSON export, and sanitize older last-visited preferences at read time. Renderer recovery uses sanitized first-party URLs.
+- Navigation: explicit user confirmation for third-party links and HTTPS downloads. Background redirects cannot silently launch an external app.
+- Media: HTML fullscreen handling in WebChromeClient, status bar fullscreen flag, back navigation and teardown. Revoke outstanding microphone/camera requests when navigation changes.
+- Convenience: four one-tap, atomic browser profiles (balanced, compatibility, private, data saver) without clearing existing bookmarks/accounts.
+- Manual build readiness: read-only `scripts/doctor.sh` that reports Java, Gradle, Android SDK 36 and adb. No CI, background checks, automatic tasks or event triggers.
+- Expanded security and translation tests to 12 Python structural tests + 64 Kotlin policy assertions. No APK was compiled or run on an Android device.
+
+
 ## v0.3.0 — 2026-11-22 (source only)
 
 - Android-only: no Windows components or service proxy.

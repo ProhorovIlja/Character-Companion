@@ -7,6 +7,10 @@ import java.util.Locale
 object UrlPolicy {
     private val identityHosts = listOf("accounts.google.com", "appleid.apple.com", "id.apple.com")
     // Only stable, content-oriented query parameters may be persisted with a bookmark.
+    // Login and account routes must never become shareable, bookmarkable or resumable.
+    private val sensitivePathParts = setOf("oauth", "authorize", "auth", "login", "signin",
+        "sign-in", "callback", "verify", "token", "session", "logout", "reset-password",
+        "account", "settings", "api", "password")
     private val bookmarkQueryKeys = setOf("char", "id", "q", "query", "search", "page", "tab", "sort", "view", "filter")
 
     private fun parsedHttps(url: String?): URI? {
@@ -36,7 +40,11 @@ object UrlPolicy {
     /** Do not persist OAuth redirects, fragments, account-provider URLs or unknown query fields. */
     fun sanitizeBookmark(url: String?): String? {
         val uri = parsedHttps(url) ?: return null
-        if (!HostBlocker.isServiceHost(uri.host)) return null
+        if (!HostBlocker.isServiceHost(uri.host) || (url?.length ?: 0) > 4096) return null
+        val decodedPath = uri.path.orEmpty()
+        if (decodedPath.length > 1500 || decodedPath.split('/').any {
+                it.lowercase(Locale.ROOT) in sensitivePathParts
+            }) return null
         val query = uri.rawQuery?.takeIf { raw ->
             raw.length <= 1024 && raw.split('&').all { item ->
                 val key = item.substringBefore('=')
@@ -50,4 +58,7 @@ object UrlPolicy {
     }
 
     fun safeBookmark(url: String?): Boolean = sanitizeBookmark(url) != null
+
+    /** Share/copy only a sanitized first-party content link, never OAuth or session URLs. */
+    fun safeShareUrl(url: String?): String? = sanitizeBookmark(url)
 }

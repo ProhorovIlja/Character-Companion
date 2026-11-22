@@ -84,4 +84,17 @@
     <string name="footer_share">↗\nСсылка</string>
     <string name="footer_filter">◈\nЗащита</string>
     <string name="footer_settings">⚙\nОпции</string>
+    <string name="external_link_title">Покинуть Character.AI?</string>
+    <string name="external_link_message">Открыть внешний сайт %1$s в другом браузере? Проверьте адрес перед вводом данных.</string>
+    <string name="link_unavailable">Этой страницей нельзя безопасно поделиться.</string>
+    <string name="download_confirm_title">Скачать файл?</string>
+    <string name="download_confirm_message">Скачать %1$s с сайта %2$s?</string>
+    <string name="section_profiles">БЫСТРЫЕ ПРОФИЛИ</string>
+    <string name="profile_title">Выбрать профиль подключения</string>
+    <string name="profile_desc">Баланс, совместимость, приватность или экономия трафика. Меняет только настройки браузера; не удаляет вход и закладки.</string>
+    <string name="profile_balanced">Баланс · обычная работа</string>
+    <string name="profile_compatibility">Совместимость · минимум блокировок</string>
+    <string name="profile_private">Приватность · строгая фильтрация</string>
+    <string name="profile_data_saver">Экономия · без изображений</string>
+    <string name="profile_applied">Применён профиль: %1$s</string>
 </resources>

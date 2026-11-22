@@ -22,3 +22,14 @@ Reasons not to merge arbitrary forks: license obligations, outdated endpoint ass
 - [AndroidX WebKit release notes](https://developer.android.com/jetpack/androidx/releases/webkit): version 1.18.0 is stable as of 2026-11-18; avoid unverified alpha-only features.
 - [Kotlin compatibility](https://kotlinlang.org/docs/gradle-configure-project.html) and [Android AGP 8.13](https://developer.android.com/build/releases/agp-8-13-0-release-notes): retained tested-in-documentation dependency family pending actual compilation.
 - GitHub survey covered `Edsuns/AdblockAndroid`, `brave/adblock-rust` and Android WebView ad-block browsers. A full third-party filter engine is deferred: license compliance, native binary size, rule-list updates and WebView/API breakage need proof of benefit in device tests. **No third-party implementation code was copied.**
+
+## November 2026 comparison (v0.4)
+
+- AndroidX WebKit stable 1.18.0 (2026-11-18): https://developer.android.com/jetpack/androidx/releases/webkit
+- WebChromeClient fullscreen / permission APIs: https://developer.android.com/reference/android/webkit/WebChromeClient
+- WebViewClient navigation callbacks: https://developer.android.com/reference/android/webkit/WebViewClient
+- Edsuns/AdblockAndroid (LGPL-2.1): https://github.com/Edsuns/AdblockAndroid — EasyList/AdGuard syntax but adds a native C++ integration and distribution obligations. Evaluated; not copied.
+- AmniX/AdBlockedWebView-Android (MIT): https://github.com/AmniX/AdBlockedWebView-Android — legacy wrapper; not copied because current core APIs are preferable.
+- brave/adblock-rust (MPL-2.0): https://github.com/brave/adblock-rust — much more capable engine, but integrating Rust/JNI, maintaining binary ABIs and filters is a separate validated milestone. Not included.
+
+The site itself, not this wrapper, owns account authentication and available chat/call functions. Do not equate complex filter engines with higher reliability: excessive blocking breaks sign-in and chat dependencies. No external source code was merged in this version.

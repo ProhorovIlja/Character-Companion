@@ -13,6 +13,7 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.view.WindowInsets
+import android.view.WindowManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.os.Bundle
@@ -78,6 +79,8 @@ class MainActivity : Activity() {
     private var lastUrl = HOME
     private var defaultAgent = ""
     private var pendingMediaResources: Array<String> = emptyArray()
+    private var fullscreenView: View? = null
+    private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
     private var destroyed = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -122,7 +125,7 @@ class MainActivity : Activity() {
         root.viewTreeObserver.addOnGlobalLayoutListener {
             val visible = android.graphics.Rect().also { root.getWindowVisibleDisplayFrame(it) }
             val keyboardVisible = root.rootView.height - visible.bottom > 180 * resources.displayMetrics.density
-            footer.visibility = if (keyboardVisible) View.GONE else View.VISIBLE
+            footer.visibility = if (keyboardVisible || fullscreenView != null) View.GONE else View.VISIBLE
         }
         if (savedInstanceState == null || webView.restoreState(savedInstanceState) == null) {
             lastUrl = if (store.resumePage) store.lastVisited.ifBlank { HOME } else HOME
@@ -165,7 +168,8 @@ class MainActivity : Activity() {
                 if (url == "about:blank") return false
                 if (!UrlPolicy.isHttps(url)) return true
                 if (UrlPolicy.isInternal(url)) return false
-                openExternal(url)
+                // Never launch an external application from a background redirect.
+                if (request.hasGesture()) confirmExternalNavigation(url)
                 return true
             }
             override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest): WebResourceResponse? {
@@ -173,8 +177,10 @@ class MainActivity : Activity() {
                 return filterResponse(request.url.toString())
             }
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                // WebRTC grants are scoped to the page that requested them, not its successor.
+                denyPendingMedia()
                 errorOverlay.visibility = View.GONE
-                if (UrlPolicy.isInternal(url)) lastUrl = url!!
+                lastUrl = UrlPolicy.sanitizeBookmark(url) ?: HOME
                 status.setText(R.string.status_loading)
             }
             override fun onPageFinished(view: WebView?, url: String?) {
@@ -198,8 +204,8 @@ class MainActivity : Activity() {
             override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
                 // Old WebView is unusable. Replace it; don't crash the whole application.
                 if (destroyed) return true
-                pendingMedia?.deny()
-                pendingMedia = null
+                denyPendingMedia()
+                leaveFullscreen()
                 chooser?.onReceiveValue(null)
                 chooser = null
                 val index = container.indexOfChild(view)
@@ -215,9 +221,13 @@ class MainActivity : Activity() {
             }
         }
         view.webChromeClient = object : WebChromeClient() {
+            override fun onShowCustomView(customView: View, callback: CustomViewCallback) {
+                enterFullscreen(customView, callback)
+            }
+            override fun onHideCustomView() { leaveFullscreen() }
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                 progress.progress = newProgress
-                progress.visibility = if (newProgress in 0..99) View.VISIBLE else View.GONE
+                progress.visibility = if (newProgress in 0..99 && fullscreenView == null) View.VISIBLE else View.GONE
                 refreshBackForward()
             }
             override fun onReceivedTitle(view: WebView?, title: String?) {
@@ -227,7 +237,10 @@ class MainActivity : Activity() {
                 requestMediaPermission(request)
             }
             override fun onPermissionRequestCanceled(request: PermissionRequest) = runOnUiThread {
-                if (pendingMedia === request) pendingMedia = null
+                if (pendingMedia === request) {
+                    pendingMedia = null
+                    pendingMediaResources = emptyArray()
+                }
             }
             override fun onShowFileChooser(
                 webView: WebView?, filePathCallback: ValueCallback<Array<Uri>>?,
@@ -250,6 +263,20 @@ class MainActivity : Activity() {
         view.setDownloadListener(DownloadListener { url, agent, disposition, mime, _ ->
             if (!UrlPolicy.isHttps(url)) return@DownloadListener
             val safeUrl = url ?: return@DownloadListener
+            val name = URLUtil.guessFileName(safeUrl, disposition, mime)
+                .replace(Regex("[\\\\/:*?\"<>|]"), "_").take(100)
+            val host = Uri.parse(safeUrl).host ?: return@DownloadListener
+            AlertDialog.Builder(this)
+                .setTitle(R.string.download_confirm_title)
+                .setMessage(getString(R.string.download_confirm_message, name, host))
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.confirm) { _, _ ->
+                    enqueueDownload(safeUrl, agent, disposition, mime)
+                }.show()
+        })
+    }
+
+    private fun enqueueDownload(safeUrl: String, agent: String?, disposition: String?, mime: String?) {
             try {
                 val uri = Uri.parse(safeUrl)
                 val filename = URLUtil.guessFileName(safeUrl, disposition, mime)
@@ -267,7 +294,35 @@ class MainActivity : Activity() {
                 (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
                 showToast(getString(R.string.download_requested))
             } catch (_: Exception) { showToast(getString(R.string.error_download)) }
-        })
+    }
+
+    private fun enterFullscreen(customView: View, callback: WebChromeClient.CustomViewCallback) {
+        if (fullscreenView != null || destroyed) {
+            callback.onCustomViewHidden()
+            return
+        }
+        fullscreenView = customView
+        fullscreenCallback = callback
+        window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
+        container.addView(customView, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        webView.visibility = View.GONE
+        errorOverlay.visibility = View.GONE
+        progress.visibility = View.GONE
+        header.visibility = View.GONE
+        footer.visibility = View.GONE
+    }
+
+    private fun leaveFullscreen() {
+        val current = fullscreenView ?: return
+        container.removeView(current)
+        fullscreenView = null
+        runCatching { fullscreenCallback?.onCustomViewHidden() }
+        fullscreenCallback = null
+        window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
+        webView.visibility = View.VISIBLE
+        header.visibility = if (store.compactChrome || fullscreenView != null) View.GONE else View.VISIBLE
+        footer.visibility = View.VISIBLE
     }
 
     private fun desktopAgent(): String = defaultAgent.replace(Regex("\\([^)]*\\)"), "(X11; Linux x86_64)")
@@ -313,6 +368,10 @@ class MainActivity : Activity() {
             .setNegativeButton(R.string.cancel) { _, _ -> denyPendingMedia() }
             .setOnCancelListener { denyPendingMedia() }
             .setPositiveButton(R.string.confirm) { _, _ ->
+                if (pendingMedia !== request || !UrlPolicy.isTrustedMediaOrigin(webView.url)) {
+                    denyPendingMedia()
+                    return@setPositiveButton
+                }
                 val needed = mutableListOf<String>()
                 if (microphone && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED)
                     needed.add(Manifest.permission.RECORD_AUDIO)
@@ -334,7 +393,9 @@ class MainActivity : Activity() {
         val camera = pendingMediaResources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE)
         val permissionOk = (!microphone || checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) &&
             (!camera || checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
-        if (permissionOk && store.mediaAllowed && UrlPolicy.isTrustedMediaOrigin(request.origin.toString()))
+        if (permissionOk && store.mediaAllowed &&
+            UrlPolicy.isTrustedMediaOrigin(request.origin.toString()) &&
+            UrlPolicy.isTrustedMediaOrigin(webView.url))
             request.grant(pendingMediaResources) else request.deny()
         pendingMedia = null
         pendingMediaResources = emptyArray()
@@ -345,7 +406,9 @@ class MainActivity : Activity() {
         findViewById<View>(R.id.forward).setOnClickListener { if (webView.canGoForward()) webView.goForward() }
         findViewById<View>(R.id.reload).setOnClickListener { webView.reload() }
         findViewById<View>(R.id.home).setOnClickListener { webView.loadUrl(HOME) }
-        findViewById<View>(R.id.open_browser).setOnClickListener { openExternal(webView.url ?: HOME) }
+        findViewById<View>(R.id.open_browser).setOnClickListener {
+            openExternal(UrlPolicy.safeShareUrl(webView.url) ?: HOME)
+        }
         findViewById<View>(R.id.share).setOnClickListener { sharePage() }
         findViewById<View>(R.id.share).setOnLongClickListener { copyPageLink(); true }
         findViewById<View>(R.id.reload).setOnLongClickListener {
@@ -363,6 +426,17 @@ class MainActivity : Activity() {
         findViewById<View>(R.id.error_retry).setOnClickListener { errorOverlay.visibility = View.GONE; webView.loadUrl(lastUrl) }
     }
 
+    private fun confirmExternalNavigation(url: String) {
+        if (!UrlPolicy.isHttps(url)) return
+        val host = Uri.parse(url).host ?: return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.external_link_title)
+            .setMessage(getString(R.string.external_link_message, host))
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.open_browser) { _, _ -> openExternal(url) }
+            .show()
+    }
+
     private fun openExternal(url: String) {
         if (!UrlPolicy.isHttps(url)) return
         try {
@@ -371,7 +445,8 @@ class MainActivity : Activity() {
         } catch (_: ActivityNotFoundException) { showToast(getString(R.string.error_browser)) }
     }
     private fun copyPageLink() {
-        val url = webView.url?.takeIf(UrlPolicy::isHttps) ?: HOME
+        val url = UrlPolicy.safeShareUrl(webView.url)
+        if (url == null) { showToast(getString(R.string.link_unavailable)); return }
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("Character Companion link", url))
         showToast(getString(R.string.link_copied))
@@ -389,7 +464,8 @@ class MainActivity : Activity() {
             .setPositiveButton(R.string.confirm, null).show()
     }
     private fun sharePage() {
-        val url = webView.url?.takeIf(UrlPolicy::isHttps) ?: HOME
+        val url = UrlPolicy.safeShareUrl(webView.url)
+        if (url == null) { showToast(getString(R.string.link_unavailable)); return }
         startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"; putExtra(Intent.EXTRA_TEXT, url)
         }, getString(R.string.share)))
@@ -412,10 +488,11 @@ class MainActivity : Activity() {
     private fun showToast(message: String) = Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
 
     private fun applySettings(reload: Boolean) {
+        if (!store.mediaAllowed) denyPendingMedia()
         filter.enabled = store.blocking
         filter.strict = store.strictBlocking
         filter.replace(store.customRules, store.excludeRules)
-        header.visibility = if (store.compactChrome) View.GONE else View.VISIBLE
+        header.visibility = if (store.compactChrome || fullscreenView != null) View.GONE else View.VISIBLE
         if (::webView.isInitialized) {
             webView.setBackgroundColor(if (store.darkCanvas) Color.rgb(17, 18, 25) else Color.WHITE)
             webView.settings.textZoom = store.textZoom
@@ -470,10 +547,28 @@ class MainActivity : Activity() {
             }.show()
     }
 
+    private fun showProfiles() {
+        val titles = arrayOf(
+            getString(R.string.profile_balanced), getString(R.string.profile_compatibility),
+            getString(R.string.profile_private), getString(R.string.profile_data_saver)
+        )
+        val profiles = BrowserProfile.entries
+        AlertDialog.Builder(this).setTitle(R.string.profile_title)
+            .setSingleChoiceItems(titles, -1) { dialog, position ->
+                store.applyProfile(profiles[position])
+                applySettings(reload = true)
+                showToast(getString(R.string.profile_applied, titles[position]))
+                dialog.dismiss()
+            }.setNegativeButton(R.string.cancel, null).show()
+    }
+
     private fun showSettings() {
         val scroll = ScrollView(this).apply { setBackgroundColor(Color.rgb(21,22,30)) }
         val layout = settingsColumn()
         scroll.addView(layout)
+        layout.addView(sectionLabel(getString(R.string.section_profiles)))
+        addButton(layout, getString(R.string.profile_title)) { showProfiles() }
+        layout.addView(infoLabel(getString(R.string.profile_desc)))
         layout.addView(sectionLabel(getString(R.string.section_privacy)))
         addToggle(layout, getString(R.string.toggle_filter), getString(R.string.toggle_filter_desc), store.blocking) {
             store.blocking = it; applySettings(reload = true)
@@ -530,7 +625,7 @@ class MainActivity : Activity() {
         addButton(layout, getString(R.string.clear_cache)) { confirmClearCache() }
         addButton(layout, getString(R.string.clear_data)) { confirmClearSiteData() }
         layout.addView(sectionLabel(getString(R.string.section_about)))
-        layout.addView(infoLabel("Character Companion v0.3.0 · Android only\nUnofficial client. No Character.AI affiliation, API, bypass of premium features, chat interception or background tasks.\n\nFilter intercepted: ${filter.blockedRequestCount.get()} requests this session."))
+        layout.addView(infoLabel("Character Companion v0.4.0 · Android only\nUnofficial client. No Character.AI affiliation, API, bypass of premium features, chat interception or background tasks.\n\nFilter intercepted: ${filter.blockedRequestCount.get()} requests this session."))
         AlertDialog.Builder(this).setView(scroll).setPositiveButton("Done", null).show()
     }
 
@@ -607,7 +702,9 @@ class MainActivity : Activity() {
 
     @Deprecated("Compatibility with Android framework navigation")
     override fun onBackPressed() {
-        if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
+        if (fullscreenView != null) leaveFullscreen()
+        else if (webView.canGoBack()) webView.goBack()
+        else super.onBackPressed()
     }
     override fun onSaveInstanceState(outState: Bundle) {
         webView.saveState(outState)
@@ -621,7 +718,8 @@ class MainActivity : Activity() {
     override fun onResume() { super.onResume(); webView.onResume() }
     override fun onDestroy() {
         destroyed = true
-        pendingMedia?.deny(); pendingMedia = null
+        leaveFullscreen()
+        denyPendingMedia()
         chooser?.onReceiveValue(null); chooser = null
         container.removeView(webView)
         webView.destroy()

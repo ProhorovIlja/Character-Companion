@@ -84,4 +84,17 @@
     <string name="footer_share">↗\nShare</string>
     <string name="footer_filter">◈\nShield</string>
     <string name="footer_settings">⚙\nSettings</string>
+    <string name="external_link_title">Leave Character.AI?</string>
+    <string name="external_link_message">Open the external website %1$s in another browser? Verify the address before entering any information.</string>
+    <string name="link_unavailable">This page cannot be shared safely.</string>
+    <string name="download_confirm_title">Download this file?</string>
+    <string name="download_confirm_message">Download %1$s from %2$s?</string>
+    <string name="section_profiles">QUICK PROFILES</string>
+    <string name="profile_title">Choose a connection profile</string>
+    <string name="profile_desc">Balanced, compatibility, privacy and data-saving options. Changes only browser settings; does not erase logins or bookmarks.</string>
+    <string name="profile_balanced">Balanced · regular browsing</string>
+    <string name="profile_compatibility">Compatibility · avoid blocked resources</string>
+    <string name="profile_private">Private · strict filtering / fewer cookies</string>
+    <string name="profile_data_saver">Low data · skip images</string>
+    <string name="profile_applied">Profile applied: %1$s</string>
 </resources>

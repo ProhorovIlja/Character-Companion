@@ -16,6 +16,18 @@ class Structure(unittest.TestCase):
         self.assertTrue((ROOT/'app/build.gradle.kts').exists())
         self.assertFalse((ROOT/'src/windows').exists())
 
+    def test_android_resource_references(self):
+        # Catch unresolved string and ID names before a full Android SDK build.
+        sources = '\n'.join(p.read_text() for p in (ROOT/'app/src/main/java').rglob('*.kt'))
+        strings_xml = ET.parse(ROOT/'app/src/main/res/values/strings.xml').getroot()
+        defined_strings = {node.attrib['name'] for node in strings_xml.findall('string')}
+        missing_strings = set(re.findall(r'R\.string\.([A-Za-z0-9_]+)', sources)) - defined_strings
+        self.assertEqual(missing_strings, set())
+        layout = (ROOT/'app/src/main/res/layout/activity_main.xml').read_text()
+        defined_ids = set(re.findall(r'@\+id/([A-Za-z0-9_]+)', layout))
+        missing_ids = set(re.findall(r'R\.id\.([A-Za-z0-9_]+)', sources)) - defined_ids
+        self.assertEqual(missing_ids, set())
+
     def test_privacy_defaults(self):
         manifest=(ROOT/'app/src/main/AndroidManifest.xml').read_text()
         self.assertIn('android:allowBackup="false"',manifest)
@@ -26,6 +38,26 @@ class Structure(unittest.TestCase):
         self.assertIn('onRenderProcessGone',activity)
         self.assertIn('ServiceWorkerControllerCompat',activity)
         self.assertNotIn('@JavascriptInterface',activity)
+
+    def test_manual_profiles_and_no_api_proxy(self):
+        profiles=(ROOT/'app/src/main/java/dev/caicompanion/app/BrowserProfile.kt').read_text()
+        store=(ROOT/'app/src/main/java/dev/caicompanion/app/SettingsStore.kt').read_text()
+        self.assertIn('BrowserProfile.DATA_SAVER', profiles)
+        self.assertIn('BrowserProfile.COMPATIBILITY', profiles)
+        self.assertIn('fun applyProfile(profile: BrowserProfile)', store)
+        self.assertNotIn('retrofit2', ''.join(p.read_text() for p in ROOT.rglob('*.kt')))
+
+    def test_navigation_media_and_link_safety(self):
+        activity=(ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
+        self.assertIn('onShowCustomView', activity)
+        self.assertIn('WindowManager.LayoutParams.FLAG_FULLSCREEN', activity)
+        self.assertIn('download_confirm_title', (ROOT/'app/src/main/res/values/strings.xml').read_text())
+        self.assertIn('enqueueDownload(safeUrl, agent, disposition, mime)', activity)
+        self.assertIn('leaveFullscreen()', activity)
+        self.assertIn('request.hasGesture()', activity)
+        self.assertIn('UrlPolicy.safeShareUrl(webView.url)', activity)
+        self.assertIn('denyPendingMedia()', activity)
+        self.assertNotIn('webView.url?.takeIf(UrlPolicy::isHttps)', activity)
 
     def test_no_scheduled_actions(self):
         self.assertFalse((ROOT/'.github/workflows').exists())
@@ -46,6 +78,8 @@ class Structure(unittest.TestCase):
         self.assertNotIn('it.readText().take(200_001)', activity)
         self.assertIn('prefs.edit()\n            .putBoolean("blocking"', store)
         self.assertIn('UrlPolicy.sanitizeBookmark(u)', store)
+        self.assertIn('put("bookmarks", sanitizedBookmarkArray())', store)
+        self.assertIn('get() = UrlPolicy.sanitizeBookmark(prefs.getString("last_visited", "")).orEmpty()', store)
 
     def test_translations_cover_default_strings(self):
         en=ET.parse(ROOT/'app/src/main/res/values/strings.xml').getroot()

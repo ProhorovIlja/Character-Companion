@@ -32,7 +32,7 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("resume_page", false)
         set(v) = prefs.edit().putBoolean("resume_page", v).apply()
     var lastVisited: String
-        get() = prefs.getString("last_visited", "").orEmpty().takeIf(UrlPolicy::safeBookmark).orEmpty()
+        get() = UrlPolicy.sanitizeBookmark(prefs.getString("last_visited", "")).orEmpty()
         set(v) {
             val sanitized = UrlPolicy.sanitizeBookmark(v).orEmpty()
             prefs.edit().putString("last_visited", sanitized).apply()
@@ -52,6 +52,18 @@ class SettingsStore(context: Context) {
     var excludeRules: String
         get() = prefs.getString("exclude_rules", "").orEmpty()
         set(v) = prefs.edit().putString("exclude_rules", v.take(12_000)).apply()
+
+    /** Atomically change a subset of options; preserve bookmarks, theme and media consent. */
+    fun applyProfile(profile: BrowserProfile) {
+        val p = BrowserProfiles.options(profile)
+        prefs.edit()
+            .putBoolean("blocking", p.blocking)
+            .putBoolean("strict_blocking", p.strictBlocking)
+            .putBoolean("third_party_cookies", p.thirdPartyCookies)
+            .putBoolean("reduce_images", p.reduceImages)
+            .putBoolean("media_gesture", p.requireMediaGesture)
+            .apply()
+    }
 
     private fun bookmarks(): JSONArray = try {
         JSONArray(prefs.getString("bookmarks", "[]"))
@@ -81,6 +93,12 @@ class SettingsStore(context: Context) {
         prefs.edit().putString("bookmarks", array.toString()).apply()
     }
 
+    private fun sanitizedBookmarkArray(): JSONArray = JSONArray().also { sanitized ->
+        listBookmarks().takeLast(100).forEach { (title, url) ->
+            sanitized.put(JSONObject().put("title", title).put("url", url))
+        }
+    }
+
     /** Manual SAF export. No cookies, chat text, auth tokens or WebView localStorage. */
     fun exportJson(): String = JSONObject().apply {
         put("schema", 1)
@@ -98,7 +116,7 @@ class SettingsStore(context: Context) {
         put("textZoom", textZoom)
         put("customRules", customRules)
         put("excludeRules", excludeRules)
-        put("bookmarks", bookmarks())
+        put("bookmarks", sanitizedBookmarkArray())
     }.toString(2)
 
     fun importJson(contents: String): Boolean {

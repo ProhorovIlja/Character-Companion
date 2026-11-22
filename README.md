@@ -1,8 +1,8 @@
 # Character Companion — Android
 
-**v0.3.0 source preview · 22 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
+**v0.4.0 source preview · 22 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
 
-**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (9 structural Python tests + 49 Kotlin assertions). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
+**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (12 structural Python tests + 64 Kotlin assertions). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
 
 ## What is implemented
 
@@ -10,19 +10,22 @@
 | --- | --- | --- |
 | App | One Android `WebView` loading the official site | No reverse-engineered Character.AI API or credential bridge |
 | Navigation | Home, back/forward, reload, share link, open in system browser | Long-press Share to copy URL; long-press Reload for fresh cache |
-| Bookmarks | Local 100-entry list, save/open/delete | Only `character.ai` / `c.ai`; removes unknown query fields and fragments to avoid storing authorization tokens |
+| Bookmarks | Local 100-entry list, save/open/delete | Only sanitized content URLs; exports and resume also sanitize legacy stored URLs |
 | Interface | Dark graphite/gold native layout, adaptive launcher icon | Status/loading/error overlays, larger touch targets and Android 15/16 system bar insets |
+| Profiles | Balanced / Compatibility / Private / Data saver | One-tap, atomic browser-setting changes; no background action |
+| Navigation safety | External-link confirmation, safe share/copy | Background redirects cannot launch external apps; OAuth/account URLs not shared |
+| Fullscreen | Native WebChromeClient HTML-media fullscreen | Website support depends on its own HTML and WebView; device test outstanding |
 | Languages | English / Russian native resources | Website language remains controlled by Character.AI |
 | Blocking | 21 conservative host rules + optional extra 20-host strict mode | User block/allow domains, filter counter; strict mode may break external widgets |
 | Service workers | WebView and supported service-worker request interception | Does not block all first-party ads or WebSocket traffic |
 | Privacy | WebView cookies/storage on device, configurable third-party cookies | No application analytics, VPN, device-wide traffic interception or background jobs |
 | Media | Camera/mic denied by default; trusted origin + per-request confirmation | Requires Android runtime permission; site voice support is unverified |
-| Files | Android system file picker; DownloadManager for HTTPS files | No remote files stored by companion servers |
+| Files | Android system file picker; manual confirmation of HTTPS downloads | DownloadManager receives first-party cookies only for trusted origin |
 | Compatibility | Renderer-crash replacement, TLS rejection, retry overlay | Site updates and external Google OAuth may still cause failures |
 | Performance | Optional image download saver; compact chrome; text scale; media gesture | No measured performance claims without device benchmarks |
 | Session | Optional resume last visited first-party page | OFF by default; stores sanitized URL locally, not in exported backups |
 | Diagnostics | User-initiated device/API/WebView versions, rule count and Java VM heap | No chat text, cookies or identifiers collected |
-| Backups | Manual JSON export/import of settings and bookmarks only | Limit 200,000 decoded characters, atomic import transaction, no passwords/chat content |
+| Backups | Manual JSON export/import of settings and bookmarks only | Limit 200,000 decoded characters, atomic import transaction, sanitized export, no passwords/chat content |
 
 **Shortcuts:** tap shield counter for diagnostics; long-press Shield to edit host rules. Long-press Share to copy the current URL. Long-press Reload to clear cache and reload. The Settings screen provides most controls. No periodic updates, scheduled tasks, notifications or monitoring services exist.
 
@@ -36,6 +39,8 @@ Requirements: Android Studio compatible with AGP **8.13.0**, JDK **17**, **Andro
 4. **Only after the build succeeds**, the debug APK will normally be at `app/build/outputs/apk/debug/app-debug.apk`. Debug APKs are for personal testing; publish a release only after signed builds and device tests.
 5. Install and verify an updated Android System WebView, then run the checks in [docs/QA.md](docs/QA.md) with a test account and real device.
 
+Manual environment check (read-only; does not install or schedule anything): `bash scripts/doctor.sh`.
+
 Offline checks (requires Python 3; optionally Kotlin CLI):
 
 ```bash
@@ -47,6 +52,7 @@ These checks validate policy logic and source structure, **not** Android compila
 ## Important site limitations
 
 - Character.AI does **not** provide an official public API, so the client embeds the real site. Its layout, restrictions and supported features may change.
+- External link and download confirmation reduces accidental redirects, but a website can still change its markup and flows at any time. Compatibility mode disables domain blocking when troubleshooting.
 - Google OAuth commonly rejects authentication in embedded WebView with `disallowed_useragent`. Opening the site in the system browser is supported, but **system-browser cookies will not transfer to WebView**. We do not spoof OAuth claims or extract tokens.
 - Character Calls are documented by Character.AI as a mobile-app feature; they may not exist on the browser site or work in WebView. This app does not offer independent voice-call capability.
 - Domain blocking is best-effort. It does not unlock premium subscriptions, remove all first-party advertisement, interfere with payment/account protections, or rewrite traffic beyond supported WebView interceptors.

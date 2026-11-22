@@ -2,6 +2,8 @@ import dev.caicompanion.app.HostBlocker
 import dev.caicompanion.app.UrlPolicy
 import dev.caicompanion.app.FilterEngine
 import dev.caicompanion.app.BoundedText
+import dev.caicompanion.app.BrowserProfiles
+import dev.caicompanion.app.BrowserProfile
 import java.io.StringReader
 
 fun main() {
@@ -48,6 +50,14 @@ fun main() {
     check(UrlPolicy.sanitizeBookmark("https://accounts.google.com/?code=123") == null)
     check(UrlPolicy.sanitizeBookmark("https://character.ai:8443/chat") == null)
     check(!UrlPolicy.isHttps("https://character.ai:9999/"))
+    check(UrlPolicy.safeShareUrl("https://character.ai/chat/abc?char=1#fragment") ==
+        "https://character.ai/chat/abc?char=1")
+    check(UrlPolicy.safeShareUrl("https://accounts.google.com/o/oauth2?code=secret") == null)
+    check(UrlPolicy.safeShareUrl("https://evil.test/?code=secret") == null)
+    check(UrlPolicy.safeShareUrl("https://character.ai/login?token=secret") == null)
+    check(UrlPolicy.safeShareUrl("https://character.ai/%6fAuth%2fcallback?code=secret") == null)
+    check(UrlPolicy.safeShareUrl("https://character.ai/account") == null)
+    check(UrlPolicy.sanitizeBookmark("https://character.ai/chat/public") == "https://character.ai/chat/public")
     check(UrlPolicy.isIdentityUrl("https://accounts.google.com/o/oauth2/auth"))
     check(!UrlPolicy.isIdentityUrl("https://accounts.google.com.evil.org"))
     check(BoundedText.read(StringReader("test"), 4) == "test")
@@ -70,5 +80,13 @@ fun main() {
     engine.replace("tracker.test", "a.doubleclick.net")
     check(!engine.shouldBlock("https://a.doubleclick.net/x"))
     check(engine.shouldBlock("https://tracker.test/x"))
-    println("PolicySmoke: 49 assertions passed")
+    check(BrowserProfiles.options(BrowserProfile.BALANCED).blocking)
+    check(!BrowserProfiles.options(BrowserProfile.BALANCED).strictBlocking)
+    check(!BrowserProfiles.options(BrowserProfile.COMPATIBILITY).blocking)
+    check(BrowserProfiles.options(BrowserProfile.COMPATIBILITY).thirdPartyCookies)
+    check(BrowserProfiles.options(BrowserProfile.PRIVATE).strictBlocking)
+    check(!BrowserProfiles.options(BrowserProfile.PRIVATE).thirdPartyCookies)
+    check(BrowserProfiles.options(BrowserProfile.DATA_SAVER).reduceImages)
+    check(BrowserProfiles.options(BrowserProfile.DATA_SAVER).requireMediaGesture)
+    println("PolicySmoke: browser policy and profile assertions passed")
 }
