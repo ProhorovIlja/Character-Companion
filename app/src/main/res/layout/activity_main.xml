@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root" android:layout_width="match_parent"
+    android:layout_height="match_parent" android:orientation="vertical"
+    android:fitsSystemWindows="true" android:background="#111219">
+    <LinearLayout android:id="@+id/chrome_header" android:orientation="vertical"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:background="#171923">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="60dp"
+            android:paddingStart="18dp" android:paddingEnd="10dp" android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <TextView android:layout_width="36dp" android:layout_height="36dp"
+                android:background="@drawable/accent_background" android:gravity="center"
+                android:text="C" android:textSize="23sp" android:fontFamily="serif"
+                android:textColor="#17141C" android:contentDescription="Character Companion" />
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:orientation="vertical" android:paddingStart="11dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="COMPANION" android:textSize="14sp" android:letterSpacing="0.19"
+                    android:textStyle="bold" android:textColor="#F1E6D5" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="CHARACTER.AI  •  UNOFFICIAL" android:textSize="9sp"
+                    android:letterSpacing="0.08" android:textColor="#A9A8B4" />
+            </LinearLayout>
+            <TextView android:id="@+id/status_badge" android:layout_width="wrap_content"
+                android:layout_height="35dp" android:minWidth="50dp" android:gravity="center"
+                android:paddingStart="8dp" android:paddingEnd="8dp"
+                android:background="@drawable/pill_background" android:text="•••"
+                android:textSize="11sp" android:textColor="#D9C29B" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="46dp"
+            android:paddingStart="12dp" android:paddingEnd="12dp" android:paddingBottom="7dp"
+            android:orientation="horizontal" android:gravity="center_vertical">
+            <TextView android:id="@+id/back" style="@style/NavButton" android:text="‹" android:contentDescription="@string/back" />
+            <TextView android:id="@+id/forward" style="@style/NavButton" android:text="›" android:contentDescription="@string/forward" />
+            <TextView android:id="@+id/reload" style="@style/NavButton" android:text="↻" android:contentDescription="@string/reload" />
+            <TextView android:id="@+id/page_title" android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:gravity="center_vertical"
+                android:ellipsize="end" android:singleLine="true" android:paddingStart="12dp"
+                android:text="character.ai" android:textColor="#CAC9D2" android:textSize="12sp" />
+            <TextView android:id="@+id/open_browser" style="@style/NavButton" android:text="↗" android:contentDescription="@string/open_browser" />
+        </LinearLayout>
+    </LinearLayout>
+    <ProgressBar android:id="@+id/loading_progress"
+        style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent"
+        android:layout_height="2dp" android:max="100" android:progressTint="#C6A97A"
+        android:progressBackgroundTint="#171923" android:visibility="gone" />
+    <FrameLayout android:id="@+id/web_container" android:layout_width="match_parent"
+        android:layout_height="0dp" android:layout_weight="1" android:background="#111219">
+        <WebView android:id="@+id/web_view" android:layout_width="match_parent" android:layout_height="match_parent" />
+        <LinearLayout android:id="@+id/error_overlay" android:layout_width="match_parent"
+            android:layout_height="match_parent" android:orientation="vertical" android:gravity="center"
+            android:padding="24dp" android:background="#12141C" android:visibility="gone">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="◇" android:textSize="52sp" android:textColor="#BFA277" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="@string/error_title" android:textSize="19sp" android:textStyle="bold"
+                android:textColor="#F1E6D5" />
+            <TextView android:id="@+id/error_text" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:gravity="center"
+                android:padding="14dp" android:text="@string/error_loading"
+                android:textSize="13sp" android:textColor="#BAB9C3" />
+            <Button android:id="@+id/error_retry" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:text="@string/retry" />
+        </LinearLayout>
+    </FrameLayout>
+    <LinearLayout android:id="@+id/chrome_footer" android:layout_width="match_parent"
+        android:layout_height="68dp" android:gravity="center" android:orientation="horizontal"
+        android:paddingStart="6dp" android:paddingEnd="6dp" android:background="#171923">
+        <TextView android:id="@+id/home" style="@style/FooterButton" android:text="⌂\nHome" android:contentDescription="@string/home" />
+        <TextView android:id="@+id/bookmarks" style="@style/FooterButton" android:text="☆\nSaved" android:contentDescription="@string/bookmarks" />
+        <TextView android:id="@+id/share" style="@style/FooterButton" android:text="↗\nShare" android:contentDescription="@string/share" />
+        <TextView android:id="@+id/filter" style="@style/FooterButton" android:text="◈\nShield" android:contentDescription="@string/filter" />
+        <TextView android:id="@+id/settings" style="@style/FooterButton" android:text="⚙\nSettings" android:contentDescription="@string/settings" />
+    </LinearLayout>
+</LinearLayout>

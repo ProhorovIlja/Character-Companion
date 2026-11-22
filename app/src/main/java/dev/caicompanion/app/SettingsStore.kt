@@ -1,0 +1,112 @@
+package dev.caicompanion.app
+
+import android.content.Context
+import org.json.JSONArray
+import org.json.JSONObject
+
+/** Stores only browser shell configuration and user bookmarks, never messages or credentials. */
+class SettingsStore(context: Context) {
+    private val prefs = context.getSharedPreferences("character_companion_v2", Context.MODE_PRIVATE)
+    var blocking: Boolean
+        get() = prefs.getBoolean("blocking", true)
+        set(v) = prefs.edit().putBoolean("blocking", v).apply()
+    var cookies: Boolean
+        get() = prefs.getBoolean("third_party_cookies", true)
+        set(v) = prefs.edit().putBoolean("third_party_cookies", v).apply()
+    var mediaRequiresGesture: Boolean
+        get() = prefs.getBoolean("media_gesture", true)
+        set(v) = prefs.edit().putBoolean("media_gesture", v).apply()
+    var mediaAllowed: Boolean
+        get() = prefs.getBoolean("media_allowed", false)
+        set(v) = prefs.edit().putBoolean("media_allowed", v).apply()
+    var desktopMode: Boolean
+        get() = prefs.getBoolean("desktop_mode", false)
+        set(v) = prefs.edit().putBoolean("desktop_mode", v).apply()
+    var compactChrome: Boolean
+        get() = prefs.getBoolean("compact_chrome", false)
+        set(v) = prefs.edit().putBoolean("compact_chrome", v).apply()
+    var darkCanvas: Boolean
+        get() = prefs.getBoolean("dark_canvas", true)
+        set(v) = prefs.edit().putBoolean("dark_canvas", v).apply()
+    var textZoom: Int
+        get() = prefs.getInt("text_zoom", 100).coerceIn(75, 175)
+        set(v) = prefs.edit().putInt("text_zoom", v.coerceIn(75, 175)).apply()
+    var customRules: String
+        get() = prefs.getString("custom_rules", "").orEmpty()
+        set(v) = prefs.edit().putString("custom_rules", v.take(12_000)).apply()
+    var excludeRules: String
+        get() = prefs.getString("exclude_rules", "").orEmpty()
+        set(v) = prefs.edit().putString("exclude_rules", v.take(12_000)).apply()
+
+    private fun bookmarks(): JSONArray = try {
+        JSONArray(prefs.getString("bookmarks", "[]"))
+    } catch (_: Exception) { JSONArray() }
+
+    fun listBookmarks(): List<Pair<String, String>> = buildList {
+        val data = bookmarks()
+        for (i in 0 until data.length()) {
+            val entry = data.optJSONObject(i) ?: continue
+            val url = entry.optString("url")
+            if (UrlPolicy.safeBookmark(url)) add(entry.optString("title").take(90) to url)
+        }
+    }
+    fun addBookmark(title: String, url: String): Boolean {
+        if (!UrlPolicy.safeBookmark(url)) return false
+        val data = listBookmarks().filterNot { it.second == url }.takeLast(99).toMutableList()
+        data.add(title.take(90).ifBlank { "Character.AI" } to url)
+        writeBookmarks(data)
+        return true
+    }
+    fun removeBookmark(url: String) = writeBookmarks(listBookmarks().filterNot { it.second == url })
+    private fun writeBookmarks(items: List<Pair<String, String>>) {
+        val array = JSONArray()
+        items.takeLast(100).forEach { (title, url) ->
+            array.put(JSONObject().put("title", title).put("url", url))
+        }
+        prefs.edit().putString("bookmarks", array.toString()).apply()
+    }
+
+    /** Manual SAF export. No cookies, chat text, auth tokens or WebView localStorage. */
+    fun exportJson(): String = JSONObject().apply {
+        put("schema", 1)
+        put("application", "Character Companion for Android")
+        put("blocking", blocking)
+        put("thirdPartyCookies", cookies)
+        put("mediaRequiresGesture", mediaRequiresGesture)
+        put("mediaAllowed", mediaAllowed)
+        put("desktopMode", desktopMode)
+        put("compactChrome", compactChrome)
+        put("darkCanvas", darkCanvas)
+        put("textZoom", textZoom)
+        put("customRules", customRules)
+        put("excludeRules", excludeRules)
+        put("bookmarks", bookmarks())
+    }.toString(2)
+
+    fun importJson(contents: String): Boolean {
+        if (contents.length > 200_000) return false
+        val parsed = try { JSONObject(contents) } catch (_: Exception) { return false }
+        if (parsed.optString("application") != "Character Companion for Android" ||
+            parsed.optInt("schema") != 1) return false
+        // Parse values before changing preferences, for consistent validation.
+        val saved = mutableListOf<Pair<String,String>>()
+        val array = parsed.optJSONArray("bookmarks") ?: JSONArray()
+        for (i in 0 until minOf(array.length(), 100)) {
+            val obj = array.optJSONObject(i) ?: continue
+            val u = obj.optString("url")
+            if (UrlPolicy.safeBookmark(u)) saved.add(obj.optString("title").take(90) to u)
+        }
+        blocking = parsed.optBoolean("blocking", true)
+        cookies = parsed.optBoolean("thirdPartyCookies", true)
+        mediaRequiresGesture = parsed.optBoolean("mediaRequiresGesture", true)
+        mediaAllowed = parsed.optBoolean("mediaAllowed", false)
+        desktopMode = parsed.optBoolean("desktopMode", false)
+        compactChrome = parsed.optBoolean("compactChrome", false)
+        darkCanvas = parsed.optBoolean("darkCanvas", true)
+        textZoom = parsed.optInt("textZoom", 100)
+        customRules = parsed.optString("customRules").take(12_000)
+        excludeRules = parsed.optString("excludeRules").take(12_000)
+        writeBookmarks(saved)
+        return true
+    }
+}

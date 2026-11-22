@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Character Companion</string>
+    <string name="back">Back</string><string name="forward">Forward</string>
+    <string name="reload">Reload</string><string name="home">Home</string>
+    <string name="bookmarks">Bookmarks</string><string name="share">Share</string>
+    <string name="filter">Privacy shield</string><string name="settings">Settings</string>
+    <string name="open_browser">Open in browser</string><string name="retry">Retry</string>
+    <string name="error_title">Connection interrupted</string>
+    <string name="error_loading">Check your connection or retry. Website availability is controlled by Character.AI.</string>
+    <string name="cancel">Cancel</string><string name="confirm">Confirm</string>
+    <string name="error_download">Cannot start this download</string>
+    <string name="error_browser">No browser available</string>
+    <string name="status_ready">READY</string><string name="status_loading">LOADING</string>
+    <string name="status_blocked">BLOCKED %1$d</string>
+    <string name="microphone_reason">The website requests microphone access. Allow once?</string>
+    <string name="camera_reason">The website requests camera access. Allow once?</string>
+    <string name="media_reason">The website requests access to microphone/camera. Allow once?</string>
+</resources>
