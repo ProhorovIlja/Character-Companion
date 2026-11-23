@@ -1,4 +1,5 @@
 using CharacterCompanion.Windows.Security;
+using CharacterCompanion.Windows.Speech;
 
 // Foreground-only smoke test with no network, Windows-specific APIs, automation, or NuGet packages.
 // Run manually: dotnet run --project windows/PolicySmoke/CharacterCompanion.PolicySmoke.csproj
@@ -49,4 +50,34 @@ Check(SitePolicy.SafeBrowserHandoff("https://character.ai/%25252Fauth/callback")
 Check(SitePolicy.SafeBrowserHandoff("https://example.org/page?statefulness=x") ==
       "https://example.org/page?statefulness=x", "avoid substring false positives");
 
-Console.WriteLine($"PASS {checkedCount} external-handoff policy cases; tested production SitePolicy.cs");
+
+
+// Exercise the real streaming PCM16 converter without NAudio or device access.
+static byte[] Samples(params short[] input)
+{
+    using var stream = new MemoryStream();
+    using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, true))
+        foreach (var value in input) writer.Write(value);
+    return stream.ToArray();
+}
+static short[] Resample(byte[] source, int rate, int channels)
+{
+    using var input = new MemoryStream(source);
+    using var output = new MemoryStream();
+    Pcm16Resampler.Convert(input, output, rate, channels, source.Length);
+    return Enumerable.Range(0, (int)(output.Length / 2))
+        .Select(i => BitConverter.ToInt16(output.GetBuffer(), i * 2)).ToArray();
+}
+Check(Resample(Samples(1_000, 3_000, 5_000), 48_000, 1)
+    .SequenceEqual(new short[] { 3_000 }), "48k mono weighted downsample");
+Check(Resample(Samples(8_000, 4_000, 6_000, 2_000), 48_000, 2)
+    .SequenceEqual(new short[] { 5_000 }), "48k stereo two-frame partial output");
+Check(Resample(Samples(2_000, -2_000), 16_000, 1)
+    .SequenceEqual(new short[] { 2_000, -2_000 }), "16k passthrough");
+Check(Resample(Samples(7_000, 7_000, 7_000), 44_100, 1)
+    .All(x => x == 7_000), "44.1k mono constant level");
+Check(Resample(Samples(short.MinValue, short.MaxValue), 48_000, 1)
+    .Length == 1, "clipped values produce one sample");
+Console.WriteLine("PASS PCM16 capture-rate normalization cases (no hardware).");
+
+Console.WriteLine($"PASS {checkedCount} policy + PCM16 checks; linked production sources");

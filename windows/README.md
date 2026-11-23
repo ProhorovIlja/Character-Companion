@@ -1,8 +1,10 @@
-# Character Companion · Windows 0.4.0 pre-alpha — bundled CEF, NOT WebView2
+# Character Companion · Windows 0.5.0 pre-alpha — bundled CEF, NOT WebView2
+
+**v0.5.0 source:** NAudio capture now tries PCM16 48/44.1/16-kHz mono and 48/44.1-kHz stereo formats, then a bounded streaming resampler produces 16-kHz mono WAV for offline whisper.cpp. This code has not been run on Windows or compiled in this environment. [Speech change notes](RELEASE_NOTES_v0.5.0-prealpha.md).
 
 **v0.4.0 source:** hardened handoff to the system browser. Native `SitePolicy` now validates HTTPS origin, rejects userinfo and alternate ports, and redirects identity links, callback paths, encoded OAuth keys, nested redirect credentials, and hash-token fragments to a fixed Character.AI homepage only after user confirmation. Credentials or cookies are never transferred between CEF and the system browser.
 
-**Manual unit compilation without WPF/CEF:** `dotnet run --project windows/PolicySmoke/CharacterCompanion.PolicySmoke.csproj` from the repository root. It compiles the **actual production `SitePolicy.cs`** with .NET 10 and checks 24 cases, without additional NuGet packages or a browser. It has NOT been run in this environment because the .NET SDK is absent. [See test README](PolicySmoke/README.md).
+**Manual unit compilation without WPF/CEF:** `dotnet run --project windows/PolicySmoke/CharacterCompanion.PolicySmoke.csproj` from the repository root. It compiles the **actual production `SitePolicy.cs` and `Speech/Pcm16Resampler.cs`** with .NET 10, checks 24 URL cases and 5 PCM resampling cases, without additional NuGet packages or a browser. It has NOT been run in this environment because the .NET SDK is absent. [See test README](PolicySmoke/README.md).
 
 Source-only WPF/.NET 10 desktop prototype. **The former WebView2 dependency has been removed.** The web renderer is app-distributed `CefSharp.Wpf.NETCore` 156.0.300 (Chromium Embedded Framework), not Edge WebView2. No standalone Edge/WebView2 Runtime installer is required. This does **not** make Character.AI's website fully native or remove the cost of bundling a Chromium engine.
 
@@ -10,7 +12,7 @@ Source-only WPF/.NET 10 desktop prototype. **The former WebView2 dependency has 
 
 - A first-party `https://character.ai/` browsing surface in a native WPF window and a private, dedicated CEF profile at `%LOCALAPPDATA%\CharacterCompanion\CefProfile`.
 - Top-level URL restrictions, popup blocking or user-confirmed external HTTPS browser handoff, conservative toggleable tracker-domain filter.
-- A user-triggered NAudio microphone recording (max three minutes), local `whisper-cli.exe` with selected multilingual GGML model, editable draft and explicit copy/save/clear/insert/send operations. No automatic background listening and no cloud speech requests.
+- A user-triggered NAudio microphone recording with multiple PCM16 capture-format fallbacks (max three minutes), local `whisper-cli.exe` with selected multilingual GGML model, editable draft and explicit copy/save/clear/insert/send operations. No automatic background listening and no cloud speech requests.
 - **Record → transcribe → attempt send** only when explicitly requested and no earlier/changed draft exists. Ctrl+Enter sends only when explicitly pressed. The app does not claim message receipt when it merely clicked a web button.
 - The CEF bridge uses the exact checked-in `ComposerBridge` script, a JSON-encoded transcript, original-page origin check and a unique composer/send control requirement.
 

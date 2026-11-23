@@ -9,5 +9,6 @@
   <ItemGroup>
     <!-- Compile the production policy itself, with no CEF/NuGet or Windows SDK dependency. -->
     <Compile Include="../CharacterCompanion.Windows/Security/SitePolicy.cs" Link="SitePolicy.cs" />
+    <Compile Include="../CharacterCompanion.Windows/Speech/Pcm16Resampler.cs" />
   </ItemGroup>
 </Project>

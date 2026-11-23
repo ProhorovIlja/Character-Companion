@@ -39,3 +39,7 @@ The preceding source-only tests do **not** qualify as completion of this list.
 - Review the documented **missing Chromium sandbox in CefSharp** before shipping.
 - Confirm Character.AI authentication and third-party redirects without stealing or transferring OAuth state, cookies or session identifiers.
 - Confirm native microphone dictation does not require granting the embedded webpage microphone permissions.
+
+## v0.5.0 speech capture acceptance
+
+On Windows, test a 48-kHz default input, a 44.1-kHz input and a device that lacks native 16-kHz capture. Stop and cancel recordings, confirm no truncated WAV or stale native-capture temp file, and check generated 16-kHz mono RIFF metadata before using whisper.cpp. Repeat with a stereo-only capture driver if available. Run `dotnet run --project windows/PolicySmoke/CharacterCompanion.PolicySmoke.csproj` to execute the source-linked URL and PCM regression checks. Document perceived speech quality and latency; none of these real-device checks were performed in the source-only environment.

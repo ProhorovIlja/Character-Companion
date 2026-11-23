@@ -62,3 +62,7 @@ These are **manual commands**; no GitHub Actions, background jobs, schedules, or
 - [Mozilla site and device permissions](https://firefox-source-docs.mozilla.org/mobile/android/geckoview/consumer/permissions.html)
 - [Published ARM64 GeckoView 156.0.20260921121718 artifact](https://mvnrepository.com/artifact/org.mozilla.geckoview/geckoview-arm64-v8a/156.0.20260921121718)
 - [LineageOS `akita` device repository](https://github.com/LineageOS/android_device_google_akita/tree/lineage-24.0)
+
+## v0.29.0 — stale file prompt prevention
+
+File picker/upload responses and unconfirmed downloads are owned by the exact trusted page that initiated them. Changing the top-level location invalidates the operation immediately; any new top-level page load cancels it even if the URL is identical. Accepted document save selections still run as bounded user-initiated copies. Android SDK and Pixel 8a runtime checks remain outstanding.

@@ -53,6 +53,18 @@ class WindowsSourceAudit(unittest.TestCase):
         self.assertNotIn('HttpClient',speech)
         self.assertNotIn('https://',speech)
 
+    def test_microphone_capture_format_fallback_and_normalization(self):
+        recorder = self.src('Speech/MicrophoneRecorder.cs')
+        converter = self.src('Speech/Pcm16Resampler.cs')
+        self.assertIn('(48_000, 1), (44_100, 1), (16_000, 1)', recorder)
+        self.assertIn('(48_000, 2), (44_100, 2)', recorder)
+        self.assertIn('Pcm16Resampler.Convert(source, output', recorder)
+        self.assertIn('EraseTemporaryRecording(_nativePath)', recorder)
+        self.assertIn('n -= n % blockAlign', recorder)
+        self.assertIn('var overlap = Math.Min(end, nextTarget) - current', converter)
+        self.assertIn('BinaryWriter(output', converter)
+        self.assertNotIn('HttpClient', recorder + converter)
+
     def test_explicit_send_button(self):
         code = self.src('MainWindow.xaml.cs')
         self.assertIn('RecordAndSend_Click',code)

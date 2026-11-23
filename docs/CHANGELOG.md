@@ -1,3 +1,8 @@
+## v0.29.0-source — 2026-11-23
+- GeckoView revokes pending SAF uploads and unconfirmed downloads upon top-level URL changes or reload, with a pure Kotlin same-page guard. Android version 0.25.0-rc1.
+- Windows version 0.5.0 pre-alpha: PCM16 capture format fallback, local streamed native-rate-to-16k WAV conversion and source-linked .NET tests.
+- Source only; no device-compiled APK/EXE or release, and no automations/CI.
+
 ## Последние изменения — v0.28.0-source
 
 GeckoView: в запросах микрофона/камеры устранена возможность подтверждения после перехода на другой HTTPS-origin, системные и встроенные разрешения теперь отслеживаются раздельно. Внешняя авторизация: вложенные процентно-кодированные callback-данные очищаются. Добавлены ручные Windows-команды для сборки Android из полного GitHub-репозитория и проверка SHA-256 Gradle Wrapper. **APK/EXE не собраны, устройство не проверено**, автоматизации не создавались. [Описание](RELEASE_NOTES_v0.28.0-source.md).

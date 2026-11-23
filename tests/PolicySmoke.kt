@@ -18,10 +18,18 @@ import dev.caicompanion.app.DeferredWebReload
 import dev.caicompanion.app.OfflineBookmarkEditor
 import dev.caicompanion.app.SupportReport
 import dev.caicompanion.app.DeviceCompatibility
+import dev.caicompanion.app.GeckoTransferOriginPolicy
 import dev.caicompanion.app.GeckoTransferPolicy
 import java.io.StringReader
 
 fun main() {
+    // A pending SAF operation may finish only for its original HTTPS page.
+    check(GeckoTransferOriginPolicy.isSamePage("https://character.ai/chat/abc", "https://character.ai/chat/abc"))
+    check(!GeckoTransferOriginPolicy.isSamePage("https://character.ai/chat/abc", "https://character.ai/chat/xyz"))
+    check(!GeckoTransferOriginPolicy.isSamePage("https://character.ai/chat/abc", "https://sub.character.ai/chat/abc"))
+    check(!GeckoTransferOriginPolicy.isSamePage("https://character.ai/chat/abc", "https://evil.example/"))
+    check(!GeckoTransferOriginPolicy.isSamePage(null, "https://character.ai/"))
+    check(!GeckoTransferOriginPolicy.isSamePage("https://character.ai/", null))
     // A cold local-library start never creates Chromium. Explicit shared links bypass it.
     check(NativeStartupPolicy.useHub(true, null))
     check(!NativeStartupPolicy.useHub(false, null))

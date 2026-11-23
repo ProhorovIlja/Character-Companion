@@ -11,7 +11,8 @@ class HandoffSmokeStructure(unittest.TestCase):
         project = ET.parse(WINDOWS/'PolicySmoke/CharacterCompanion.PolicySmoke.csproj').getroot()
         self.assertEqual(project.findtext('./PropertyGroup/TargetFramework'), 'net10.0')
         compile_items=[v.attrib['Include'] for v in project.findall('./ItemGroup/Compile')]
-        self.assertEqual(compile_items, ['../CharacterCompanion.Windows/Security/SitePolicy.cs'])
+        self.assertEqual(compile_items, ['../CharacterCompanion.Windows/Security/SitePolicy.cs',
+                                        '../CharacterCompanion.Windows/Speech/Pcm16Resampler.cs'])
         self.assertEqual(project.findall('.//PackageReference'), [])
 
     def test_coverage_of_auth_redirect_and_nested_encoding(self):

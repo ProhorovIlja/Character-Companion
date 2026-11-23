@@ -51,6 +51,21 @@ class GeckoTransferTests(unittest.TestCase):
         self.assertIn('finishFilePrompt(emptyList())\n        abandonDownload()', GECKO)
         self.assertIn('override fun onDestroy()', GECKO)
 
+    def test_pending_transfers_revoke_on_navigation_and_reload(self):
+        self.assertIn('private var downloadPage: String? = null', GECKO)
+        self.assertIn('downloadPage = activeUrl', GECKO)
+        self.assertIn('val initialPage = downloadPage', GECKO)
+        self.assertIn('GeckoTransferOriginPolicy.isSamePage(initialPage, activeUrl)', GECKO)
+        self.assertIn('GeckoTransferOriginPolicy.isSamePage(filePickerOrigin, url)', GECKO)
+        self.assertIn('GeckoTransferOriginPolicy.isSamePage(downloadPage, url)', GECKO)
+        on_page_start = GECKO.split('override fun onPageStart(', 1)[1].split('override fun onPageStop(', 1)[0]
+        self.assertIn('finishFilePrompt(emptyList())', on_page_start)
+        self.assertIn('abandonDownload()', on_page_start)
+        self.assertGreaterEqual(GECKO.count('downloadPage = null'), 2)
+        pure = (ROOT/'app/src/main/java/dev/caicompanion/app/GeckoTransferOriginPolicy.kt').read_text()
+        self.assertIn('original == current', pure)
+        self.assertIn('UrlPolicy.isTrustedMediaOrigin(current)', pure)
+
     def test_modal_prompts_other_than_file_upload_remain_handled(self):
         for token in ['onAlertPrompt(', 'onButtonPrompt(', 'onTextPrompt(',
                       'onChoicePrompt(', 'setOnDismissListener',
@@ -66,8 +81,8 @@ class GeckoTransferTests(unittest.TestCase):
             self.assertIn('gecko_download_saved',keys)
 
     def test_application_version_moves_forward_without_platform_mixup(self):
-        self.assertIn('versionCode = 24', BUILD)
-        self.assertIn('versionName = "0.24.0-rc1"', BUILD)
+        self.assertIn('versionCode = 25', BUILD)
+        self.assertIn('versionName = "0.25.0-rc1"', BUILD)
         self.assertIn('create("gecko")',BUILD)
         self.assertIn('create("legacy")',BUILD)
         self.assertFalse((ROOT/'.github/workflows').exists())

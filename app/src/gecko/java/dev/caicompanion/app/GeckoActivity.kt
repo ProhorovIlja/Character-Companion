@@ -75,6 +75,7 @@ class GeckoActivity : Activity() {
     private var filePickerOpen = false
     private var filePickerOrigin: String? = null
     private var pendingDownload: WebResponse? = null
+    private var downloadPage: String? = null
     private var downloadPickerOpen = false
     private var genericPromptDialog: AlertDialog? = null
     private var backCallback: OnBackInvokedCallback? = null
@@ -556,6 +557,7 @@ class GeckoActivity : Activity() {
             }
             response.setReadTimeoutMillis(30_000L)
             pendingDownload = response
+            downloadPage = activeUrl
             val name = GeckoTransferPolicy.filename(response.uri)
             AlertDialog.Builder(this@GeckoActivity)
                 .setTitle(R.string.download_confirm_title)
@@ -570,12 +572,16 @@ class GeckoActivity : Activity() {
     private fun abandonDownload() {
         val pending = pendingDownload
         pendingDownload = null
+        downloadPage = null
         downloadPickerOpen = false
         try { pending?.body?.close() } catch (_: Exception) { }
     }
 
     private fun openSaveDocument(response: WebResponse, filename: String) {
-        if (pendingDownload !== response || !started) { abandonDownload(); return }
+        if (pendingDownload !== response || !started ||
+            !GeckoTransferOriginPolicy.isSamePage(downloadPage, activeUrl)) {
+            abandonDownload(); return
+        }
         val contentType = response.headers.entries.firstOrNull {
             it.key.equals("content-type", ignoreCase = true)
         }?.value
@@ -594,11 +600,13 @@ class GeckoActivity : Activity() {
 
     private fun finishDownload(target: Uri?) {
         val response = pendingDownload
+        val initialPage = downloadPage
         pendingDownload = null
+        downloadPage = null
         downloadPickerOpen = false
         if (response == null) return
         if (target == null || !GeckoTransferPolicy.isSelectedDocumentUri(target.toString()) ||
-            !UrlPolicy.isTrustedMediaOrigin(activeUrl)) {
+            !GeckoTransferOriginPolicy.isSamePage(initialPage, activeUrl)) {
             try { response.body?.close() } catch (_: Exception) { }
             return
         }
@@ -666,6 +674,15 @@ class GeckoActivity : Activity() {
             session: GeckoSession, url: String?,
             perms: List<GeckoSession.PermissionDelegate.ContentPermission>, hasUserGesture: Boolean
         ) {
+            // A file chooser or download belongs to the exact page that started it.
+            // Cancel immediately on navigation, even if a later redirect returns
+            // to the same URL before the Android document picker finishes.
+            if (pendingFileResult != null &&
+                !GeckoTransferOriginPolicy.isSamePage(filePickerOrigin, url))
+                finishFilePrompt(emptyList())
+            if (pendingDownload != null &&
+                !GeckoTransferOriginPolicy.isSamePage(downloadPage, url))
+                abandonDownload()
             // A page navigation must not complete a permission granted to the
             // previously visible origin. The request will have to be repeated.
             if (permissionCallback != null &&
@@ -693,6 +710,10 @@ class GeckoActivity : Activity() {
 
     private val progressDelegate = object : GeckoSession.ProgressDelegate {
         override fun onPageStart(session: GeckoSession, url: String) {
+            // A fresh top-level load invalidates pending document-picker state,
+            // including reloads that keep the same URL.
+            if (pendingFileResult != null) finishFilePrompt(emptyList())
+            if (pendingDownload != null) abandonDownload()
             locationLabel.alpha = 0.6f
         }
         override fun onPageStop(session: GeckoSession, success: Boolean) {
