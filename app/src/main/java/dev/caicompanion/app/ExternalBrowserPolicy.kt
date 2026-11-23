@@ -53,6 +53,14 @@ object ExternalBrowserPolicy {
             val key = decodeLimited(entry.substringBefore('=')) ?: return HOME
             if (key.lowercase(Locale.ROOT) in sensitiveKeys) return HOME
         }
+        // Percent-encoded callback URLs can be hidden in an otherwise harmless
+        // parameter such as ?payload=https%3A%2F%2Fhost%2F%3Fcode%3Dsecret.
+        // Inspect a bounded, recursively decoded query without persisting its value.
+        val expanded = decodeLimited(query) ?: return HOME
+        val embeddedKey = Regex("(?:^|[?&#])([a-zA-Z_][a-zA-Z0-9_-]{0,63})=")
+        if (embeddedKey.findAll(expanded).any {
+            it.groupValues[1].lowercase(Locale.ROOT) in sensitiveKeys
+        }) return HOME
         val fragment = decodeLimited(uri.rawFragment.orEmpty()) ?: return HOME
         // OAuth implicit-grant flows can carry tokens after '#', not just '?'.
         // A structured hash can contain implicit grant credentials, even when

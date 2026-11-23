@@ -1,6 +1,8 @@
+**v0.28.0-source security update:** Gecko media permission requests require the same approved first-party HTTPS origin before and after each prompt; system runtime permission and site media callbacks have independent pending-origin snapshots. Switching media off, leaving the app or changing origins revokes pending consent. Nested encoded OAuth callback values in non-sensitive query parameters are redacted on external-browser handoff. For manual Windows-hosted Android builds see [Windows instructions](ANDROID17_MANUAL_BUILD_WINDOWS.md). Neither feature has yet been device-tested.
+
 ## v0.26.0-source: safe external-browser handoff
 
-External navigation is still user-confirmed. The new `ExternalBrowserPolicy` prevents transfer of OAuth `code`, `state`, tokens, signed URLs and callback fragments from Gecko into the separate system browser, showing an explicit Character.AI home-page fallback instead. This **does not establish Google OAuth SSO or transfer cookies**. Source candidate only, not device-tested. Android app version `0.23.0-rc1` (`versionCode 23`).
+External navigation is still user-confirmed. The new `ExternalBrowserPolicy` prevents transfer of OAuth `code`, `state`, tokens, signed URLs and callback fragments from Gecko into the separate system browser, showing an explicit Character.AI home-page fallback instead. This **does not establish Google OAuth SSO or transfer cookies**. Source candidate only, not device-tested. Android app version `0.24.0-rc1` (`versionCode 24`).
 
 ## v0.25.0-source — native library, settings and crash recovery
 
@@ -19,7 +21,7 @@ Android now has two explicit Gradle flavors:
 
 Both flavors use the same application ID, so **they cannot be installed side by side** without assigning separate application IDs. Gecko's cookies, app permission grants and in-process state are **not** migrated from the existing Android WebView profile. Do not promise SSO across engines. The gecko variant carries embedded ARM64 Gecko libraries and may be substantially larger.
 
-The version in Gradle is Android `0.23.0-rc1`, `versionCode 23`; the latest multi-platform source bundle is `v0.26.0-source`. This is source development versioning, **not a GitHub Release**.
+The version in Gradle is Android `0.24.0-rc1`, `versionCode 24`; the latest multi-platform source bundle is `v0.28.0-source`. This is source development versioning, **not a GitHub Release**.
 
 ## Manual build (requires proper SDK)
 

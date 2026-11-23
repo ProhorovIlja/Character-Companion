@@ -1,3 +1,7 @@
+## Source-only v0.28 manual Windows-hosted Android build
+
+For a local, foreground-only Android debug build from a complete GitHub checkout, use `.\scripts\build-apk-windows.ps1 gecko` or `legacy` in interactive PowerShell. The helper verifies the wrapper SHA-256 before invoking Gradle and fails closed when SDK 36 or Java are missing; no CI, automation, schedule or background execution. See [Windows manual build checklist](ANDROID17_MANUAL_BUILD_WINDOWS.md). Neither debug APKs nor production signed artifacts were generated in this source-only checkpoint.
+
 # Android release process — manual-only, no automations
 
 This repository has no GitHub Actions, schedules, upload hooks, services or automated release jobs. A GitHub Release is **not** available until a real APK has been assembled, tested and signed.

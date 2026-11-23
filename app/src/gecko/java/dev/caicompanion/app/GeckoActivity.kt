@@ -66,6 +66,8 @@ class GeckoActivity : Activity() {
     private var canGoBack = false
     private var canGoForward = false
     private var permissionCallback: GeckoSession.PermissionDelegate.Callback? = null
+    private var androidPermissionPage: String? = null
+    private var mediaPromptPage: String? = null
     private var pendingMediaCallback: GeckoSession.PermissionDelegate.MediaCallback? = null
     private var started = false
     private var pendingFilePrompt: GeckoSession.PromptDelegate.FilePrompt? = null
@@ -294,10 +296,7 @@ class GeckoActivity : Activity() {
         })
         options.addView(settingCheckbox(R.string.toggle_media, settings.mediaAllowed) {
             settings.mediaAllowed = it
-            if (!it) {
-                pendingMediaCallback?.reject(); pendingMediaCallback = null
-                permissionCallback?.reject(); permissionCallback = null
-            }
+            if (!it) revokeMediaPermissions()
         })
         options.addView(settingCheckbox(R.string.toggle_protect_screen, settings.protectScreen) {
             settings.protectScreen = it
@@ -320,6 +319,15 @@ class GeckoActivity : Activity() {
             }.setPositiveButton(R.string.close, null).show()
     }
 
+    private fun revokeMediaPermissions() {
+        runCatching { pendingMediaCallback?.reject() }
+        pendingMediaCallback = null
+        runCatching { permissionCallback?.reject() }
+        permissionCallback = null
+        androidPermissionPage = null
+        mediaPromptPage = null
+    }
+
     private fun updateCompactChrome() {
         if (::actionsRow.isInitialized)
             actionsRow.visibility = if (settings.compactChrome) View.GONE else View.VISIBLE
@@ -330,10 +338,7 @@ class GeckoActivity : Activity() {
         needsRecovery = true
         // A destroyed renderer cannot satisfy old site permissions, pending file
         // prompts or downloads. Keep no callback into the failed session.
-        runCatching { pendingMediaCallback?.reject() }
-        pendingMediaCallback = null
-        runCatching { permissionCallback?.reject() }
-        permissionCallback = null
+        revokeMediaPermissions()
         runCatching { finishFilePrompt(emptyList()) }
         abandonDownload()
         if (!isFinishing && !isDestroyed && started) showRecoveryPrompt()
@@ -661,6 +666,14 @@ class GeckoActivity : Activity() {
             session: GeckoSession, url: String?,
             perms: List<GeckoSession.PermissionDelegate.ContentPermission>, hasUserGesture: Boolean
         ) {
+            // A page navigation must not complete a permission granted to the
+            // previously visible origin. The request will have to be repeated.
+            if (permissionCallback != null &&
+                !UrlPolicy.sameTrustedMediaOrigin(androidPermissionPage, url))
+                revokeMediaPermissions()
+            if (pendingMediaCallback != null &&
+                !UrlPolicy.sameTrustedMediaOrigin(mediaPromptPage, url))
+                revokeMediaPermissions()
             activeUrl = url ?: HOME
             // Only store public content paths, never credentials, tokens or fragments.
             UrlPolicy.sanitizeBookmark(url)?.let { if (settings.resumePage) settings.lastVisited = it }
@@ -704,6 +717,7 @@ class GeckoActivity : Activity() {
             if (absent.isEmpty()) callback.grant()
             else {
                 permissionCallback = callback
+                androidPermissionPage = activeUrl
                 requestPermissions(absent.toTypedArray(), MEDIA_REQUEST_CODE)
             }
         }
@@ -717,17 +731,21 @@ class GeckoActivity : Activity() {
             val hasCamera = !video.isNullOrEmpty()
             val hasMic = !audio.isNullOrEmpty()
             if (!started || !settings.mediaAllowed || pendingMediaCallback != null ||
-                !UrlPolicy.isTrustedMediaOrigin(uri) ||
-                !UrlPolicy.isTrustedMediaOrigin(activeUrl) || (!hasCamera && !hasMic) ||
+                !UrlPolicy.sameTrustedMediaOrigin(uri, activeUrl) || (!hasCamera && !hasMic) ||
                 (hasMic && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) ||
                 (hasCamera && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED)) {
                 callback.reject(); return
             }
             pendingMediaCallback = callback
+            mediaPromptPage = activeUrl
             fun finishMedia(accepted: Boolean) {
                 if (pendingMediaCallback !== callback) return // onStop may already deny it
                 pendingMediaCallback = null
-                if (accepted && started && settings.mediaAllowed && UrlPolicy.isTrustedMediaOrigin(activeUrl))
+                val expected = mediaPromptPage
+                mediaPromptPage = null
+                if (accepted && started && settings.mediaAllowed &&
+                    UrlPolicy.sameTrustedMediaOrigin(uri, expected) &&
+                    UrlPolicy.sameTrustedMediaOrigin(expected, activeUrl))
                     callback.grant(video?.firstOrNull(), audio?.firstOrNull())
                 else callback.reject()
             }
@@ -752,7 +770,10 @@ class GeckoActivity : Activity() {
         if (requestCode != MEDIA_REQUEST_CODE) return
         val callback = permissionCallback ?: return
         permissionCallback = null
-        if (started && settings.mediaAllowed && UrlPolicy.isTrustedMediaOrigin(activeUrl) &&
+        val expected = androidPermissionPage
+        androidPermissionPage = null
+        if (started && settings.mediaAllowed &&
+            UrlPolicy.sameTrustedMediaOrigin(expected, activeUrl) &&
             grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED })
             callback.grant()
         else callback.reject()
@@ -777,6 +798,7 @@ class GeckoActivity : Activity() {
             .setMessage(if (settings.mediaAllowed) R.string.gecko_media_on else R.string.gecko_media_off)
             .setPositiveButton(if (settings.mediaAllowed) R.string.disabled else R.string.enabled) { _, _ ->
                 settings.mediaAllowed = !settings.mediaAllowed
+                if (!settings.mediaAllowed) revokeMediaPermissions()
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
@@ -828,8 +850,7 @@ class GeckoActivity : Activity() {
     override fun onStop() {
         // Revoke unresolved prompts when hidden; do not auto-grant on return.
         started = false
-        pendingMediaCallback?.reject(); pendingMediaCallback = null
-        permissionCallback?.reject(); permissionCallback = null
+        revokeMediaPermissions()
         // The system SAF picker temporarily stops this Activity: preserve only that
         // specific user-initiated prompt until its onActivityResult callback arrives.
         if (!filePickerOpen) finishFilePrompt(emptyList())
@@ -842,8 +863,7 @@ class GeckoActivity : Activity() {
     }
 
     override fun onDestroy() {
-        pendingMediaCallback?.reject(); pendingMediaCallback = null
-        permissionCallback?.reject(); permissionCallback = null
+        revokeMediaPermissions()
         finishFilePrompt(emptyList())
         abandonDownload()
         genericPromptDialog?.dismiss()

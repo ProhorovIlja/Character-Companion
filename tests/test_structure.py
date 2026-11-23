@@ -6,6 +6,19 @@ import xml.etree.ElementTree as ET
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 class Structure(unittest.TestCase):
+    def test_manual_windows_android_build_entrypoints(self):
+        batch = (ROOT/'gradlew.bat').read_text()
+        script = (ROOT/'scripts/build-apk-windows.ps1').read_text()
+        self.assertIn('org.gradle.wrapper.GradleWrapperMain %*', batch)
+        self.assertIn('Get-FileHash -Algorithm SHA256', script)
+        self.assertIn('81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f', script)
+        self.assertIn(':app:assembleGeckoDebug', script)
+        self.assertIn(':app:assembleLegacyDebug', script)
+        self.assertIn('android-36', script)
+        self.assertIn('if ($result -ne 0)', script)
+        self.assertIn('DEBUG_ONLY=YES', script)
+        self.assertFalse((ROOT/'.github/workflows').exists())
+
     def test_resource_xml(self):
         for path in (ROOT/'app/src/main/res').rglob('*.xml'):
             with self.subTest(path=path):
@@ -364,8 +377,8 @@ class Structure(unittest.TestCase):
     def test_browser_dependencies_are_pinned_without_new_permissions(self):
         build=(ROOT/'app/build.gradle.kts').read_text()
         manifest=(ROOT/'app/src/main/AndroidManifest.xml').read_text()
-        self.assertIn('versionName = "0.23.0-rc1"', build)
-        self.assertIn('versionCode = 23', build)
+        self.assertIn('versionName = "0.24.0-rc1"', build)
+        self.assertIn('versionCode = 24', build)
         release = (ROOT/'scripts/prepare-release.sh').read_text()
         self.assertIn('VERSION="$(sed -nE', release)
         self.assertIn('VERSION_CODE="$(sed -nE', release)

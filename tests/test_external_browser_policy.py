@@ -30,6 +30,25 @@ class ExternalBrowserSafety(unittest.TestCase):
         self.assertIn('ActivityNotFoundException', block)
         self.assertIn('SecurityException', block)
 
+    def test_nested_authorization_values_have_a_real_jvm_guard(self):
+        policy = POLICY.read_text()
+        smoke = (ROOT / 'tests/PolicySmoke.kt').read_text()
+        self.assertIn('val expanded = decodeLimited(query) ?: return HOME', policy)
+        self.assertIn('embeddedKey.findAll(expanded)', policy)
+        self.assertIn('payload=https%3A%2F%2Felse.test', smoke)
+        self.assertIn('payload=one%26access_token%3DSECRET', smoke)
+
+    def test_media_permissions_are_origin_pinned_and_revoked(self):
+        url_policy = (ROOT / 'app/src/main/java/dev/caicompanion/app/UrlPolicy.kt').read_text()
+        self.assertIn('fun sameTrustedMediaOrigin(', url_policy)
+        self.assertIn('request.host.equals(visible.host, ignoreCase = true)', url_policy)
+        self.assertIn('UrlPolicy.sameTrustedMediaOrigin(uri, activeUrl)', GECKO)
+        self.assertIn('UrlPolicy.sameTrustedMediaOrigin(uri, expected)', GECKO)
+        self.assertIn('UrlPolicy.sameTrustedMediaOrigin(expected, activeUrl)', GECKO)
+        self.assertIn('androidPermissionPage = activeUrl', GECKO)
+        self.assertIn('mediaPromptPage = activeUrl', GECKO)
+        self.assertIn('revokeMediaPermissions()', GECKO)
+
     def test_no_page_load_on_crashed_session(self):
         block = GECKO.split('override fun onNewIntent(intent: Intent)', 1)[1].split('private val promptDelegate', 1)[0]
         self.assertIn('!needsRecovery', block)

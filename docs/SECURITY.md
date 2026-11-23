@@ -1,3 +1,7 @@
+## v0.28 Gecko origin-bound permissions and handoff policy
+
+Only identical first-party HTTPS origins may complete an outstanding Gecko media request; Android runtime permission and Gecko per-site callbacks record independent origin snapshots. Navigating between subdomains or hiding the app invalidates unapproved requests. Nested percent-encoded OAuth callback keys in ordinary URL query values are redacted before an explicit external-browser handoff. Pure Kotlin tests verify these policies. Full Gecko/Android permission behavior on a physical device is not yet verified.
+
 ## v0.26.0 Gecko external-browser handoff
 
 An external browser has a different cookie jar from GeckoView. Never hand off transient OAuth authorization codes, `state`, bearer tokens, callback URLs, implicit-flow fragments or signed redirect parameters from the embedded session. `ExternalBrowserPolicy.target` enforces HTTPS, rejects malformed URLs and falls back to a fixed Character.AI home address for sensitive transfers, with an explicit confirmation. The feature does not implement or guarantee Google/Apple sign-in.

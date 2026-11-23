@@ -35,8 +35,8 @@ class GeckoFlavorTests(unittest.TestCase):
         self.assertIn('create("legacy")', build)
         self.assertIn('abiFilters.add("arm64-v8a")', build)
         self.assertIn('maven.mozilla.org/maven2/', settings)
-        self.assertEqual(build.count('versionCode = 23'), 1)
-        self.assertEqual(build.count('versionName = "0.23.0-rc1"'), 1)
+        self.assertEqual(build.count('versionCode = 24'), 1)
+        self.assertEqual(build.count('versionName = "0.24.0-rc1"'), 1)
 
     def test_gecko_navigation_is_first_party_and_fail_closed(self):
         src = (ROOT/'app/src/gecko/java/dev/caicompanion/app/GeckoActivity.kt').read_text()
@@ -47,7 +47,7 @@ class GeckoFlavorTests(unittest.TestCase):
         self.assertIn('onNewSession', src)
         self.assertIn('UrlPolicy.isIdentityUrl', policy)
         self.assertIn('UrlPolicy.isHttps', policy)
-        self.assertIn('UrlPolicy.isTrustedMediaOrigin(uri)', src)
+        self.assertIn('UrlPolicy.sameTrustedMediaOrigin(uri, activeUrl)', src)
         self.assertNotIn('android.webkit.WebView', src)
         self.assertNotIn('CookieManager', src)
         self.assertNotIn('@JavascriptInterface', src)

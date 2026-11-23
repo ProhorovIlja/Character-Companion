@@ -39,6 +39,17 @@ object UrlPolicy {
     fun isTrustedMediaOrigin(url: String?): Boolean =
         parsedHttps(url)?.host?.let(HostBlocker::isServiceHost) == true
 
+    /** Only the same first-party HTTPS origin may complete an in-flight media permission. */
+    fun sameTrustedMediaOrigin(requestUrl: String?, visibleUrl: String?): Boolean {
+        val request = parsedHttps(requestUrl) ?: return false
+        val visible = parsedHttps(visibleUrl) ?: return false
+        return HostBlocker.isServiceHost(request.host) &&
+            HostBlocker.isServiceHost(visible.host) &&
+            request.host.equals(visible.host, ignoreCase = true) &&
+            (if (request.port == -1) 443 else request.port) ==
+            (if (visible.port == -1) 443 else visible.port)
+    }
+
     /** Do not persist OAuth redirects, fragments, account-provider URLs or unknown query fields. */
     fun sanitizeBookmark(url: String?): String? {
         val uri = parsedHttps(url) ?: return null

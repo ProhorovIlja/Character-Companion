@@ -51,12 +51,16 @@ class GeckoNativeControlsTests(unittest.TestCase):
 
     def test_outstanding_permissions_are_revoked_after_failure(self):
         crash = ACTIVITY.split('private fun geckoExited()', 1)[1].split('private fun showRecoveryPrompt()', 1)[0]
-        self.assertIn('pendingMediaCallback?.reject()', crash)
-        self.assertIn('permissionCallback?.reject()', crash)
+        self.assertIn('revokeMediaPermissions()', crash)
+        revoke = ACTIVITY.split('private fun revokeMediaPermissions()', 1)[1].split('private fun updateCompactChrome()', 1)[0]
+        self.assertIn('pendingMediaCallback?.reject()', revoke)
+        self.assertIn('permissionCallback?.reject()', revoke)
+        self.assertIn('androidPermissionPage = null', revoke)
+        self.assertIn('mediaPromptPage = null', revoke)
         self.assertIn('finishFilePrompt(emptyList())', crash)
         self.assertIn('abandonDownload()', crash)
         result = ACTIVITY.split('override fun onRequestPermissionsResult(', 1)[1].split('private fun updateNavigation()', 1)[0]
-        self.assertIn('started && settings.mediaAllowed && UrlPolicy.isTrustedMediaOrigin(activeUrl)', result)
+        self.assertIn('UrlPolicy.sameTrustedMediaOrigin(expected, activeUrl)', result)
 
     def test_gecko_preserves_layout_on_rotation(self):
         root = ET.parse(ROOT / 'app/src/gecko/AndroidManifest.xml').getroot()
