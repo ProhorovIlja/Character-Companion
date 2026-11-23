@@ -154,4 +154,10 @@
     <string name="hub_bookmark_invalid">Only safe Character.AI links can be saved</string>
     <string name="hub_bookmark_rename">Rename bookmark</string>
     <string name="device_compat_title">Device and ROM compatibility</string>
+    <string name="gecko_preview_title">Character.AI · GeckoView preview</string>
+    <string name="gecko_legacy">Tools</string>
+    <string name="gecko_media">Media access</string>
+    <string name="gecko_media_on">Media requests enabled. Turn them off? The site still asks for permission each time.</string>
+    <string name="gecko_media_off">Media requests disabled. Enable site microphone and camera prompts?</string>
+    <string name="gecko_error">GeckoView could not start. You can open the legacy browser tools instead.</string>
 </resources>

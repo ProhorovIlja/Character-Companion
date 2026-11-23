@@ -1,3 +1,10 @@
+## v0.23.0-source — 2026-11-23
+
+- New Android `gecko` ARM64 flavor with Mozilla GeckoView; original `legacy` flavor remains available.
+- First-party navigation policy, Gecko tracking protection, per-request media gate, manual share and explicit external browser prompts; no transfer of WebView/Gecko cookies.
+- Manifest launcher and Share Sheet split by build flavor; explicit manual build/release signoff for gecko vs legacy.
+- Documentation and offline tests; no APK/EXE built or device-tested. Windows CEF pre-alpha unchanged.
+
 ## v0.22.0-source / Windows v0.3.0-prealpha — 2026-11-23 (source-only)
 
 - Windows: removed WebView2 from WPF project and replaced it with in-app CefSharp/CEF 154.0.340 on x64; added CEF-specific request/popup handlers, app profile, JS JSON envelope and browser initialization/shutdown.

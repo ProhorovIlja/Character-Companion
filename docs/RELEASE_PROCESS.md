@@ -14,9 +14,9 @@ This repository has no GitHub Actions, schedules, upload hooks, services or auto
 ```bash
 bash scripts/test-offline.sh
 bash scripts/doctor.sh
-./gradlew --no-daemon --offline :app:assembleRelease  # after dependency caching and signing setup
-# Verify on devices, then write a separate device-signoff.txt with DEVICE_TESTS_PASSED=YES.
-bash scripts/prepare-release.sh /absolute/path/to/signed-release.apk /absolute/path/to/device-signoff.txt
+./gradlew --no-daemon --offline :app:assembleGeckoRelease  # or :app:assembleLegacyRelease; signed only after real QA
+# Verify on devices, then write a separate device-signoff.txt with DEVICE_TESTS_PASSED=YES and RENDERER_FLAVOR=gecko (or legacy).
+bash scripts/prepare-release.sh /absolute/path/to/app-gecko-release-signed.apk /absolute/path/to/device-signoff.txt gecko
 ```
 
 Never set `DEVICE_TESTS_PASSED=YES` before the tests. The packaging script rejects missing signoff, debug APKs, unsigned APKs, wrong package IDs/version labels and corrupt ZIPs. It packages versioned source ZIP/tar.gz and SHA-256 checksums from committed Git HEAD. Review `out/release-*/RELEASE_NOTES.md` and `BUILD_PROVENANCE.txt`.
@@ -58,3 +58,7 @@ Use the repository's **GitHub Releases** page only after verifying the source ar
 - Receive a safe Character.AI link via Android Share Sheet both from a cold start and with the native library visible. Navigation must bypass the hub. Repeat with a rejected OAuth link and verify no navigation.
 - Force an absent/outdated WebView provider on a test device: no uninitialized WebView dereference or crash; show browser fallback and retry. Do not modify the owner's system WebView without consent.
 - On Android 17/LineageOS Pixel 8a, measure memory and startup with this build against v0.15. No performance percentage is asserted from off-device tests.
+
+## GeckoView ARM64 preview variant (v0.20.0-rc1)
+
+`bash scripts/build-apk.sh gecko` builds the GeckoView ARM64 debug flavor from a complete GitHub checkout; `bash scripts/build-apk.sh legacy` builds the earlier Android WebView flavor. A flavor-specific signed release requires `RENDERER_FLAVOR=gecko`/`legacy` in the device signoff. Gecko support is experimental: file chooser, downloads, OAuth and media require physical-device validation; see [GeckoView test plan](GECKOVIEW_ANDROID_PREVIEW.md). Neither variant can be called a final release until tested.

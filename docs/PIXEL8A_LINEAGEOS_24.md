@@ -85,3 +85,8 @@ References:
 - https://lineageos.github.io/lineage_wiki/gapps/
 
 No installed package data is uploaded; there are no new background services or scheduled scans.
+
+
+## 2026-11-23 GeckoView ARM64 development flavor (not an installed APK)
+
+The project includes a separate `gecko` ARM64 Gradle flavor whose launcher is GeckoActivity; legacy Android System WebView remains as an explicit fallback flavor. GeckoView is pinned to 156.0.20260921121718 for ARM64 Pixel 8a (`akita`). No Android SDK, Gradle or device was available for compiling and running this variant. Pixel 8a Android 17/LineageOS, Google sign-in, media, downloads and memory impact remain unverified. Refer to [`docs/GECKOVIEW_ANDROID_PREVIEW.md`](GECKOVIEW_ANDROID_PREVIEW.md). MindTheGapps and Morphe MicroG-RE are separate components; no app blindly imports Google sessions or treats package visibility as functional Google sign-in.

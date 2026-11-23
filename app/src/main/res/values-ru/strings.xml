@@ -154,4 +154,10 @@
     <string name="hub_bookmark_invalid">Можно сохранить только безопасную ссылку Character.AI</string>
     <string name="hub_bookmark_rename">Переименовать закладку</string>
     <string name="device_compat_title">Совместимость устройства и прошивки</string>
+    <string name="gecko_preview_title">Character.AI · GeckoView (проверка)</string>
+    <string name="gecko_legacy">Инструменты</string>
+    <string name="gecko_media">Микрофон и камера</string>
+    <string name="gecko_media_on">Запросы доступа включены. Отключить? Сайт по-прежнему будет запрашивать разрешение для каждого сеанса.</string>
+    <string name="gecko_media_off">Запросы доступа выключены. Разрешить сайту запрашивать доступ к микрофону и камере?</string>
+    <string name="gecko_error">Не удалось запустить GeckoView. Можно открыть прежние инструменты браузера.</string>
 </resources>

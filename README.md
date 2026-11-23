@@ -1,8 +1,10 @@
+**v0.23.0-source / Android 0.20.0-rc1 GeckoView preview (2026-11-23):** Added a distinct `gecko` ARM64 Android flavor with Mozilla GeckoView as its launcher/browser and `legacy` flavor preserving the previous Android WebView implementation. Native navigation, media permission gate and Gecko tracking protection are implemented in source; missing feature parity is documented, **no APK has been built or installed**. Windows CEF/Whisper prototype remains at v0.3.0. [Gecko preview and limitations](docs/GECKOVIEW_ANDROID_PREVIEW.md) · [New source notes](docs/RELEASE_NOTES_v0.23.0-source.md).
+
 **v0.22.0 source / Windows v0.3.0 pre-alpha (2026-11-23):** Migrated Windows from WebView2 to bundled CEF (CefSharp.Wpf.NETCore 156.0.300). The design needs no separately installed WebView2 Runtime but carries a larger browser bundle and CefSharp has no Chromium sandbox. The native Whisper dictation and editable draft remain. Android is unchanged; GeckoView is a researched migration candidate, **not implemented**. **Neither EXE nor APK has been built or device-tested.** [Renderer decision](docs/RENDERER_DECISION_2026-11-23.md) · [Windows](windows/README.md).
 
 **Windows v0.2.0 source revision:** speech-to-send now avoids sending existing or edited draft; concurrent send requests are blocked. Ctrl+Enter and Clear Draft added. The 8-scenario JS DOM harness can be run with Node. [Details](windows/README.md). **No tested installers yet.**
 
-**Windows client added (source prototype):** See [windows/README.md](windows/README.md) for native WPF/WebView2 and offline Whisper dictation. The original Android client remains separate and unchanged in v0.19.0-rc1. No Windows executable has been built or tested yet.
+**Windows client added (source prototype):** See [windows/README.md](windows/README.md) for native WPF/CEF and offline Whisper dictation. The original Android client remains separate and unchanged in v0.19.0-rc1. No Windows executable has been built or tested yet.
 
 > **v0.19.0-rc1 source candidate:** updated Morphe MicroG-RE package detection for the current `app.revanced.android.gms` and legacy IDs; fixed manual APK release-version drift. No tested APK or guaranteed Google login yet.
 

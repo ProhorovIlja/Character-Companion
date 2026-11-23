@@ -11,7 +11,7 @@ The Character.AI Help Center still describes the API as unavailable at https://s
 | Renderer/UI | Windows | Android | Runtime/install tradeoff | Decision |
 |---|---|---|---|---|
 | **WPF + CEF via CefSharp** | Native WPF shell, embedded Chromium with app | No single shared Android CEF target | Bundles substantial Chromium binaries, no WebView2 Runtime; frequent security updates required | **Selected for current Windows source prototype**: least rewrite of existing microphone/draft feature |
-| **Kotlin/Android Views + Mozilla GeckoView** | GeckoView does not target Windows desktop | Ships Firefox/Gecko engine as an AAR, independent of Android system WebView | Increases APK size and requires manual rewrite of browser APIs, permissions, downloads, auth, tabs and crash handling | **Android migration candidate**, NOT integrated or signed yet |
+| **Kotlin/Android Views + Mozilla GeckoView** | GeckoView does not target Windows desktop | Ships Firefox/Gecko engine as an AAR, independent of Android system WebView | Increases APK size and requires manual rewrite of browser APIs, permissions, downloads, auth, tabs and crash handling | **Android experimental Gecko ARM64 flavor implemented in source**, NOT built or signed yet |
 | Qt Quick/Widgets + Qt WebEngine | Powerful native C++/QML shell and bundled Chromium on Windows | Qt WebEngine is not a viable drop-in for the Android web renderer | Different Qt WebView paths invoke native system web engines, defeating this requirement | Useful desktop alternative, not a single identical renderer for both targets |
 | Avalonia UI | Cross-platform native shell | Cross-platform native shell | Its `NativeWebView` implementation on Windows uses WebView2, so it does not solve this requirement by itself | Native UI framework only, not engine replacement |
 | Tauri/Electron | Tauri delegates to OS webview (WebView2 on Windows); Electron bundles Chromium | Electron is not a native Android strategy | Tauri violates stated runtime preference; Electron heavier/limited cross-platform reuse here | Rejected for current desktop build |
@@ -28,7 +28,7 @@ The existing audio stack remains `NAudio` + user-selected local `whisper-cli.exe
 
 ## Android GeckoView migration: concrete missing work
 
-The Android `MainActivity.kt` directly depends on `WebView`, `WebViewClient`, `WebChromeClient`, `CookieManager`, service workers, Android WebView file chooser, DownloadManager policy and `evaluateJavascript`. GeckoView is NOT compatible at source level. A responsible migration must separately implement and manually verify:
+The `legacy` Android `MainActivity.kt` directly depends on `WebView`, `WebViewClient`, `WebChromeClient`, `CookieManager`, service workers, Android WebView file chooser, DownloadManager policy and `evaluateJavascript`. GeckoView is NOT compatible at source level. A responsible migration must separately implement and manually verify:
 
 1. An engine interface and Gecko runtime lifecycle under Kotlin, with teardown on Android lifecycle events and renderer-crash handling.
 2. Controlled `NavigationDelegate` and first-party policy for top-level visits, while allowing legitimate authentication/CDN subresources. Google OAuth may still refuse embedded browsers. Use a separate browser flow without leaking auth state.
@@ -37,7 +37,7 @@ The Android `MainActivity.kt` directly depends on `WebView`, `WebViewClient`, `W
 5. Cookie, cache, data clearing, restore/session behavior, accessibility, font sizes, IME and keyboard insets, orientation and memory pressure on Pixel 8a (`akita`) running LineageOS 24 / Android 17. Do not copy old WebView cookies into Gecko sessions.
 6. Exact GeckoView version, APK size, memory/CPU/energy metrics and site sign-in/call compatibility tests on physical Android 17 hardware. Keep existing Android implementation as a fallback until signoff.
 
-The Windows CEF migration is in source only. **Android code remains unchanged in this change** to avoid untested loss of existing behavior. Once tested, a browser-engine abstraction could allow GeckoView adoption without sacrificing the native offline workspace.
+The Windows CEF migration is in source only. **Update v0.23:** a separate `gecko` Android flavor now launches GeckoView (ARM64 Pixel 8a preview), while the `legacy` flavor retains the original MainActivity and all its mature WebView features. The new Gecko flavor does not yet match every feature; see `docs/GECKOVIEW_ANDROID_PREVIEW.md`. Neither engine has been compiled or run on a device here.
 
 ## Source references
 

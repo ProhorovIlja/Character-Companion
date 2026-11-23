@@ -10,8 +10,16 @@ android {
         applicationId = "dev.caicompanion.app"
         minSdk = 29
         targetSdk = 36
-        versionCode = 19
-        versionName = "0.19.0-rc1"
+        versionCode = 20
+        versionName = "0.20.0-rc1"
+    }
+    flavorDimensions += "browserEngine"
+    productFlavors {
+        create("legacy") { dimension = "browserEngine" }
+        create("gecko") {
+            dimension = "browserEngine"
+            ndk { abiFilters.add("arm64-v8a") }
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -30,6 +38,8 @@ android {
 }
 
 dependencies {
+    // Gecko browser is confined to the opt-in arm64 flavor. Legacy does not ship it.
+    add("geckoImplementation", "org.mozilla.geckoview:geckoview-arm64-v8a:156.0.20260921121718")
     // Stable AndroidX WebKit 1.18.0 (2026-11-18). Service-worker request interception.
     implementation("androidx.webkit:webkit:1.18.0")
     // Browser-backed Custom Tabs share the default browser's sign-in state,

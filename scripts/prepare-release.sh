@@ -14,10 +14,18 @@ fi
 PKG='dev.caicompanion.app'
 APK="${1:-}"
 SIGNOFF="${2:-}"
+FLAVOR="${3:-}"
+case "$FLAVOR" in gecko|legacy) ;; *) echo "Explicit renderer flavor (gecko|legacy) required." >&2; exit 2;; esac
 if [[ -z "$APK" || -z "$SIGNOFF" || ! -s "$APK" ]]; then
-  echo 'Usage: bash scripts/prepare-release.sh /absolute/path/to/signed-release.apk /path/to/device-signoff.txt' >&2
+  echo 'Usage: bash scripts/prepare-release.sh /path/to/app-gecko-release-signed.apk /path/to/device-signoff.txt gecko|legacy' >&2
   echo 'No APK or device signoff: release preparation intentionally refused.' >&2
   exit 2
+fi
+if [[ "$(basename "$APK")" != *"$FLAVOR"* ]]; then
+  echo 'APK filename must identify its tested renderer flavor.' >&2; exit 2
+fi
+if ! grep -Fxq "RENDERER_FLAVOR=$FLAVOR" "$SIGNOFF"; then
+  echo 'Device signoff does not match selected renderer flavor.' >&2; exit 2
 fi
 if ! grep -Fxq 'DEVICE_TESTS_PASSED=YES' "$SIGNOFF"; then
   echo 'Device test gate NOT passed. Refusing to package a release.' >&2
@@ -56,15 +64,16 @@ fi
 if [[ ! -f docs/RELEASE_TEMPLATE.md ]]; then
   echo 'Missing checked-in release notes template.' >&2; exit 2
 fi
-OUTPUT="${RELEASE_OUTPUT_DIR:-$(pwd)/out/release-$VERSION}"
+OUTPUT="${RELEASE_OUTPUT_DIR:-$(pwd)/out/release-$VERSION-$FLAVOR}"
 mkdir -p "$OUTPUT"
-cp -- "$APK" "$OUTPUT/CharacterCompanion-Android-$VERSION.apk"
-git archive --format=zip --output="$OUTPUT/CharacterCompanion-Android-$VERSION-source.zip" HEAD
-git archive --format=tar HEAD | gzip -n -9 > "$OUTPUT/CharacterCompanion-Android-$VERSION-source.tar.gz"
+cp -- "$APK" "$OUTPUT/CharacterCompanion-Android-$VERSION-$FLAVOR.apk"
+git archive --format=zip --output="$OUTPUT/CharacterCompanion-Android-$VERSION-$FLAVOR-source.zip" HEAD
+git archive --format=tar HEAD | gzip -n -9 > "$OUTPUT/CharacterCompanion-Android-$VERSION-$FLAVOR-source.tar.gz"
 cp -- docs/RELEASE_TEMPLATE.md "$OUTPUT/RELEASE_NOTES.md"
 (cd "$OUTPUT" && sha256sum ./*.apk ./*.zip ./*.tar.gz > SHA256SUMS.txt)
 cat > "$OUTPUT/BUILD_PROVENANCE.txt" <<INFO
 version=$VERSION
+renderer_flavor=$FLAVOR
 commit=$(git rev-parse HEAD)
 package_id=$PKG
 apk_signature=verified_by_apksigner
