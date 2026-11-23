@@ -52,6 +52,8 @@ import java.io.ByteArrayInputStream
 import androidx.webkit.ServiceWorkerClientCompat
 import androidx.webkit.ServiceWorkerControllerCompat
 import androidx.webkit.WebViewFeature
+import androidx.browser.customtabs.CustomTabsIntent
+import androidx.browser.customtabs.CustomTabColorSchemeParams
 
 /** Native Android shell. Browsing is first-party; no private API, HTML scraping or JS credential bridge. */
 class MainActivity : Activity() {
@@ -161,6 +163,8 @@ class MainActivity : Activity() {
         super.onNewIntent(intent)
         if (intent.action == Intent.ACTION_SEND && ::webView.isInitialized) {
             val safe = incomingShareLink(intent)
+            // This Activity is singleTop: clear the new, untrusted share Intent too.
+            setIntent(Intent(Intent.ACTION_MAIN))
             if (safe == null) showToast(getString(R.string.shared_link_rejected))
             else { lastUrl = safe; webView.loadUrl(safe) }
         }
@@ -227,9 +231,13 @@ class MainActivity : Activity() {
             }
             override fun onPageFinished(view: WebView?, url: String?) {
                 titleLabel.text = view?.title?.take(65)?.ifBlank { "character.ai" } ?: "character.ai"
-                if (store.resumePage && UrlPolicy.safeBookmark(url)) store.lastVisited = url.orEmpty()
+                // Persist only a canonical content link, not the raw page URL or fragment.
+                if (store.resumePage) {
+                    UrlPolicy.sanitizeBookmark(url)?.let { store.lastVisited = it }
+                }
                 updateStatus()
-                CookieManager.getInstance().flush()
+                // WebView handles cookies; flush them onPause instead of forcing disk IO
+                // after each navigation (including the many SPA route changes).
                 refreshBackForward()
             }
             override fun onReceivedError(view: WebView?, request: WebResourceRequest, error: WebResourceError) {
@@ -455,7 +463,10 @@ class MainActivity : Activity() {
         findViewById<View>(R.id.reload).setOnClickListener { webView.reload() }
         findViewById<View>(R.id.home).setOnClickListener { webView.loadUrl(HOME) }
         findViewById<View>(R.id.open_browser).setOnClickListener {
-            openExternal(UrlPolicy.safeShareUrl(webView.url) ?: HOME)
+            openBrowserTab(BrowserSessionPolicy.safeTabUrl(webView.url))
+        }
+        findViewById<View>(R.id.open_browser).setOnLongClickListener {
+            openExternal(BrowserSessionPolicy.safeTabUrl(webView.url)); true
         }
         findViewById<View>(R.id.share).setOnClickListener { sharePage() }
         findViewById<View>(R.id.share).setOnLongClickListener { copyPageLink(); true }
@@ -480,7 +491,9 @@ class MainActivity : Activity() {
             .setTitle(R.string.external_identity_title)
             .setMessage(R.string.external_identity_message)
             .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.open_browser) { _, _ -> openExternal(url) }
+            // Restart at the first-party homepage in the browser's own cookie jar.
+            // Never forward an in-progress WebView OAuth URL/nonce to another session.
+            .setPositiveButton(R.string.open_browser) { _, _ -> openBrowserTab(BrowserSessionPolicy.HOME) }
             .show()
     }
 
@@ -493,6 +506,26 @@ class MainActivity : Activity() {
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.open_browser) { _, _ -> openExternal(url) }
             .show()
+    }
+
+    /** Browser-backed mode for sign-in compatibility; it cannot inherit this WebView's cookies. */
+    private fun openBrowserTab(url: String) {
+        val safe = BrowserSessionPolicy.safeTabUrl(url)
+        try {
+            val colors = CustomTabColorSchemeParams.Builder()
+                .setToolbarColor(Color.rgb(21, 22, 30))
+                .setNavigationBarColor(Color.rgb(21, 22, 30))
+                .build()
+            CustomTabsIntent.Builder()
+                .setShowTitle(true)
+                .setShareState(CustomTabsIntent.SHARE_STATE_OFF)
+                .setDefaultColorSchemeParams(colors)
+                .build().launchUrl(this, Uri.parse(safe))
+        } catch (_: ActivityNotFoundException) {
+            openExternal(safe)
+        } catch (_: SecurityException) {
+            openExternal(safe)
+        }
     }
 
     private fun openExternal(url: String) {
@@ -648,6 +681,11 @@ class MainActivity : Activity() {
         layout.addView(sectionLabel(getString(R.string.section_profiles)))
         addButton(layout, getString(R.string.profile_title)) { showProfiles() }
         layout.addView(infoLabel(getString(R.string.profile_desc)))
+        layout.addView(sectionLabel(getString(R.string.section_browser_session)))
+        addButton(layout, getString(R.string.browser_session_open)) {
+            openBrowserTab(BrowserSessionPolicy.HOME)
+        }
+        layout.addView(infoLabel(getString(R.string.browser_session_desc)))
         layout.addView(sectionLabel(getString(R.string.section_privacy)))
         addToggle(layout, getString(R.string.toggle_protect_screen),
             getString(R.string.toggle_protect_screen_desc), store.protectScreen) {

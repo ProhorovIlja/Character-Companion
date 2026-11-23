@@ -1,4 +1,11 @@
-# v0.7.0 — 2026-11-22 (source only)
+# Changelog
+
+## v0.9.0 — 2026-11-23 (source only)
+- Added separate first-party AndroidX Browser 1.10.0 Custom Tab browser session; login compatibility fallback shares the **browser's** cookies, not WebView's. No ad filtering or credentials are shared between them.
+- Identity-provider handoff starts at the Character.AI homepage instead of forwarding an in-progress OAuth URL. Only sanitized first-party URLs can open this browser-session path.
+- Fixed stale Android Share Intent retention in `onNewIntent`, avoided redundant WebView cookie flushing after each load, and made page-resume storage explicitly use a canonical sanitized URL.
+- Improved manual doctor script: verify official Gradle 8.13 wrapper JAR checksum when present; no automatic downloads, CI or event triggers.
+- 27 offline structure tests and 174 standalone Kotlin checks passed. APK compilation and live site still unverified.
 
 ## v0.8.0 — 2026-11-23
 - Accept validated first-party Character.AI links explicitly shared as `text/plain` via the Android Share Sheet, including when the Activity is on top; discard untrusted extras after use.
@@ -13,7 +20,6 @@
 - Added verified official Gradle 8.13 Wrapper binary on GitHub, manual POSIX launcher and pinned distribution checksum; lightweight ZIP omits wrapper JAR.
 - 20 Python structural tests and 149 Kotlin policy assertions pass offline. No Android APK compiled or device-validated.
 
-# Changelog
 
 ## v0.6.0 — 2026-11-22 (source only)
 

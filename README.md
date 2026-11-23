@@ -1,8 +1,19 @@
 # Character Companion — Android
 
-**v0.8.0 source preview · 23 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
+**v0.9.0 source preview · 23 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
 
-**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (23 structural Python tests + 162 Kotlin assertions). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
+**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (27 structural Python tests + 174 Kotlin assertions). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
+
+## v0.9.0 update (23 November 2026)
+
+- **Two browsing paths:** the in-app WebView retains local privacy rules; a separate AndroidX Browser 1.10.0 Custom Tab runs the first-party Character.AI website with the user's **browser session** for compatibility with provider-managed Google/Apple authentication. The tab is an app-launched browser surface, not a credential bridge or a replacement for native WebView filtering.
+- **Correct OAuth handoff:** any identity redirect encountered inside WebView prompts for a browser-backed session that begins at `https://character.ai/` rather than forwarding a state/nonce-bearing Google or Apple authorization URL from the wrong session. Browser cookies do **not** synchronize back to WebView.
+- **Bounded browser URL policy:** Custom Tab URLs must be sanitized public Character.AI content links; the fallback is the fixed HTTPS home URL. No identity, login, password, callback or third-party URL is passed through this browser-session path.
+- **Performance/privacy:** eliminated a redundant cookies-to-disk flush at the end of every page load; still flush on app pause. Incoming Android Share intents are cleared on `onNewIntent`, not only on initial activity creation. Optional saved URL is assigned its canonical sanitized form.
+- **Build-chain audit:** updated the manual doctor script to verify the Gradle Wrapper JAR SHA-256. The full GitHub checkout includes the official JAR, whereas the lightweight source ZIP does not. No CI or scheduled updates.
+- **Offline checks:** 27 Python structural tests + 174 Kotlin policy assertions pass on the available JVM. Android SDK/Gradle compilation and on-device browser-session behavior **have not** been tested.
+
+**Browser-mode tradeoff:** Custom Tabs use the default browser's cookies and security model, *not* this app's WebView cookie jar, domain blocker, request statistics, or appearance settings. Do not promise filtering or silent sign-in transfer for browser-mode sessions.
 
 ## v0.8.0 update (23 November 2026)
 
@@ -45,7 +56,7 @@
 | Area | Feature | Notes |
 | --- | --- | --- |
 | App | One Android `WebView` loading the official site | No reverse-engineered Character.AI API or credential bridge |
-| Navigation | Home, back/forward, reload, share link, receive safe Android Share Sheet links, open in system browser | External Share text is validated before loading; long-press Share copies the current link |
+| Navigation | Home, back/forward, reload, share link, receive safe Android Share Sheet links, open first-party Custom Tab | External Share text is validated before loading; long-press Share copies the current link |
 | Bookmarks | Local 100-entry list, save/open/delete | Only sanitized content URLs; exports and resume also sanitize legacy stored URLs |
 | Interface | Dark graphite/gold native layout, adaptive launcher icon | Status/loading/error overlays, larger touch targets and Android 15/16 system bar insets |
 | Profiles | Balanced / Compatibility / Private / Data saver | One-tap, atomic browser-setting changes; no background action |
@@ -57,7 +68,7 @@
 | Privacy | WebView cookies/storage on device, configurable third-party cookies; optional FLAG_SECURE | Screenshots/recents protection is user-controlled and off by default; no analytics, VPN or background jobs |
 | Media | Camera/mic denied by default; trusted origin + per-request confirmation | Requires Android runtime permission; site voice support is unverified |
 | Files | Android system file picker; manual confirmation of HTTPS downloads | Query-bearing or auth-related URLs open externally; no WebView cookies sent to DownloadManager |
-| Compatibility | Renderer-crash replacement, TLS rejection, retry overlay | Site updates and external Google OAuth may still cause failures |
+| Compatibility | Renderer-crash replacement, TLS rejection, retry overlay, browser-backed session | Site updates and external Google OAuth may still cause failures |
 | Performance | Optional image download saver; compact chrome; text scale; media gesture | No measured performance claims without device benchmarks |
 | Session | Optional resume last visited first-party page | OFF by default; stores sanitized URL locally, not in exported backups |
 | Diagnostics | User-initiated device/API/WebView versions, rule count and Java VM heap | No chat text, cookies or identifiers collected |
@@ -67,7 +78,7 @@
 
 ## Build (Android Studio)
 
-Requirements: Android Studio compatible with AGP **8.13.0**, JDK **17**, **Android SDK 36**, Gradle **8.13**, Kotlin plugin **2.2.0**, AndroidX WebKit **1.18.0**. Application target is API 36; minimum Android version API 29 (Android 10). All external dependencies are downloaded by the build tool when networking is available. The full GitHub repository includes the official verified Gradle 8.13 Wrapper JAR and a POSIX launcher. The lightweight source ZIP omits the binary JAR; use a full GitHub clone or a verified installed Gradle 8.13.
+Requirements: Android Studio compatible with AGP **8.13.0**, JDK **17**, **Android SDK 36**, Gradle **8.13**, Kotlin plugin **2.2.0**, AndroidX WebKit **1.18.0**, AndroidX Browser **1.10.0**. Application target is API 36; minimum Android version API 29 (Android 10). All external dependencies are downloaded by the build tool when networking is available. The full GitHub repository includes the official verified Gradle 8.13 Wrapper JAR and a POSIX launcher. The lightweight source ZIP omits the binary JAR; use a full GitHub clone or a verified installed Gradle 8.13.
 
 1. Clone the **full GitHub repository** (recommended), or extract the source ZIP and supply a local verified Gradle 8.13. The GitHub version includes `gradlew`, `gradle-wrapper.jar` and distribution checksum verification. Open the project root in Android Studio.
 2. Install SDK Platform 36 and required build tools; accept licenses locally. Sync the project.

@@ -11,6 +11,18 @@ else
 fi
 if [[ -f gradle/wrapper/gradle-wrapper.jar && -x ./gradlew ]]; then
   echo 'GRADLE_WRAPPER_FOUND=YES'
+  expected='81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f'
+  actual=''
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual="$(sha256sum gradle/wrapper/gradle-wrapper.jar | cut -d' ' -f1)"
+  elif command -v shasum >/dev/null 2>&1; then
+    actual="$(shasum -a 256 gradle/wrapper/gradle-wrapper.jar | cut -d' ' -f1)"
+  fi
+  if [[ -n "$actual" && "$actual" == "$expected" ]]; then
+    echo 'GRADLE_WRAPPER_SHA256=PASS'
+  else
+    echo 'GRADLE_WRAPPER_SHA256=FAIL_OR_UNAVAILABLE'; fail=1
+  fi
 elif command -v gradle >/dev/null 2>&1; then
   echo 'GRADLE_FOUND=YES'
   gradle --version | sed -n '/^Gradle /p' | head -1

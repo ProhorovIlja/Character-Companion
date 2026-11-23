@@ -10,8 +10,8 @@ android {
         applicationId = "dev.caicompanion.app"
         minSdk = 29
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.8.0"
+        versionCode = 9
+        versionName = "0.9.0"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -32,4 +32,7 @@ android {
 dependencies {
     // Stable AndroidX WebKit 1.18.0 (2026-11-18). Service-worker request interception.
     implementation("androidx.webkit:webkit:1.18.0")
+    // Browser-backed Custom Tabs share the default browser's sign-in state,
+    // while the ad-filtering WebView keeps a separate cookie jar.
+    implementation("androidx.browser:browser:1.10.0")
 }

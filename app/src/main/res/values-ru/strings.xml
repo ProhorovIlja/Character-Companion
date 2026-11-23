@@ -98,7 +98,7 @@
     <string name="profile_data_saver">Экономия · без изображений</string>
     <string name="profile_applied">Применён профиль: %1$s</string>
     <string name="external_identity_title">Вход в другом браузере</string>
-    <string name="external_identity_message">Этот сервис авторизации может запрещать вход через Android WebView. Открыть системный браузер? Его cookie не перенесутся автоматически в это приложение.</string>
+    <string name="external_identity_message">Авторизация Google/Apple может не работать во встроенном WebView. Открыть Character.AI с начала во вкладке системного браузера? Авторизация останется в браузере и не перенесётся автоматически в WebView с фильтрацией.</string>
     <string name="media_permission_title">Character.AI · запрос доступа</string>
     <string name="privacy_stats">Заблокированные домены · сеанс</string>
     <string name="privacy_stats_empty">За этот сеанс запросы не блокировались. Ссылки и переписки не сохраняются.</string>
@@ -120,4 +120,7 @@
     <string name="toggle_protect_screen">Защитить экран и миниатюру в недавних</string>
     <string name="toggle_protect_screen_desc">Запретить обычные снимки и запись экрана в приложении; по умолчанию выключено</string>
     <string name="shared_link_rejected">В полученном тексте нет безопасной публичной ссылки Character.AI</string>
+    <string name="section_browser_session">СЕССИЯ БРАУЗЕРА</string>
+    <string name="browser_session_open">Открыть Character.AI во вкладке браузера</string>
+    <string name="browser_session_desc">Для входа через Google и лучшей совместимости. Используется сессия системного браузера, а не cookies WebView приложения. Фильтрация Character Companion, статистика и настройки оформления WebView на эту вкладку не распространяются.</string>
 </resources>

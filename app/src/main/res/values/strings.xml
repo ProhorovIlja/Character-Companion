@@ -98,7 +98,7 @@
     <string name="profile_data_saver">Low data · skip images</string>
     <string name="profile_applied">Profile applied: %1$s</string>
     <string name="external_identity_title">Sign-in in another browser</string>
-    <string name="external_identity_message">This identity provider may reject sign-in inside Android WebView. Open the provider in your system browser? Browser cookies cannot automatically sign you in to this app.</string>
+    <string name="external_identity_message">Google/Apple authentication can fail in Android WebView. Open Character.AI from the beginning in a browser-backed tab? This tab uses your browser session: sign-in will not automatically transfer back to the filtered WebView.</string>
     <string name="media_permission_title">Character.AI · access request</string>
     <string name="privacy_stats">Blocked domains · this session</string>
     <string name="privacy_stats_empty">No domains blocked in this session. No URLs or conversations are recorded.</string>
@@ -120,4 +120,7 @@
     <string name="toggle_protect_screen">Protect screen and recent-app previews</string>
     <string name="toggle_protect_screen_desc">Prevent normal screenshots and screen recording while this app is open; off by default</string>
     <string name="shared_link_rejected">No safe public Character.AI link found in the shared text</string>
+    <string name="section_browser_session">BROWSER SESSION</string>
+    <string name="browser_session_open">Open Character.AI in a browser tab</string>
+    <string name="browser_session_desc">For Google sign-in and maximum website compatibility. Uses the default browser\'s session, not this app\'s WebView cookies. Character Companion filtering, privacy statistics and WebView appearance settings do not apply inside the browser tab.</string>
 </resources>

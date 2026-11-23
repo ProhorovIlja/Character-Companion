@@ -8,6 +8,7 @@ import dev.caicompanion.app.DownloadPolicy
 import dev.caicompanion.app.RuleListParser
 import dev.caicompanion.app.IncomingLinkParser
 import dev.caicompanion.app.BrowserProfile
+import dev.caicompanion.app.BrowserSessionPolicy
 import java.io.StringReader
 
 fun main() {
@@ -221,5 +222,19 @@ fun main() {
     check(IncomingLinkParser.safeSharedLink(null) == null)
     check(IncomingLinkParser.safeSharedLink("https://c.ai/abc#session=hidden") == "https://c.ai/abc")
     check(IncomingLinkParser.safeSharedLink("https://character.ai/@trusted/one)") == "https://character.ai/@trusted/one")
+    // Browser-backed session always starts from a safe first-party URL. Cookies
+    // are not moved from WebView; OAuth redirects are deliberately discarded.
+    check(BrowserSessionPolicy.safeTabUrl(null) == "https://character.ai/")
+    check(BrowserSessionPolicy.safeTabUrl("https://character.ai/chat?id=abc") == "https://character.ai/chat?id=abc")
+    check(BrowserSessionPolicy.safeTabUrl("https://character.ai/chat?id=abc#token=secret") == "https://character.ai/chat?id=abc")
+    check(BrowserSessionPolicy.safeTabUrl("https://character.ai/account/oauth?code=TOPSECRET") == "https://character.ai/")
+    check(BrowserSessionPolicy.safeTabUrl("https://accounts.google.com/o/oauth2/v2/auth?code=X") == "https://character.ai/")
+    check(BrowserSessionPolicy.safeTabUrl("https://character.ai.evil.test/a") == "https://character.ai/")
+    check(BrowserSessionPolicy.safeTabUrl("https://evil@character.ai/") == "https://character.ai/")
+    check(BrowserSessionPolicy.safeTabUrl("javascript:alert(1)") == "https://character.ai/")
+    check(BrowserSessionPolicy.safeTabUrl("https://c.ai/chats") == "https://c.ai/chats")
+    check(BrowserSessionPolicy.safeTabUrl("https://c.ai:444/chats") == "https://character.ai/")
+    check(BrowserSessionPolicy.safeTabUrl("https://character.ai/?token=SECRET") == "https://character.ai/")
+    check(BrowserSessionPolicy.safeTabUrl("https://character.ai/../auth") == "https://character.ai/")
     println("PolicySmoke: browser policy, concurrency, URL safety and local statistics assertions passed")
 }

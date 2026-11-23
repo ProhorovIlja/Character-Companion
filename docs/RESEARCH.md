@@ -47,3 +47,10 @@ The site itself, not this wrapper, owns account authentication and available cha
 - Android WebViewClient reference: https://developer.android.com/reference/android/webkit/WebViewClient (interception limitations; errors must not be conflated with site functionality).
 - Character.AI login documentation: https://support.character.ai/hc/en-us/articles/23628361893659-Trouble-logging-in-We-ve-Updated-our-Login-Process (Google/Apple/email sign-in, not a public client API).
 - Considered reusing alternative Android WebView adblock projects, but copying unreviewed third-party code is less safe than a bounded auditable domain filter. No third-party source merged.
+
+## v0.9 browser-session fallback — November 2026
+
+- [AndroidX Browser 1.10.0](https://developer.android.com/jetpack/androidx/releases/browser): stable browser support for Android Custom Tabs.
+- [Custom Tabs overview](https://developer.android.com/develop/ui/views/layout/webapps/overview-of-android-custom-tabs): browser-backed tabs share browser cookies/permissions and security features, not the WebView cookie jar.
+- [Google sign-in best practices](https://developers.google.com/identity/siwg/best-practices): embedded Android WebViews are blocked for Google OAuth.
+- A Custom Tab is **not** a credential-transfer bridge, a replacement API for Character.AI, or an app-controlled adblock surface. The fallback must start a clean first-party login journey in the browser.

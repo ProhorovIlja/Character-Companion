@@ -1,8 +1,8 @@
-# Quality assurance · 2026-11-23 · v0.8.0
+# Quality assurance · 2026-11-23 · v0.9.0
 
 ## Completed in offline environment
 
-- `bash scripts/test-offline.sh` passed: **20 Python structural tests** and **149 Kotlin assertions**.
+- `bash scripts/test-offline.sh` passed: **27 Python structural tests** and **174 Kotlin assertions**.
 - Kotlin checks cover HTTPS and hostname boundaries, rejecting domain spoofing, protected service hosts, strict filter rules/overrides, URL query sanitization, identity URL discrimination, request counts and bounded Reader behavior.
 - Static checks cover XML parsing, RU/EN parity, privacy manifest defaults, no scheduled jobs, HTTPS-only surface, atomic settings import, conservative domain rules and no Javascript bridge.
 - New offline cases cover URL sharing sanitization (including encoded auth paths), four browser profiles, UI code contracts for external-link and download confirmation, fullscreen, permission cleanup, and legacy storage sanitization.
@@ -64,3 +64,12 @@
 - Toggle screen protection; check screenshots, screen recording and recent-apps thumbnail behavior. Verify disabling it restores normal screenshots.
 - Export JSON to a functional Storage Access Framework provider; simulate a provider returning no stream and check the error message. Roundtrip the screen protection setting.
 - Confirm Android 29/33/35/36 app installation and real Character.AI site authentication, messaging and media functions; these remain untested and must not be represented as verified.
+
+## v0.9 browser-backed session verification — PENDING ON ANDROID
+
+- Confirm AndroidX Browser 1.10.0 dependency resolves and Custom Tab launches on Android 10, 13, 15, 16. Test with Chrome and another browser, plus no Custom Tabs-capable browser.
+- Verify the tab inherits **only the system browser** cookie session; it must not log the user into the in-app WebView. Test whether Character.AI login works in the browser tab without calling it a WebView fix.
+- On Google/Apple authentication attempts inside WebView, verify the prompt opens a fresh `https://character.ai/` tab, *not* a transient OAuth redirect with `state`, `nonce`, or `code`.
+- Verify browser mode does **not** block ads or show WebView-only settings, and switching back to the filtered mode does not claim browser cookies transferred.
+- Launch through the Share Sheet twice on the same Activity; ensure original untrusted extras cannot be reused.
+- Use Android Profiler / tracing to measure whether removing per-navigation cookie flushing improves smoothness without harming session persistence. No benchmark claims from offline tests.

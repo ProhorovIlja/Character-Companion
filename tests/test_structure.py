@@ -153,7 +153,7 @@ class Structure(unittest.TestCase):
         self.assertIn('BoundedText.read(reader, RuleListParser.MAX_CHARACTERS)', activity)
         self.assertIn('IMPORT_FILTER_LIST ->', activity)
         self.assertIn('if (configuration == appliedConfiguration) return', engine)
-        self.assertIn('RuleListParser,IncomingLinkParser}.kt', script)
+        self.assertIn('RuleListParser,IncomingLinkParser,BrowserSessionPolicy}.kt', script)
         self.assertNotIn('https://easylist.to/easylist/easylist.txt', activity)
         self.assertNotIn('PeriodicWorkRequest', activity)
 
@@ -201,6 +201,55 @@ class Structure(unittest.TestCase):
         self.assertIn('view.isSaveEnabled = false', main)
         self.assertIn('view.isSaveFromParentEnabled = false', main)
         self.assertIn('Document provider returned no output stream', main)
+
+    def test_browser_session_is_first_party_and_no_cookie_stealing(self):
+        activity=(ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
+        browser=(ROOT/'app/src/main/java/dev/caicompanion/app/BrowserSessionPolicy.kt').read_text()
+        build=(ROOT/'app/build.gradle.kts').read_text()
+        self.assertIn('implementation("androidx.browser:browser:1.10.0")', build)
+        self.assertIn('CustomTabsIntent.Builder()', activity)
+        self.assertIn('BrowserSessionPolicy.safeTabUrl(webView.url)', activity)
+        self.assertIn('openBrowserTab(BrowserSessionPolicy.HOME)', activity)
+        self.assertIn('UrlPolicy.sanitizeBookmark(current) ?: HOME', browser)
+        self.assertNotIn('CookieManager.getInstance().getCookie(', activity)
+        self.assertNotIn('setUserAgentString(', activity)
+        self.assertNotIn('addJavascriptInterface(', activity)
+        self.assertNotIn('.github/workflows', str(ROOT/'app'))
+
+    def test_browser_session_strings_and_persistent_intent_safety(self):
+        activity=(ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
+        self.assertIn('setIntent(Intent(Intent.ACTION_MAIN))', activity)
+        self.assertIn('val safe = incomingShareLink(intent)\n            // This Activity is singleTop', activity)
+        self.assertIn('UrlPolicy.sanitizeBookmark(url)?.let { store.lastVisited = it }', activity)
+        self.assertNotIn('store.lastVisited = url.orEmpty()', activity)
+        self.assertIn('CookieManager.getInstance().flush()', activity) # onPause / clear-data only
+        self.assertIn('BrowserSessionPolicy,', (ROOT/'scripts/test-offline.sh').read_text().replace('}.kt',','))
+        en=(ROOT/'app/src/main/res/values/strings.xml').read_text()
+        ru=(ROOT/'app/src/main/res/values-ru/strings.xml').read_text()
+        for key in ['browser_session_open','browser_session_desc','section_browser_session']:
+            self.assertIn('name="'+key+'"', en)
+            self.assertIn('name="'+key+'"', ru)
+
+    def test_browser_dependencies_are_pinned_without_new_permissions(self):
+        build=(ROOT/'app/build.gradle.kts').read_text()
+        manifest=(ROOT/'app/src/main/AndroidManifest.xml').read_text()
+        self.assertIn('versionName = "0.9.0"', build)
+        self.assertIn('androidx.browser:browser:1.10.0', build)
+        self.assertIn('androidx.webkit:webkit:1.18.0', build)
+        self.assertNotIn('android.permission.QUERY_ALL_PACKAGES', manifest)
+        self.assertNotIn('android.permission.READ_EXTERNAL_STORAGE', manifest)
+        self.assertNotIn('android.permission.WRITE_EXTERNAL_STORAGE', manifest)
+        self.assertNotIn('android:usesCleartextTraffic="true"', manifest)
+
+    def test_debug_apk_build_is_manual_and_verified(self):
+        script=(ROOT/'scripts/build-apk.sh').read_text()
+        self.assertIn('scripts/doctor.sh', script)
+        self.assertIn('--no-daemon :app:assembleDebug', script)
+        self.assertIn('APK_READY=', script)
+        self.assertIn('APK_SHA256=', script)
+        self.assertIn('[[ ! -s "$apk" ]]', script)
+        self.assertNotIn('upload-file', script)
+        self.assertNotIn('schedule', script.lower().split('set -euo pipefail',1)[1])
 
     def test_all_localized_keys_unique(self):
         for locale in ('values','values-ru'):
