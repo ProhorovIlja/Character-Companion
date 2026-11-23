@@ -41,3 +41,8 @@ For Android 11–17, the shell now checks `WindowInsets.Type.ime()` instead of u
 ## v0.15.0 source check
 
 The native library can create and rename sanitized first-party bookmarks without WebView traffic. Configuration changes while the offline library is visible are queued until the web surface resumes; explicit navigation consumes the queued refresh instead of loading twice. These are JVM-tested policies only, **not Android 17 device validation**.
+
+
+## v0.16 lazy WebView, pending Android 17 device test
+
+Native library cold start now avoids WebView inflation and cookie-manager initialization. Compare first frame, Java/native memory and return-to-browser behavior against v0.15 on LineageOS Android 17. Validate with both a functional WebView provider and a test environment with an unavailable provider. No device results or Play Protect outcomes are claimed.

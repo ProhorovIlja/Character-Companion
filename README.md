@@ -1,5 +1,7 @@
 # Character Companion — Android
 
+**v0.16.0-rc1 — source candidate (23 November 2026).** Native cold start now defers WebView creation, Chromium startup, service worker and user-agent initialization until the first explicit website navigation. Android Share links bypass the offline home when valid; missing WebView provider errors can be retried without dereferencing an uninitialized WebView. 50 Python tests and 243 Kotlin smoke assertions pass offline. **APK not built or device tested.** [Notes](docs/RELEASE_NOTES_v0.16.0-rc1.md) · [Android 17](docs/ANDROID_17.md).
+
 **v0.15.0-rc1 source candidate · 23 November 2026.** Native offline bookmark creation and rename, deferred website refresh while offline, stricter imported bookmark titles, Russian/English strings and 49 passing Python tests plus JVM Kotlin policy tests. **Android-only; no signed or device-tested APK yet.** [Release notes](docs/RELEASE_NOTES_v0.15.0-rc1.md) · [Native architecture](docs/NATIVE_ARCHITECTURE.md) · [Android 17 checklist](docs/ANDROID_17.md).
 
 **v0.14.0-rc1 source candidate (23 November 2026).** Fixes native workspace lifecycle, shared-link routing, local bookmark actions, and asynchronous manual settings backups; microphone/camera prompts are blocked while the app or workspace is hidden. Offline tests pass. No verified APK or Android 17 device test. See [native architecture](docs/NATIVE_ARCHITECTURE.md) and [release notes](docs/RELEASE_NOTES_v0.14.0-rc1.md).
@@ -7,7 +9,7 @@
 
 **Previous v0.12.0-rc1 source candidate · 23 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
 
-**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (49 Python unit/structural tests + 239 pure Kotlin `check` assertions). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
+**Current delivery status:** project sources, tests, Android resources and build instructions are included. Current offline checks pass (50 Python tests + 243 pure Kotlin `check` expressions). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
 
 ## v0.11.0-rc1 — Android 17 & XAPK research readiness (NOT an APK release)
 

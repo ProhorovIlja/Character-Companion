@@ -118,3 +118,11 @@
 ## v0.2.0 — 2026-11-22
 
 - Initial Kotlin Android WebView client with bookmarks, privacy host rules, media permissions, file picker, downloads and manual settings backups.
+
+## v0.16.0-rc1 — 2026-11-23 (Android source candidate)
+
+- Lazy WebView: native offline library no longer inflates Chromium at startup; browser initialized on explicit first-party navigation only.
+- Android Share Sheet links override the optional native launch screen; foreground `singleTop` sharing works without a preexisting WebView.
+- WebView initialization errors offer native error/retry/browser fallback; retry cannot dereference an uninitialized WebView.
+- Lifecycle handles absence of WebView during backgrounding and destruction; cookie flushing is avoided before browser creation.
+- New pure Kotlin startup policy and regression tests; 50 Python tests and 243 Kotlin checks passed. Full Android APK compilation, install and Android 17 performance/compatibility still pending.

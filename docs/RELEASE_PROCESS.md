@@ -49,3 +49,12 @@ Use the repository's **GitHub Releases** page only after verifying the source ar
 - Rename an existing bookmark; verify search refreshes and the old URL remains canonical.
 - Toggle filters while the native home is open; verify no network reload until the web surface becomes visible. A direct navigation should load the new page once, never reload the old one first.
 - Return from background and fullscreen keyboard interactions; verify browser chrome and media permissions remain safe.
+
+
+## Lazy native startup verification — v0.16 source candidate (pending hardware)
+
+- With native workspace enabled, force-stop and cold-start Character Companion while offline. Confirm no WebView provider process is created merely by opening/filtering/renaming bookmarks. Capture cold-start duration and PSS only via on-device profiling with user approval.
+- From the workspace, open a safe Character.AI link: WebView must initialize exactly once, load the intended page and leave no native overlay behind. Close/reopen the hub, background and rotate.
+- Receive a safe Character.AI link via Android Share Sheet both from a cold start and with the native library visible. Navigation must bypass the hub. Repeat with a rejected OAuth link and verify no navigation.
+- Force an absent/outdated WebView provider on a test device: no uninitialized WebView dereference or crash; show browser fallback and retry. Do not modify the owner's system WebView without consent.
+- On Android 17/LineageOS Pixel 8a, measure memory and startup with this build against v0.15. No performance percentage is asserted from off-device tests.

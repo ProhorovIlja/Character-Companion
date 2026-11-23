@@ -38,3 +38,8 @@
 ## v0.15.0: native offline bookmark editor and refresh policy
 
 `OfflineBookmarkEditor` normalizes user-supplied titles and passes links through the strict first-party bookmark URL policy; this also applies to imported bookmarks in `SettingsStore`. `DeferredWebReload` is a pure Kotlin controller that records user-driven settings changes while the Activity is stopped or its offline workspace is visible, and consumes them only when appropriate. Explicit first-party navigation clears the pending refresh before moving to WebView. Neither class contacts Character.AI or invokes a native library.
+
+
+## v0.16: true lazy WebView lifecycle
+
+Unlike v0.13–v0.15, the native hub no longer inflates WebView in its Android XML layout. `MainActivity.ensureWebView()` creates and configures it only after explicit navigation (or after dismissing the hub into the browser). `NativeStartupPolicy` gives a validated Android Share link priority over the optional offline start preference. `onPause`, `onDestroy`, toolbar state, renderer lifecycle and retry paths tolerate WebView not having been created. Service-worker and user-agent initialization are also deferred. This should reduce cold-start and memory overhead for users staying in the native library, but requires real Pixel 8a instrumentation to establish quantitative improvement. It does **not** make the remote Character.AI chat UI native.

@@ -12,12 +12,18 @@ import dev.caicompanion.app.BrowserSessionPolicy
 import dev.caicompanion.app.RendererRecoveryBudget
 import dev.caicompanion.app.NativeLibrarySearch
 import dev.caicompanion.app.NativeWorkspaceNavigation
+import dev.caicompanion.app.NativeStartupPolicy
 import dev.caicompanion.app.DeferredWebReload
 import dev.caicompanion.app.OfflineBookmarkEditor
 import dev.caicompanion.app.SupportReport
 import java.io.StringReader
 
 fun main() {
+    // A cold local-library start never creates Chromium. Explicit shared links bypass it.
+    check(NativeStartupPolicy.useHub(true, null))
+    check(!NativeStartupPolicy.useHub(false, null))
+    check(!NativeStartupPolicy.useHub(true, "https://character.ai/chat?id=abc"))
+    check(!NativeStartupPolicy.useHub(false, "https://character.ai/chat?id=abc"))
     check(NativeWorkspaceNavigation.safeDestination("https://character.ai/chat/abc?access_token=secret") ==
         "https://character.ai/chat/abc")
     check(NativeWorkspaceNavigation.safeDestination("https://evil.example/path") == "https://character.ai/")

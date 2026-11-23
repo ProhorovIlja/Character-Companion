@@ -124,3 +124,12 @@
 - Import a JSON settings backup from a slow document provider; the application must remain responsive. Export must report errors when no writable SAF stream is supplied.
 - From a hidden app or native workspace, ensure WebRTC microphone/camera requests cannot show a permission prompt or be granted.
 - Repeat on Android 10, 13, 16 and Pixel 8a LineageOS Android 17. Confirm keyboard insets, predictive Back, rotation and accessibility.
+
+## v0.16 Android 17 lazy-start QA — PENDING DEVICE
+
+- Verify a fresh install with `startInHub` enabled opens the local library without initializing a WebView; check actual process memory in Android Studio Profiler, not just absence of network traffic.
+- Navigate from the hub to a public Character.AI link; a WebView should be initialized once. Return to the hub and verify it does not restart the renderer. The browser still needs a supported WebView provider.
+- From the Android Share Sheet, launch a public Character.AI link from both a closed app and a running native hub; verify it bypasses the offline hub. Rejected/identity links should not launch anything.
+- If no WebView provider exists, show the first-party error screen and system-browser option. Test retry and Back without crashes.
+- Test app pause/resume and activity destruction before any WebView creation; no cookie flush should trigger Chromium initialization.
+- Repeat startup/rotation/keyboard/recent-apps, permission and site-login checks on Pixel 8a with LineageOS API 37. Measure cold-start and PSS against v0.15 before asserting improvement.

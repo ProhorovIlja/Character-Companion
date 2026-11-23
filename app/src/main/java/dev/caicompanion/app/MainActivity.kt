@@ -103,7 +103,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WebView.setWebContentsDebuggingEnabled(false)
+        // The native workspace starts without initializing the Chromium WebView provider.
         store = SettingsStore(this)
         importedRuleStore = ImportedRuleStore(this)
         importedRules = importedRuleStore.load()
@@ -121,13 +121,9 @@ class MainActivity : Activity() {
         titleLabel = findViewById(R.id.page_title)
         footer = findViewById(R.id.chrome_footer)
         header = findViewById(R.id.chrome_header)
-        webView = findViewById(R.id.web_view)
-        defaultAgent = WebSettings.getDefaultUserAgent(this)
-        installServiceWorkerFilter()
-        configureWebView(webView)
         bindControls()
         applySettings(reload = false)
-        // Android 15/16 enforce edge-to-edge. Keep native controls outside system bars.
+        // Android 15-17 enforce edge-to-edge. Keep native controls outside system bars.
         val root = findViewById<View>(R.id.root)
         root.setOnApplyWindowInsetsListener { target, insets ->
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -159,7 +155,9 @@ class MainActivity : Activity() {
         // Drop untrusted share extras from the Activity's retained Intent after validation.
         if (intent?.action == Intent.ACTION_SEND) setIntent(Intent(Intent.ACTION_MAIN))
         lastUrl = initialShare ?: (if (store.resumePage) store.lastVisited.ifBlank { HOME } else HOME)
-        if (store.startInHub) showNativeHub() else webView.loadUrl(lastUrl)
+        // An explicit Android Share request must take priority over the offline startup hub.
+        if (NativeStartupPolicy.useHub(store.startInHub, initialShare)) showNativeHub()
+        else openFirstPartyPage(lastUrl)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             modernBackCallback = OnBackInvokedCallback { navigateBack() }
             onBackInvokedDispatcher.registerOnBackInvokedCallback(
@@ -176,12 +174,38 @@ class MainActivity : Activity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (intent.action == Intent.ACTION_SEND && ::webView.isInitialized) {
+        if (intent.action == Intent.ACTION_SEND && ::container.isInitialized) {
             val safe = incomingShareLink(intent)
             // This Activity is singleTop: clear the new, untrusted share Intent too.
             setIntent(Intent(Intent.ACTION_MAIN))
             if (safe == null) showToast(getString(R.string.shared_link_rejected))
             else openFirstPartyPage(safe)
+        }
+    }
+
+    /** Allocate WebView only after an explicit navigation, never while browsing local bookmarks.
+     * The XML layout deliberately contains no WebView to inflate at native startup.
+     */
+    private fun ensureWebView(): Boolean {
+        if (::webView.isInitialized) return true
+        var created: WebView? = null
+        return try {
+            WebView.setWebContentsDebuggingEnabled(false)
+            val view = WebView(this)
+            created = view
+            defaultAgent = WebSettings.getDefaultUserAgent(this)
+            installServiceWorkerFilter()
+            configureWebView(view)
+            container.addView(view, 0, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            webView = view
+            syncRendererLifecycle()
+            refreshBackForward()
+            true
+        } catch (_: RuntimeException) {
+            created?.let { runCatching { (it.parent as? ViewGroup)?.removeView(it); it.destroy() } }
+            showError(getString(R.string.error_loading))
+            false
         }
     }
 
@@ -519,7 +543,10 @@ class MainActivity : Activity() {
         }
         findViewById<View>(R.id.filter).setOnLongClickListener { showFilterRules(); true }
         findViewById<View>(R.id.settings).setOnClickListener { showSettings() }
-        findViewById<View>(R.id.error_retry).setOnClickListener { errorOverlay.visibility = View.GONE; webView.loadUrl(lastUrl) }
+        findViewById<View>(R.id.error_retry).setOnClickListener {
+            errorOverlay.visibility = View.GONE
+            openFirstPartyPage(lastUrl)
+        }
         findViewById<View>(R.id.error_open_browser).setOnClickListener {
             openBrowserTab(BrowserSessionPolicy.safeTabUrl(lastUrl))
         }
@@ -643,8 +670,8 @@ class MainActivity : Activity() {
         findViewById<TextView>(R.id.filter).setTextColor(if (store.blocking) ACCENT else MUTED)
     }
     private fun refreshBackForward() {
-        findViewById<View>(R.id.back).alpha = if (webView.canGoBack()) 1f else 0.35f
-        findViewById<View>(R.id.forward).alpha = if (webView.canGoForward()) 1f else 0.35f
+        findViewById<View>(R.id.back).alpha = if (::webView.isInitialized && webView.canGoBack()) 1f else 0.35f
+        findViewById<View>(R.id.forward).alpha = if (::webView.isInitialized && webView.canGoForward()) 1f else 0.35f
     }
     private fun showError(message: String) {
         errorOverlay.visibility = View.VISIBLE
@@ -811,11 +838,12 @@ class MainActivity : Activity() {
         refresh("")
         addButton(layout, getString(R.string.close)) { closeNativeHub() }
         nativeHub = panel
+        header.visibility = View.GONE
         updateFooterVisibility()
         // A hidden web page cannot keep a pending microphone/camera prompt alive.
         denyPendingMedia()
-        // Pause timers/media while the independent offline screen covers the site.
-        webView.onPause()
+        // No WebView exists on cold native startup, so nothing Chromium-related is loaded.
+        if (::webView.isInitialized) webView.onPause()
         container.addView(panel, FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         panel.bringToFront()
@@ -826,6 +854,10 @@ class MainActivity : Activity() {
         val safeUrl = NativeWorkspaceNavigation.safeDestination(rawUrl)
         lastUrl = safeUrl
         deferredWebReload.consumedByNavigation()
+        if (!ensureWebView()) {
+            closeNativeHub(loadIfBlank = false)
+            return
+        }
         closeNativeHub(loadIfBlank = false)
         webView.loadUrl(safeUrl)
     }
@@ -837,7 +869,9 @@ class MainActivity : Activity() {
             container.removeView(it)
         }
         nativeHub = null
+        header.visibility = if (store.compactChrome || fullscreenView != null) View.GONE else View.VISIBLE
         updateFooterVisibility()
+        if (!destroyed && loadIfBlank && !::webView.isInitialized && !ensureWebView()) return
         if (!destroyed && ::webView.isInitialized) {
             // Closing the native launch screen must never reveal an uninitialized blank WebView.
             if (loadIfBlank && NativeWorkspaceNavigation.needsInitialLoad(webView.url)) {
@@ -1243,7 +1277,7 @@ class MainActivity : Activity() {
         when {
             nativeHub != null -> closeNativeHub()
             fullscreenView != null -> leaveFullscreen()
-            webView.canGoBack() -> webView.goBack()
+            ::webView.isInitialized && webView.canGoBack() -> webView.goBack()
             else -> finish()
         }
     }
@@ -1261,7 +1295,8 @@ class MainActivity : Activity() {
         activityResumed = false
         super.onPause()
         syncRendererLifecycle()
-        CookieManager.getInstance().flush()
+        // CookieManager access itself may start WebView: keep cold native startup cold.
+        if (::webView.isInitialized) CookieManager.getInstance().flush()
     }
     override fun onResume() {
         super.onResume()
@@ -1285,8 +1320,10 @@ class MainActivity : Activity() {
         closeNativeHub()
         denyPendingMedia()
         chooser?.onReceiveValue(null); chooser = null
-        container.removeView(webView)
-        webView.destroy()
+        if (::webView.isInitialized) {
+            container.removeView(webView)
+            webView.destroy()
+        }
         super.onDestroy()
     }
 
