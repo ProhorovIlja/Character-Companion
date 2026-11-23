@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
@@ -18,6 +19,7 @@ import android.view.WindowManager
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -26,12 +28,15 @@ import org.mozilla.geckoview.GeckoResult
 import org.mozilla.geckoview.GeckoRuntime
 import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.GeckoView
+import org.mozilla.geckoview.WebResponse
 
 /** ARM64 Gecko preview; does not use Android WebView or transfer its cookies. */
 class GeckoActivity : Activity() {
     companion object {
         private const val HOME = "https://character.ai/"
         private const val MEDIA_REQUEST_CODE = 817
+        private const val OPEN_DOCUMENT_CODE = 818
+        private const val SAVE_DOCUMENT_CODE = 819
         @Volatile private var engine: GeckoRuntime? = null
         private fun engine(context: Context): GeckoRuntime = synchronized(this) {
             engine ?: GeckoRuntime.create(context.applicationContext).also { engine = it }
@@ -52,6 +57,13 @@ class GeckoActivity : Activity() {
     private var permissionCallback: GeckoSession.PermissionDelegate.Callback? = null
     private var pendingMediaCallback: GeckoSession.PermissionDelegate.MediaCallback? = null
     private var started = false
+    private var pendingFilePrompt: GeckoSession.PromptDelegate.FilePrompt? = null
+    private var pendingFileResult: GeckoResult<GeckoSession.PromptDelegate.PromptResponse>? = null
+    private var filePickerOpen = false
+    private var filePickerOrigin: String? = null
+    private var pendingDownload: WebResponse? = null
+    private var downloadPickerOpen = false
+    private var genericPromptDialog: AlertDialog? = null
     private var backCallback: OnBackInvokedCallback? = null
     private val fg = Color.rgb(235, 225, 211)
     private val accent = Color.rgb(201, 169, 113)
@@ -118,7 +130,8 @@ class GeckoActivity : Activity() {
             session.settings.setUseTrackingProtection(settings.blocking)
             session.setNavigationDelegate(navigationDelegate)
             session.setProgressDelegate(progressDelegate)
-            session.setContentDelegate(object : GeckoSession.ContentDelegate {})
+            session.setContentDelegate(contentDelegate)
+            session.setPromptDelegate(promptDelegate)
             session.setPermissionDelegate(permissionDelegate)
             session.open(engine(applicationContext))
             surface.setSession(session)
@@ -164,6 +177,253 @@ class GeckoActivity : Activity() {
         val safe = sharedLink(intent)
         if (intent.action == Intent.ACTION_SEND) setIntent(Intent(Intent.ACTION_MAIN))
         if (safe != null && ::session.isInitialized && session.isOpen) session.loadUri(safe)
+    }
+
+    /** SAF selection: Gecko sees only URIs explicitly selected by the user, not device storage. */
+    private val promptDelegate = object : GeckoSession.PromptDelegate {
+        override fun onAlertPrompt(
+            session: GeckoSession, prompt: GeckoSession.PromptDelegate.AlertPrompt
+        ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse> {
+            if (!started || genericPromptDialog?.isShowing == true)
+                return GeckoResult.fromValue(prompt.dismiss())
+            val result = GeckoResult<GeckoSession.PromptDelegate.PromptResponse>()
+            genericPromptDialog = AlertDialog.Builder(this@GeckoActivity)
+                .setTitle(prompt.title.orEmpty().take(100).ifBlank { getString(R.string.app_name) })
+                .setMessage(prompt.message.orEmpty().take(1200))
+                .setPositiveButton(android.R.string.ok) { _, _ -> result.complete(prompt.dismiss()) }
+                .setOnCancelListener { if (!prompt.isComplete) result.complete(prompt.dismiss()) }
+                .setOnDismissListener { if (!prompt.isComplete) result.complete(prompt.dismiss()) }
+                .create().also { it.show() }
+            return result
+        }
+
+        override fun onButtonPrompt(
+            session: GeckoSession, prompt: GeckoSession.PromptDelegate.ButtonPrompt
+        ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse> {
+            if (!started || genericPromptDialog?.isShowing == true)
+                return GeckoResult.fromValue(prompt.dismiss())
+            val result = GeckoResult<GeckoSession.PromptDelegate.PromptResponse>()
+            genericPromptDialog = AlertDialog.Builder(this@GeckoActivity)
+                .setTitle(prompt.title.orEmpty().take(100).ifBlank { getString(R.string.app_name) })
+                .setMessage(prompt.message.orEmpty().take(1200))
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    result.complete(prompt.confirm(GeckoSession.PromptDelegate.ButtonPrompt.Type.POSITIVE))
+                }
+                .setNegativeButton(android.R.string.cancel) { _, _ ->
+                    result.complete(prompt.confirm(GeckoSession.PromptDelegate.ButtonPrompt.Type.NEGATIVE))
+                }
+                .setOnCancelListener { if (!prompt.isComplete) result.complete(prompt.dismiss()) }
+                .setOnDismissListener { if (!prompt.isComplete) result.complete(prompt.dismiss()) }
+                .create().also { it.show() }
+            return result
+        }
+
+        override fun onTextPrompt(
+            session: GeckoSession, prompt: GeckoSession.PromptDelegate.TextPrompt
+        ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse> {
+            if (!started || genericPromptDialog?.isShowing == true)
+                return GeckoResult.fromValue(prompt.dismiss())
+            val result = GeckoResult<GeckoSession.PromptDelegate.PromptResponse>()
+            val field = EditText(this@GeckoActivity).apply {
+                setSingleLine(true)
+                setText(prompt.defaultValue.orEmpty().take(4096))
+                setSelectAllOnFocus(true)
+            }
+            genericPromptDialog = AlertDialog.Builder(this@GeckoActivity)
+                .setTitle(prompt.title.orEmpty().take(100).ifBlank { getString(R.string.app_name) })
+                .setMessage(prompt.message.orEmpty().take(600))
+                .setView(field)
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    result.complete(prompt.confirm(field.text.toString().take(4096)))
+                }
+                .setNegativeButton(android.R.string.cancel) { _, _ -> result.complete(prompt.dismiss()) }
+                .setOnCancelListener { if (!prompt.isComplete) result.complete(prompt.dismiss()) }
+                .setOnDismissListener { if (!prompt.isComplete) result.complete(prompt.dismiss()) }
+                .create().also { it.show() }
+            return result
+        }
+
+        override fun onChoicePrompt(
+            session: GeckoSession, prompt: GeckoSession.PromptDelegate.ChoicePrompt
+        ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse> {
+            if (!started || genericPromptDialog?.isShowing == true)
+                return GeckoResult.fromValue(prompt.dismiss())
+            val choices = prompt.choices.flatMap { it.items?.toList() ?: listOf(it) }
+                .filter { !it.separator && !it.disabled }.take(100)
+            if (choices.isEmpty()) return GeckoResult.fromValue(prompt.dismiss())
+            val names = choices.map { it.label.take(150) }.toTypedArray()
+            val result = GeckoResult<GeckoSession.PromptDelegate.PromptResponse>()
+            val builder = AlertDialog.Builder(this@GeckoActivity)
+                .setTitle(prompt.title.orEmpty().take(100).ifBlank { getString(R.string.app_name) })
+                .setOnCancelListener { if (!prompt.isComplete) result.complete(prompt.dismiss()) }
+                .setOnDismissListener { if (!prompt.isComplete) result.complete(prompt.dismiss()) }
+            if (prompt.type == GeckoSession.PromptDelegate.ChoicePrompt.Type.MULTIPLE) {
+                val selected = choices.map { it.selected }.toBooleanArray()
+                builder.setMultiChoiceItems(names, selected) { _, index, checked -> selected[index] = checked }
+                    .setPositiveButton(android.R.string.ok) { _, _ ->
+                        result.complete(prompt.confirm(choices.filterIndexed { index, _ ->
+                            selected[index]
+                        }.map { it.id }.toTypedArray()))
+                    }
+                    .setNegativeButton(android.R.string.cancel) { _, _ -> result.complete(prompt.dismiss()) }
+            } else {
+                builder.setItems(names) { _, index -> result.complete(prompt.confirm(choices[index].id)) }
+            }
+            genericPromptDialog = builder.create().also { it.show() }
+            return result
+        }
+
+        override fun onFilePrompt(
+            session: GeckoSession, prompt: GeckoSession.PromptDelegate.FilePrompt
+        ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse> {
+            if (!started || !UrlPolicy.isTrustedMediaOrigin(activeUrl) ||
+                pendingFileResult != null || pendingDownload != null ||
+                prompt.type == GeckoSession.PromptDelegate.FilePrompt.Type.FOLDER) {
+                return GeckoResult.fromValue(prompt.dismiss())
+            }
+            val result = GeckoResult<GeckoSession.PromptDelegate.PromptResponse>()
+            pendingFilePrompt = prompt
+            pendingFileResult = result
+            filePickerOrigin = activeUrl
+            val mimes = GeckoTransferPolicy.acceptedMimeTypes(prompt.mimeTypes)
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = if (mimes.size == 1) mimes[0] else "*/*"
+                if (mimes.size > 1) putExtra(Intent.EXTRA_MIME_TYPES, mimes.toTypedArray())
+                putExtra(Intent.EXTRA_ALLOW_MULTIPLE,
+                    prompt.type == GeckoSession.PromptDelegate.FilePrompt.Type.MULTIPLE)
+            }
+            try {
+                filePickerOpen = true
+                @Suppress("DEPRECATION")
+                startActivityForResult(intent, OPEN_DOCUMENT_CODE)
+            } catch (_: ActivityNotFoundException) {
+                finishFilePrompt(emptyList())
+            } catch (_: SecurityException) {
+                finishFilePrompt(emptyList())
+            }
+            return result
+        }
+    }
+
+    private fun finishFilePrompt(selected: List<Uri>) {
+        val result = pendingFileResult ?: return
+        val prompt = pendingFilePrompt
+        pendingFileResult = null
+        pendingFilePrompt = null
+        filePickerOpen = false
+        val sameSite = filePickerOrigin == activeUrl &&
+            UrlPolicy.isTrustedMediaOrigin(activeUrl)
+        filePickerOrigin = null
+        val maxSelected = if (prompt?.type == GeckoSession.PromptDelegate.FilePrompt.Type.MULTIPLE)
+            GeckoTransferPolicy.MAX_SELECTED_FILES else 1
+        val safe = selected.take(maxSelected).filter {
+            GeckoTransferPolicy.isSelectedDocumentUri(it.toString())
+        }
+        if (prompt == null) result.completeExceptionally(
+            IllegalStateException("File prompt disappeared"))
+        else result.complete(if (sameSite && safe.isNotEmpty())
+            prompt.confirm(applicationContext, safe.toTypedArray()) else prompt.dismiss())
+    }
+
+    private val contentDelegate = object : GeckoSession.ContentDelegate {
+        override fun onExternalResponse(session: GeckoSession, response: WebResponse) {
+            val stream = response.body
+            if (stream == null || !started || pendingDownload != null ||
+                pendingFileResult != null || !UrlPolicy.isTrustedMediaOrigin(activeUrl) ||
+                !GeckoTransferPolicy.isDownloadSourceAllowed(
+                    response.uri, response.isSecure, response.statusCode)) {
+                try { stream?.close() } catch (_: Exception) { }
+                return
+            }
+            response.setReadTimeoutMillis(30_000L)
+            pendingDownload = response
+            val name = GeckoTransferPolicy.filename(response.uri)
+            AlertDialog.Builder(this@GeckoActivity)
+                .setTitle(R.string.download_confirm_title)
+                .setMessage(getString(R.string.gecko_download_confirm, name))
+                .setPositiveButton(R.string.confirm) { _, _ -> openSaveDocument(response, name) }
+                .setNegativeButton(R.string.cancel) { _, _ -> abandonDownload() }
+                .setOnCancelListener { abandonDownload() }
+                .show()
+        }
+    }
+
+    private fun abandonDownload() {
+        val pending = pendingDownload
+        pendingDownload = null
+        downloadPickerOpen = false
+        try { pending?.body?.close() } catch (_: Exception) { }
+    }
+
+    private fun openSaveDocument(response: WebResponse, filename: String) {
+        if (pendingDownload !== response || !started) { abandonDownload(); return }
+        val contentType = response.headers.entries.firstOrNull {
+            it.key.equals("content-type", ignoreCase = true)
+        }?.value
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = GeckoTransferPolicy.mimeType(contentType)
+            putExtra(Intent.EXTRA_TITLE, filename)
+        }
+        try {
+            downloadPickerOpen = true
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, SAVE_DOCUMENT_CODE)
+        } catch (_: ActivityNotFoundException) { abandonDownload() }
+        catch (_: SecurityException) { abandonDownload() }
+    }
+
+    private fun finishDownload(target: Uri?) {
+        val response = pendingDownload
+        pendingDownload = null
+        downloadPickerOpen = false
+        if (response == null) return
+        if (target == null || !GeckoTransferPolicy.isSelectedDocumentUri(target.toString()) ||
+            !UrlPolicy.isTrustedMediaOrigin(activeUrl)) {
+            try { response.body?.close() } catch (_: Exception) { }
+            return
+        }
+        val resolver = applicationContext.contentResolver
+        val input = response.body ?: return
+        // One-off work initiated by the user's Save selection; never a scheduled/background job.
+        Thread({
+            val success = try {
+                input.use { source ->
+                    val dest = resolver.openOutputStream(target, "w")
+                        ?: throw java.io.IOException("Cannot open selected document")
+                    dest.use { GeckoTransferPolicy.copy(source, it) }
+                }
+                true
+            } catch (_: Exception) {
+                // The target was created by ACTION_CREATE_DOCUMENT; remove partial output.
+                try { resolver.delete(target, null, null) } catch (_: Exception) { }
+                false
+            }
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed) Toast.makeText(this@GeckoActivity,
+                    if (success) R.string.gecko_download_saved else R.string.error_download,
+                    Toast.LENGTH_LONG).show()
+            }
+        }, "companion-manual-document-save").apply { isDaemon = true; start() }
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == OPEN_DOCUMENT_CODE) {
+            val uris = mutableListOf<Uri>()
+            if (resultCode == RESULT_OK) {
+                data?.data?.let(uris::add)
+                data?.clipData?.let { items ->
+                    for (i in 0 until minOf(items.itemCount, GeckoTransferPolicy.MAX_SELECTED_FILES))
+                        items.getItemAt(i).uri?.let(uris::add)
+                }
+            }
+            finishFilePrompt(uris.distinct())
+        } else if (requestCode == SAVE_DOCUMENT_CODE) {
+            finishDownload(if (resultCode == RESULT_OK) data?.data else null)
+        }
     }
 
     private val navigationDelegate = object : GeckoSession.NavigationDelegate {
@@ -347,12 +607,22 @@ class GeckoActivity : Activity() {
         started = false
         pendingMediaCallback?.reject(); pendingMediaCallback = null
         permissionCallback?.reject(); permissionCallback = null
+        // The system SAF picker temporarily stops this Activity: preserve only that
+        // specific user-initiated prompt until its onActivityResult callback arrives.
+        if (!filePickerOpen) finishFilePrompt(emptyList())
+        if (!downloadPickerOpen) abandonDownload()
+        genericPromptDialog?.dismiss()
+        genericPromptDialog = null
         super.onStop()
     }
 
     override fun onDestroy() {
         pendingMediaCallback?.reject(); pendingMediaCallback = null
         permissionCallback?.reject(); permissionCallback = null
+        finishFilePrompt(emptyList())
+        abandonDownload()
+        genericPromptDialog?.dismiss()
+        genericPromptDialog = null
         if (Build.VERSION.SDK_INT >= 33) backCallback?.let {
             onBackInvokedDispatcher.unregisterOnBackInvokedCallback(it)
         }

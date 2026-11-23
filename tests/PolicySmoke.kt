@@ -17,6 +17,7 @@ import dev.caicompanion.app.DeferredWebReload
 import dev.caicompanion.app.OfflineBookmarkEditor
 import dev.caicompanion.app.SupportReport
 import dev.caicompanion.app.DeviceCompatibility
+import dev.caicompanion.app.GeckoTransferPolicy
 import java.io.StringReader
 
 fun main() {
@@ -417,5 +418,29 @@ fun main() {
     check(OfflineBookmarkEditor.normalize("hunter", "https://character.ai/oauth/callback") == null)
     check(OfflineBookmarkEditor.normalize("hunter", "https://character.ai/?token=secret")?.second == "https://character.ai/")
     check(OfflineBookmarkEditor.normalize("x".repeat(200), "https://c.ai/")?.first?.length == 90)
+    // Gecko SAF transfers: untrusted URLs never become external Android downloads.
+    check(GeckoTransferPolicy.isDownloadSourceAllowed("https://character.ai/chat/file.pdf", true, 200))
+    check(!GeckoTransferPolicy.isDownloadSourceAllowed("https://evil.example/file", true, 200))
+    check(!GeckoTransferPolicy.isDownloadSourceAllowed("http://character.ai/file", false, 200))
+    check(!GeckoTransferPolicy.isDownloadSourceAllowed("https://character.ai/file", true, 403))
+    check(!GeckoTransferPolicy.isDownloadSourceAllowed("https://character.ai@evil.example/file", true, 200))
+    check(GeckoTransferPolicy.filename("https://character.ai/a/Hunter%20notes.pdf?token=SECRET") == "Hunter notes.pdf")
+    check(!GeckoTransferPolicy.filename("https://character.ai/file?token=SECRET").contains("SECRET"))
+    check(!GeckoTransferPolicy.filename("https://character.ai/evil%2Fname%E2%80%AE.exe").contains('\u202E'))
+    check(GeckoTransferPolicy.mimeType("application/pdf; charset=utf-8") == "application/pdf")
+    check(GeckoTransferPolicy.mimeType("text/plain\nX-Auth: Bearer") == "application/octet-stream")
+    check(GeckoTransferPolicy.mimeType(null) == "application/octet-stream")
+    check(GeckoTransferPolicy.acceptedMimeTypes(arrayOf("image/png", "IMAGE/JPEG", "invalid", "image/png")) ==
+        listOf("image/png", "image/jpeg"))
+    check(GeckoTransferPolicy.acceptedMimeTypes(null) == listOf("*/*"))
+    check(GeckoTransferPolicy.isSelectedDocumentUri("content://com.android.providers.media.documents/document/image%3A123"))
+    check(!GeckoTransferPolicy.isSelectedDocumentUri("file:///sdcard/secret.txt"))
+    check(!GeckoTransferPolicy.isSelectedDocumentUri("content://user:pass@provider/path"))
+    val copied = java.io.ByteArrayOutputStream()
+    check(GeckoTransferPolicy.copy(java.io.ByteArrayInputStream(byteArrayOf(1,2,3,4)), copied, 4) == 4L)
+    check(copied.toByteArray().contentEquals(byteArrayOf(1,2,3,4)))
+    check(runCatching { GeckoTransferPolicy.copy(
+        java.io.ByteArrayInputStream(byteArrayOf(1,2,3,4)), java.io.ByteArrayOutputStream(), 3)
+    }.exceptionOrNull() is java.io.IOException)
     println("PolicySmoke: browser policy, concurrency, URL safety and local statistics assertions passed")
 }

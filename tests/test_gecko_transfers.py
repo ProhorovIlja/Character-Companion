@@ -1,0 +1,81 @@
+"""Focused Gecko SAF and prompt regression checks (structural, no Android emulator)."""
+from pathlib import Path
+import unittest
+import xml.etree.ElementTree as ET
+
+ROOT = Path(__file__).resolve().parents[1]
+GECKO = (ROOT/'app/src/gecko/java/dev/caicompanion/app/GeckoActivity.kt').read_text()
+POLICY = (ROOT/'app/src/main/java/dev/caicompanion/app/GeckoTransferPolicy.kt').read_text()
+BUILD = (ROOT/'app/build.gradle.kts').read_text()
+
+class GeckoTransferTests(unittest.TestCase):
+    def test_file_upload_is_explicit_android_saf_only(self):
+        for token in ['onFilePrompt(', 'Intent.ACTION_OPEN_DOCUMENT',
+                      'Intent.CATEGORY_OPENABLE', 'Intent.EXTRA_MIME_TYPES',
+                      'Intent.EXTRA_ALLOW_MULTIPLE', 'onActivityResult(',
+                      'prompt.confirm(applicationContext, safe.toTypedArray())']:
+            self.assertIn(token, GECKO)
+        self.assertNotIn('MediaStore.ACTION_IMAGE_CAPTURE', GECKO)
+        self.assertNotIn('file://', GECKO)
+
+    def test_file_chooser_requires_trusted_page_and_origin_stability(self):
+        self.assertIn('!UrlPolicy.isTrustedMediaOrigin(activeUrl)', GECKO)
+        self.assertIn('filePickerOrigin == activeUrl', GECKO)
+        self.assertIn('GeckoTransferPolicy.isSelectedDocumentUri(it.toString())', GECKO)
+        self.assertIn('GeckoTransferPolicy.MAX_SELECTED_FILES', GECKO)
+        self.assertIn('selected.take(maxSelected)', GECKO)
+        self.assertIn('pendingFileResult != null', GECKO)
+
+    def test_unsupported_folder_prompt_is_denied(self):
+        self.assertIn('prompt.type == GeckoSession.PromptDelegate.FilePrompt.Type.FOLDER', GECKO)
+        self.assertIn('return GeckoResult.fromValue(prompt.dismiss())', GECKO)
+
+    def test_download_is_user_confirmed_and_bounded(self):
+        for token in ['onExternalResponse(', 'response.isSecure', 'response.statusCode',
+                      'GeckoTransferPolicy.isDownloadSourceAllowed(',
+                      'download_confirm_title', 'Intent.ACTION_CREATE_DOCUMENT',
+                      'resolver.openOutputStream(target, "w")',
+                      'GeckoTransferPolicy.copy(source, it)', 'isDaemon = true',
+                      'resolver.delete(target, null, null)']:
+            self.assertIn(token, GECKO)
+        self.assertIn('MAX_DOWNLOAD_BYTES: Long = 256L * 1024L * 1024L', POLICY)
+        self.assertIn('response.setReadTimeoutMillis(30_000L)', GECKO)
+        self.assertIn('input: InputStream', POLICY)
+        self.assertNotIn('DownloadManager', GECKO)
+
+    def test_cancel_and_activity_teardown_close_pending_streams(self):
+        self.assertIn('try { pending?.body?.close() }', GECKO)
+        self.assertIn('try { response.body?.close() }', GECKO)
+        self.assertIn('if (!downloadPickerOpen) abandonDownload()', GECKO)
+        self.assertIn('if (!filePickerOpen) finishFilePrompt(emptyList())', GECKO)
+        self.assertIn('finishFilePrompt(emptyList())\n        abandonDownload()', GECKO)
+        self.assertIn('override fun onDestroy()', GECKO)
+
+    def test_modal_prompts_other_than_file_upload_remain_handled(self):
+        for token in ['onAlertPrompt(', 'onButtonPrompt(', 'onTextPrompt(',
+                      'onChoicePrompt(', 'setOnDismissListener',
+                      'prompt.confirm(choices[index].id)', 'prompt.confirm(field.text.toString()']:
+            self.assertIn(token, GECKO)
+
+    def test_ru_en_strings_are_complete(self):
+        for rel in ['app/src/main/res/values/strings.xml',
+                    'app/src/main/res/values-ru/strings.xml']:
+            root = ET.parse(ROOT/rel).getroot()
+            keys = {e.attrib['name'] for e in root if e.tag == 'string'}
+            self.assertIn('gecko_download_confirm',keys)
+            self.assertIn('gecko_download_saved',keys)
+
+    def test_application_version_moves_forward_without_platform_mixup(self):
+        self.assertIn('versionCode = 21', BUILD)
+        self.assertIn('versionName = "0.21.0-rc1"', BUILD)
+        self.assertIn('create("gecko")',BUILD)
+        self.assertIn('create("legacy")',BUILD)
+        self.assertFalse((ROOT/'.github/workflows').exists())
+
+    def test_gecko_avoids_webview_cookie_copying_and_private_apis(self):
+        for token in ['android.webkit.WebView','CookieManager','@JavascriptInterface',
+                      'Authorization: Bearer', 'android.app.DownloadManager']:
+            self.assertNotIn(token, GECKO)
+        self.assertNotIn('https://api.character.ai', GECKO)
+
+if __name__=='__main__': unittest.main()

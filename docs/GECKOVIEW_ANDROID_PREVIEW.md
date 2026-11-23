@@ -11,7 +11,7 @@ Android now has two explicit Gradle flavors:
 
 Both flavors use the same application ID, so **they cannot be installed side by side** without assigning separate application IDs. Gecko's cookies, app permission grants and in-process state are **not** migrated from the existing Android WebView profile. Do not promise SSO across engines. The gecko variant carries embedded ARM64 Gecko libraries and may be substantially larger.
 
-The version in Gradle is Android `0.20.0-rc1`, `versionCode 20`; the multi-platform source bundle is `v0.23.0-source`. This is source development versioning, **not a GitHub Release**.
+The version in Gradle is Android `0.21.0-rc1`, `versionCode 21`; the multi-platform source bundle is `v0.23.0-source`. This is source development versioning, **not a GitHub Release**.
 
 ## Manual build (requires proper SDK)
 
@@ -29,7 +29,7 @@ These are **manual commands**; no GitHub Actions, background jobs, schedules, or
 - First-party navigation only: HTTPS `character.ai` or `c.ai`; unknown HTTPS domains and user-gesture popups require explicit external-browser approval. Identity-provider redirects without a clear user gesture are blocked rather than silently opening authentication URLs. Userinfo, `javascript:`, `intent:`, `file:` and non-HTTPS schemes are not navigated. OAuth through the user's browser does **not** create a Gecko authenticated session.
 - Gecko's built-in tracking protection is used; **custom imported host rules from legacy WebView are not implemented in Gecko preview**. Do not claim rule parity, full cosmetic ad blocking or no ads on the site.
 - Microphone/camera are off by default. The user first enables media requests, then Android permission is checked, then each Gecko media request gets its own visible prompt; no location, notifications or local-network permission is auto-approved.
-- The current preview does not yet implement Gecko file prompt, explicit download saving, complete fullscreen video, session restore across engine crashes, complete settings parity or seamless OAuth. Its toolbar includes an explicit way into the established native tools / legacy browser.
+- As of v0.24.0-source Gecko implements explicit SAF file selection and bounded, user-confirmed first-party downloads and basic JS prompts. It still lacks complete fullscreen video, cross-origin CDN download handling, session restore across engine crashes, full settings parity and seamless OAuth. Its toolbar includes an explicit way into the established native tools / legacy browser.
 - Native Gecko profile is separate from WebView cookies. No raw cookie export/import, account token injection, private Character.AI API, or copied proprietary XAPK code.
 - The current API 37 / Android 17 runtime is a **test target**; build still uses compile/target SDK 36 with AGP 8.13 and must not be represented as API-37-targeted.
 - Pixel 8a uses `akita`, not Pixel 8 `shiba`. Both MindTheGapps and Morphe microG may be present; they are different applications, not proof that Google OAuth works in Gecko.

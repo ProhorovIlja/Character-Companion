@@ -1,173 +1,120 @@
-## v0.23.0-source — 2026-11-23
+## Последние изменения — v0.24.0-source
 
-- New Android `gecko` ARM64 flavor with Mozilla GeckoView; original `legacy` flavor remains available.
-- First-party navigation policy, Gecko tracking protection, per-request media gate, manual share and explicit external browser prompts; no transfer of WebView/Gecko cookies.
-- Manifest launcher and Share Sheet split by build flavor; explicit manual build/release signoff for gecko vs legacy.
-- Documentation and offline tests; no APK/EXE built or device-tested. Windows CEF pre-alpha unchanged.
+Android GeckoView получил выбор файлов через системный интерфейс, ручное сохранение загрузок до 256 МиБ из исходного потока и основные веб-диалоги. Резервная сборка `legacy` сохранена, Windows работает на WPF/CEF и локальном Whisper. **APK и EXE ещё не скомпилированы и не испытаны на устройствах.** [Описание выпуска](docs/RELEASE_NOTES_v0.24.0-source.md). Никаких автоматических задач или CI.
 
-## v0.22.0-source / Windows v0.3.0-prealpha — 2026-11-23 (source-only)
+**v0.23.0-source / Android 0.20.0-rc1 — GeckoView (23.11.2026):** Добавлен отдельный ARM64-вариант `gecko` с независимым браузерным движком Firefox/GeckoView и вариант `legacy` с прежним Android WebView. Реализованы нативная навигация, ограничения адресов, защита от трекеров Gecko и разрешения на микрофон/камеру по запросу; **APK пока не собран и на Pixel 8a не проверен**, функции ещё не полностью перенесены. Windows-клиент с CEF и Whisper сохранён (v0.3.0). [План проверки GeckoView](docs/GECKOVIEW_ANDROID_PREVIEW.md) · [Описание изменений](docs/RELEASE_NOTES_v0.23.0-source.md).
 
-- Windows: removed WebView2 from WPF project and replaced it with in-app CefSharp/CEF 154.0.340 on x64; added CEF-specific request/popup handlers, app profile, JS JSON envelope and browser initialization/shutdown.
-- Maintained local Whisper dictation, native editable drafts, explicit click-to-send and safety rules from v0.21.
-- Added offline policy tests and executable Node regression of CEF bridge expression; no .NET SDK compilation or Windows device testing.
-- Android unchanged; GeckoView is a migration candidate with concrete lifecycle/media/auth scope; does not currently replace Android WebView.
-- No automation, scheduled operation or background checks; no executable releases.
+**v0.22.0-source / Windows v0.3.0 pre-alpha (23.11.2026):** Windows-клиент переведён с WebView2 на встроенный CEF (CefSharp.Wpf.NETCore 156.0.300). Никакой отдельной установки WebView2 Runtime не требуется для задуманной Windows-сборки, но CEF заметно увеличивает размер, а Chromium sandbox не реализован в CefSharp. Диктовка Whisper и нативный черновик сохранены; Android на данном этапе не менялся. GeckoView изучен как будущая замена системному Android WebView, а не объявлен уже реализованным. **EXE/APK не собраны и не проверены на устройствах.** [Решение по движкам](docs/RENDERER_DECISION_2026-11-23.md) · [Windows](windows/README.md).
 
-## Windows v0.2.0-prealpha / project v0.21.0-source — 2026-11-23 (source only)
+**Windows v0.2.0 (исходники):** режим диктовки теперь не отправляет старый или изменённый черновик; защищён от повторной отправки, добавлены Ctrl+Enter и очистка текста. JavaScript-мост проверен в восьми сценариях Node. [Подробности](windows/README.md). **Проверенных установщиков пока нет.**
 
-- Fix accidental auto-send of prior or edited draft when requesting record/transcribe/send; keep recognized text for review when draft changed.
-- Prevent duplicate concurrent WebView2 send/insert actions; add Ctrl+Enter send and Clear Draft.
-- Improve Whisper timeout cleanup by waiting after child-process kill; tighten first-party URL checks against user-info.
-- Execute real composer bridge JavaScript in eight synthetic DOM security/UX scenarios using Node VM; Android offline regression suite retained.
-- No compiled Windows binary or Android APK: build/identity/device signoffs remain required.
+**Добавлена версия для Windows (прототип исходников):** см. [windows/README.md](windows/README.md) — WPF/CEF, локальная диктовка Whisper, редактируемый черновик и отправка по явному действию пользователя. Android остаётся отдельным клиентом v0.19.0-rc1. Проверенного EXE пока нет.
 
-## Windows v0.1.0-prealpha — 2026-11-23 (source only)
+> **v0.19.0-rc1 — кандидат исходников:** исправлено определение нынешнего и старого идентификаторов microG от Morphe; исправлена сверка версии APK в скрипте выпуска. Проверенного APK и гарантированного входа через Google пока нет.
 
-- Added a separate native Windows WPF/.NET 10 WebView2 client, with local whisper.cpp dictation into an editable draft and explicit manual-send / transcription-then-send buttons.
-- Security: first-party origin checks, unique editor/send-button verification, conservative tracker list, explicit external-browser authorization (no cookie copying).
-- Added Windows-only static tests and release notes. No Windows EXE built or tested; Android v0.19.0-rc1 remains untouched.
+# Character Companion — Android
 
-## v0.19.0-rc1 (2026-11-23) — source candidate; no APK
+**v0.17.0-rc1 — Pixel 8a / LineageOS 24.0 / Android 17 (23 ноября 2026).** Добавлена ручная диагностика модели `akita`, API Android, провайдера WebView, ABI, частоты дисплея, реального размера страниц памяти и видимости GMS-совместимого пакета (его наличие не доказывает работу Google OAuth). Расширен ручной ADB-аудит, подготовлен план тестов 16-КиБ и Android 17. **Работоспособность на телефоне, APK и предупреждения Play Protect ещё не проверены.** [Pixel 8a / LineageOS dossier](docs/PIXEL8A_LINEAGEOS_24.md) · [Release notes](docs/RELEASE_NOTES_v0.17.0-rc1.md).
 
-- Correct Morphe MicroG-RE package detection following its August 2026 application ID migration to `app.revanced.android.gms`; preserve older `app.morphe.android.gms` support alongside `com.google.android.gms`.
-- Update manual, read-only ADB preflight and Android manifest visibility for exactly those three packages. Do not enumerate accounts or installed apps.
-- Fix stale manual release script version (previously v0.17) by deriving versionCode/versionName directly from app Gradle metadata; keep unsigned/debug/no-device-signoff rejection.
-- Expand Kotlin and Python regression checks. No proven OAuth, Play Protect suppression, official APK code merge or on-device validation.
+**v0.16.0-rc1 — кандидат исходников (23 ноября 2026).** Нативный запуск больше не создаёт WebView заранее: браузер и его обработчики инициализируются при явном открытии сайта. Входящие безопасные ссылки из Android «Поделиться» имеют приоритет перед стартовой библиотекой; кнопка повтора защищена от отсутствующего WebView. Прошли 50 тестов Python и 243 проверок Kotlin. **Собранного и испытанного APK пока нет.** [Изменения](docs/RELEASE_NOTES_v0.16.0-rc1.md) · [Android 17](docs/ANDROID_17.md).
 
-## 0.18.0-rc1 (2026-11-23)
+**v0.15.0-rc1 — кандидат исходников (23 ноября 2026).** Добавление и переименование закладок полностью офлайн, отложенное обновление WebView вместо скрытых загрузок, очистка названий при импорте, русские и английские строки. Пройдены 49 Python-тестов и проверки Kotlin на JVM. **Только Android; подписанного и испытанного APK пока нет.** [Release notes](docs/RELEASE_NOTES_v0.15.0-rc1.md) · [Архитектура](docs/NATIVE_ARCHITECTURE.md) · [Android 17](docs/ANDROID_17.md).
 
-- Distinguish Morphe MicroG-RE (`app.morphe.android.gms`) from the system GMS package (`com.google.android.gms`) in manual Android device compatibility diagnostics.
-- Display sanitized package versions and maintain exact Android package visibility, with no package enumeration or account access.
-- Add regression checks and document MindTheGapps/Morphe coexistence and OAuth caveats. No APK build signoff.
-
-### v0.17.0-rc1 (2026-11-23) — source preview
-Added manual Pixel 8a / LineageOS 24.0 compatibility diagnostics and ADB checks, runtime 4/16-KiB page-size detection, GMS package uncertainty and source-backed hardware research. Offline tests only, no APK.
-
-# Changelog
-
-## v0.14.0-rc1 — 2026-11-23 (source candidate; no APK)
-
-- Fixed blank WebView when dismissing a native first-run workspace before browser navigation.
-- Fixed hidden WebView being resumed by Android lifecycle while native workspace remains visible.
-- Incoming Android Share links now close the workspace before navigating to a sanitized first-party URL.
-- Long-press offline bookmark to open internally, open in system browser, or remove with confirmation; RU/EN accessibility strings included.
-- Fixed duplicate URL search where the matching later title could be skipped during deduplication.
-- User-initiated SAF settings import/export now performs potentially slow I/O off the main UI thread.
-- Deny camera/microphone prompts while the Activity is hidden or the native workspace is displayed, including grants that finish after app backgrounding.
-- 48 offline Python tests and 224 Kotlin policy assertions passed. No SDK build, APK signing, Google/Apple login verification or Android 17 device testing.
+**v0.14.0-rc1 — кандидат исходников (23 ноября 2026).** Исправлены жизненный цикл нативного пространства, входящие ссылки, управление закладками, асинхронное сохранение ручных резервных копий и запрет запросов микрофона/камеры в скрытом режиме. Офлайн-тесты пройдены; проверенного APK и испытаний на Android 17 ещё нет. [Архитектура](docs/NATIVE_ARCHITECTURE.md) · [Изменения](docs/RELEASE_NOTES_v0.14.0-rc1.md).
 
 
-## v0.13.0-rc1 — 2026-11-23 (source candidate; no APK)
+**Дополнение по XAPK (23.11.2026):** второй архив `character-ai-1-17-4.xapk` (180,6 МБ) успешно загружен и статически исследован. Подтверждены Character.AI 1.17.4, 88 APK-модулей, React Native/Hermes, нативные WebRTC-библиотеки и `targetSdk 36`. Исходный архив 278,7 МБ по-прежнему превышает лимит передачи. См. [технический аудит](docs/OFFICIAL_APK_AUDIT_1.17.4.md). Вход, звонки, проверка подписи `apksigner` и запуск на Android 17 **не проверены**.
 
-- New fully native offline startup workspace and searchable local bookmark library, bilingual UI, privacy shortcuts and explicit browser handoff.
-- Native workspace pauses WebView while displayed; first launch defers remote site navigation until user action. Native layout uses Android Views, not Electron.
-- Stored configuration can opt out of native startup; long-press Home reopens the workspace.
-- Privacy-safe settings import never silently enables media capture consent.
-- 48 Python tests, 212 standalone Kotlin assertions. No verified Android binary, GitHub Release, or Android 17 on-device validation.
+**История: v0.12.0-rc1, предварительная версия исходников от 23 ноября 2026 года.** Независимый клиент сайта `https://character.ai/` на Kotlin. Без Windows, без неофициального API и без доступа к паролям. Лицензия MIT; не связан с Character.AI.
+
+**Реальный статус:** опубликованы исходники, ресурсы, документация и тесты. Проверки без Android SDK завершены: **48 Python-тестов + 212 Kotlin-проверок**. В этом окружении нет Android SDK/Gradle, поэтому **APK не собирался и на телефоне не тестировался**. Авторизация, чаты, звонки, Google/Apple OAuth и работа сайта требуют реального тестирования; нельзя утверждать, что всё это уже работает.
 
 
-## v0.12.0-rc1 — 2026-11-23 (source candidate; no APK)
+## Обновление v0.11.0-rc1: Android 17 и подготовка анализа XAPK
 
-- Android 11–17 IME tracking uses system WindowInsets, with Android 10 layout fallback.
-- Footer state preserved across video fullscreen and keyboard transitions.
-- Main-frame HTTP 5xx error handling with a separate browser fallback.
-- Manual, bounded privacy-safe support report copy, no chat URLs or credentials.
-- 47 Python tests and 200 pure Kotlin assertions passed. Android SDK build remains unavailable.
+- **Историческое состояние до загрузки второго архива:** `Character+AI_+Chat,+Talk,+Text_1.17.4_APKPure.xapk` занимает 278 738 234 байта, а Google Drive отклоняет загрузки больше 268 435 456 байт. Нельзя считать, что официальный APK уже разобран или изучен.
+- Добавлены самостоятельные утилиты `tools/split_xapk.py` и `tools/inspect_xapk.py`: безопасное деление исходного XAPK на последовательные части по 190 МиБ и статический анализ APK-модулей, разрешений, ABI, DEX и SHA-256 **без запуска чужого кода**. Проверены на синтетических архивах. Инструкции: `docs/XAPK_AUDIT.md`.
+- Для Android 17 (API 37), включая Pixel 8a на LineageOS, добавлены ручная диагностика `scripts/device-android17-preflight.sh` и план испытаний `docs/ANDROID_17.md`. Пока оставлен target/compile SDK 36: AGP 8.13 не поддерживает сборку под SDK 37 без обновления всей цепочки.
+- Activity явно допускает изменение размеров; исправлен выбор `aapt` в проверке пакета перед выпуском. APK не собран и устройство не проверено; предупреждения Google Play Protect при ручной установке гарантированно убрать нельзя. Фоновых задач и CI нет.
 
+## Что нового в v0.10.0-rc1 (без APK)
 
-## v0.11.0-rc1 — 2026-11-23 (source candidate; no APK release)
+- **Устойчивость к сбоям:** максимум три автоматических перезапуска процесса WebView за две минуты. При повторяющихся падениях приложение показывает экран с ручным повтором вместо бесконечного цикла.
+- **Экспорт пользовательских блокировок:** через системный выбор файла можно вручную сохранить импортированные домены блокировки/исключений в текстовый файл. Экспорт выполняется вне UI-потока и не содержит чаты, cookies или токены.
+- **Безопасность загрузок:** системный DownloadManager получает только безопасные HTTPS-ссылки на доменах Character.AI; внешние домены открываются в браузере после подтверждения.
+- **Разрешения:** незавершённый запрос камеры/микрофона отклоняется при полном уходе приложения в фон (`onStop`), но не при показе системного запроса разрешения (`onPause`).
+- **Подготовка Release:** добавлены ручной скрипт проверки подписанного APK и создания архива исходников, выпускные заметки, SHA-256 и обязательная проверка на устройствах. Скрипт не создаёт GitHub Release и не запускается по событию или расписанию.
+- **Проверки:** 30 структурных тестов и 185 Kotlin-проверок. Реальная компиляция APK и запуск на телефоне пока недоступны, поэтому **готовый APK и GitHub Release отсутствуют**.
 
-- Added isolated, read-only XAPK inspection with basic binary Android Manifest analysis and ZIP traversal safeguards; SHA-256 verified reconstruction from original raw chunks; synthetic fixtures and tests.
-- Added manual 190-MiB XAPK splitter for files larger than the 256-MiB Drive connector transfer limit. The original 278,738,234-byte Character.AI XAPK **was not downloaded**. A second smaller 180,553,623-byte XAPK was later downloaded and audited statically; findings are in `docs/OFFICIAL_APK_AUDIT_1.17.4.md`.
-- Android 17 / LineageOS read-only preflight and Pixel 8a compatibility plan. The current AGP 8.13 toolchain supports `compileSdk 36` only; target SDK remains 36 pending verified migration.
-- Explicit resizeable Activity and corrected manual release `aapt` choice. No signed APK, tests on hardware, scheduled operations or GitHub Release.
+## Что нового в v0.9.0
 
-## v0.10.0-rc1 — 2026-11-23 (source candidate; no APK release)
-- Bounded renderer restart policy with explicit retry after repeated WebView crashes.
-- Manual local export of imported blocking rules to TXT, without cookies or private chat data.
-- Third-party downloads use user-confirmed browser handoff rather than DownloadManager.
-- Capture permission requests are denied when the Activity stops, not merely pauses for Android permission UI.
-- Manual APK/signature/package/QA release packaging with source ZIP, tar.gz and SHA-256 (will refuse missing APK/device signoff). No automation, uploads or scheduled processes.
-- 30 structural tests and 185 Kotlin assertions passed offline; no real APK or device tests yet.
+- **Два режима:** обычный WebView с фильтрацией доменов и режим вкладки системного браузера (AndroidX Browser 1.10.0), который использует сессию выбранного браузера. Второй режим полезен для входа через Google/Apple, когда встроенный WebView не разрешён провайдером.
+- При переходе к внешней авторизации приложение предлагает открыть главную страницу Character.AI во вкладке браузера, а не пересылать временный OAuth URL из WebView. Cookie и авторизация между режимами **не переносятся**.
+- Во вкладке браузера **не действуют** встроенная блокировка рекламы, счётчик запросов и настройки оформления Character Companion. Встроенный режим остаётся основным.
+- Убрана принудительная запись cookie на диск после каждой навигации (сохраняется при паузе приложения); входящий Share Intent очищается и при повторном открытии Activity.
+- Улучшена проверка локального Gradle Wrapper: контрольная сумма JAR проверяется отдельным ручным действием.
+- Офлайн-тесты: 26 структурных и 174 Kotlin-проверки. Полноценная сборка APK и проверка входа в браузерной вкладке на Android ещё не выполнены.
 
-## v0.9.0 — 2026-11-23 (source only)
-- Added separate first-party AndroidX Browser 1.10.0 Custom Tab browser session; login compatibility fallback shares the **browser's** cookies, not WebView's. No ad filtering or credentials are shared between them.
-- Identity-provider handoff starts at the Character.AI homepage instead of forwarding an in-progress OAuth URL. Only sanitized first-party URLs can open this browser-session path.
-- Fixed stale Android Share Intent retention in `onNewIntent`, avoided redundant WebView cookie flushing after each load, and made page-resume storage explicitly use a canonical sanitized URL.
-- Improved manual doctor script: verify official Gradle 8.13 wrapper JAR checksum when present; no automatic downloads, CI or event triggers.
-- 27 offline structure tests and 174 standalone Kotlin checks passed. APK compilation and live site still unverified.
+## Обновление v0.8.0 (23 ноября 2026)
 
-## v0.8.0 — 2026-11-23
-- Accept validated first-party Character.AI links explicitly shared as `text/plain` via the Android Share Sheet, including when the Activity is on top; discard untrusted extras after use.
-- Optional `FLAG_SECURE` switch to protect screenshots/recents snapshots; default off; restore/export supported.
-- Disable automatic WebView view-hierarchy state storage; keep session restoration explicitly opt-in and sanitized.
-- Correct document-export error reporting when no output stream is provided; catch external-launch security exceptions.
-- Offline tests: 23 structural, 162 Kotlin assertions; no Android SDK/Gradle/APK/device validation available.
+- **Приём ссылок из меню Android «Поделиться».** Можно выбрать Character Companion в другом приложении при отправке текста. Откроется только безопасная публичная ссылка `https://character.ai/` или `https://c.ai/`, прошедшая проверку домена и пути. Чужие сайты, ссылки авторизации, токены и слишком большой ввод отклоняются. Приложение не перехватывает системные ссылки автоматически.
+- **Необязательная защита экрана и миниатюр недавних приложений.** В настройках приватности добавлен переключатель `FLAG_SECURE` (по умолчанию выключен); эта функция не защищает от фотографии другим устройством.
+- **Усилена защита сохранённого состояния.** WebView не передаёт состояние в автоматически создаваемый системный снимок View; полученные через Android Share данные удаляются из Intent после обработки.
+- **Исправлен экспорт JSON:** без открытого потока записи приложение сообщает об ошибке, а не об успехе. Обработаны ошибки открытия браузера.
+- **Проверки:** 27 структурных тестов и 174 Kotlin-проверки. Полноценная сборка APK и испытания на Android-устройствах ещё необходимы; SDK и Gradle здесь недоступны.
 
+## Обновление v0.7.0 (22 ноября 2026)
 
-- Added bounded manual ad-host list import, preview, exceptions and atomic on-device storage; no automatic subscriptions. Supports hosts and simple Adblock Plus domain rules only.
-- Cached filter rule snapshots to avoid unnecessary rebuilds during UI-only settings changes. Protected key identity service hosts.
-- Added verified official Gradle 8.13 Wrapper binary on GitHub, manual POSIX launcher and pinned distribution checksum; lightweight ZIP omits wrapper JAR.
-- 20 Python structural tests and 149 Kotlin policy assertions pass offline. No Android APK compiled or device-validated.
+- **Ручной импорт блокировочных списков:** выбор файла через системный Android-проводник. Поддерживаются домены, строки hosts (`0.0.0.0`, `127.0.0.1`, `::1`) и простые правила `||domain^` / `@@||domain^`. Сложные фильтры EasyList, косметические селекторы и правила URL-путей **не поддерживаются**.
+- Защита от переполнения: не более 2 млн символов, 100 тысяч строк и 40 тысяч правил. Перед применением показывается число принятых и пропущенных правил; повреждённый или слишком большой список не заменяет старый.
+- Локальное атомарное сохранение списков через `AtomicFile`. Автообновлений, фоновых служб и заданий по расписанию нет. Этот список не включается в маленький JSON-бэкап настроек — исходный файл следует хранить отдельно.
+- Ускорена настройка фильтра: при изменении масштаба текста большой список доменов больше не пересобирается. Ключевые домены Character.AI и авторизации Google/Apple исключены из блокировки.
+- **Gradle Wrapper 8.13** проверен по опубликованной контрольной сумме. Полная версия на GitHub содержит официальный JAR и проверку SHA-256 дистрибутива; облегчённый ZIP исходников JAR не содержит. Для сборки нужен полный клон GitHub либо отдельно установленный Gradle.
+- Офлайн-проверки: 20 структурных тестов и 149 Kotlin-проверок прошли. **APK не собран, функциональность сайта на телефоне не проверена.**
 
+## Обновление v0.6.0 (22 ноября 2026)
 
-## v0.6.0 — 2026-11-22 (source only)
+- Системный DownloadManager больше не получает ссылки с query-параметрами, фрагментами, доменами авторизации или замаскированными путями входа. Для таких HTTPS-ссылок доступен ручной переход в браузер; небезопасные URL отклоняются. Реальную загрузку приватных файлов нужно проверить на устройстве.
+- Встроенному сайту отключён доступ к локальным `content://` URI. Системный выбор файлов продолжает использовать платформенный SAF.
+- Реализована обработка системного «Назад» для Android 13–16 с учётом полноэкранного режима и истории веб-страниц.
+- WebView больше не помещает историю и ссылки авторизации в системный Bundle. При разрешённом восстановлении сохраняется только очищенный URL страницы.
+- Из экспортируемых закладок убраны поисковые query-параметры; разрешены только безопасные идентификаторы `char` и `id`. Усилена проверка многократного кодирования URL.
+- Успешно пройдены 17 структурных проверок и 119 Kotlin-проверок. **Проверенного APK нет**: Android SDK и Gradle отсутствуют в текущем окружении.
 
-- Download policy: refuse non-HTTPS or invalid URLs; route query/fragment/auth/signed links to an explicitly confirmed external browser instead of DownloadManager, which can follow cross-origin redirects.
-- Disable WebView `content://` access while preserving standard Android System File Picker support.
-- Android 13+ back-dispatcher handling and cleanup for fullscreen/history navigation.
-- Do not save WebView state, including potentially sensitive history and login redirects, into Activity instance-state Bundles; optional resume remains a sanitized first-party URL.
-- Restrict bookmark/share query keys and values and reject deeper nested encoded paths.
-- 17 offline Python tests and 119 Kotlin assertions pass; APK compilation and live-site compatibility remain unverified.
+## Обновление v0.5.0 (22 ноября 2026)
 
-## v0.5.0 — 2026-11-22 (source only)
+- Фильтр рекламных доменов ускорен: проверка суффиксов хоста вместо перебора всего списка правил, приоритет исключений сохранён.
+- Появилась локальная статистика блокировок по доменам правил (до 128 записей), сброс вручную; URL, параметры запросов и переписки не сохраняются.
+- Загрузки больше не получают WebView session cookies: системный DownloadManager может перенаправлять запросы; авторизованные загрузки иногда потребуют отдельного браузера.
+- Ссылки входа Google/Apple показывают объяснение и предложение открыть обычный браузер. Его cookie автоматически не попадут в WebView.
+- Проверка URL перед сохранением/отправкой дополнена защитой от многократного percent-encoding, управляющих символов и обходов пути.
+- Имена загрузок очищаются от опасных символов, в т.ч. скрытого Unicode-направления текста.
+- Глобальный обработчик service worker не удерживает ссылку на Activity; улучшены доступность переключателей и стиль кнопок настроек.
+- Локальные проверки: 16 структурных тестов + 104 Kotlin-проверки прошли. APK ещё НЕ собран из-за отсутствия Android SDK и Gradle.
 
-- Faster O(host-labels) adblock matching with correctly prioritized allowlist exceptions, no O(rule-count) scan on every resource request.
-- In-memory per-rule blocking counters, maximum 128 entries; manually resettable via diagnostics/settings; no URL/query/chat telemetry.
-- Removed WebView cookies from system download headers (DownloadManager can follow cross-domain redirects).
-- OAuth identity provider navigations show explicit external-browser consent and session-isolation limitation. No cookie bridging or User-Agent spoof workaround.
-- Stronger shared/bookmarked URL validation against double/triple percent encoded paths, dot segments, controls, backslash and credential URLs.
-- Sanitized downloaded file names and removed Activity capture in the process-wide ServiceWorker interception hook.
-- Improved settings buttons and TalkBack descriptions for toggles; RU/EN UI strings.
-- 16 structural tests, 104 standalone Kotlin assertions (including a 1000-request concurrency test) passed offline; SDK APK build remains unverified.
+## Реализованные возможности
 
+- Современная тёмная графитово-золотая оболочка с адаптивной иконкой, прогрессом загрузки, ошибками и крупными зонами нажатия; учтены системные панели Android 15/16.
+- Навигация, домашняя страница, назад/вперёд, обновление, отправка ссылки, открытие в системном браузере. Долгое нажатие на «Ссылка» копирует адрес; долгое нажатие на «Обновить» очищает кеш.
+- Четыре профиля в одно нажатие: «Баланс», «Совместимость» (без фильтра), «Приватность» (строгая фильтрация и без сторонних cookie), «Экономия трафика» (без автозагрузки картинок). Профили не изменяют переписки и не запускают фоновые задачи.
+- Безопасная отправка ссылок и копирование: ссылки входа, профиля аккаунта или с токенами не передаются другим приложениям. Внешние переходы и скачивания требуют подтверждения; фоновые редиректы не открывают браузер сами.
+- Полноэкранное HTML-видео с возвратом из режима, отзыв запросов разрешений микрофона/камеры при смене страницы; это не добавляет недоступные на сайте функции звонков.
+- Сохранение до 100 закладок. В них не сохраняются URL провайдеров авторизации, фрагменты и неизвестные query-параметры, содержащие потенциально чувствительные данные.
+- Фильтр рекламных/аналитических доменов: 21 базовое правило, 20 дополнительных правил в строгом режиме, собственные блокировки, исключения и ручной импорт ограниченных доменных списков. Блокировка запросов service worker при поддержке движка. Это не гарантирует исчезновения всей рекламы.
+- Управление сторонними cookie, доступом к микрофону/камере (по умолчанию запрещён), разрешением воспроизведения медиа, масштабом текста, компактностью панели и режимом десктопного сайта.
+- Экономия трафика изображений (может скрыть портреты), восстановление последней страницы (по умолчанию выключено), ручная диагностика версии WebView и статистики фильтра.
+- Открытие файлов через системный выбор Android, безопасные HTTPS-загрузки через DownloadManager (ссылки с параметрами открываются в браузере), обработка TLS-ошибок и восстановления после сбоя рендерера.
+- Ручной экспорт/импорт настроек и закладок через JSON. Импорт ограничен по размеру и выполняется одной транзакцией. Экспорт теперь повторно очищает старые сохранённые ссылки от потенциально опасных данных. **Переписки, cookie, токены и пароли не экспортируются.**
+- Русские и английские строки интерфейса. Сам язык сайта определяется Character.AI.
 
-## v0.4.0 — 2026-11-22 (source only)
+**Ограничения:** официальный API Character.AI отсутствует; Google может запрещать OAuth во встроенном WebView. Внешний браузер сохраняет собственную сессию и не авторизует автоматически встроенный WebView. Голосовые звонки могут быть доступны только в официальном приложении. Подписки и серверные ограничения не обходятся. Нет фоновых задач, мониторингов, уведомлений или запусков по расписанию.
 
-- Security: sanitized URL sharing, copying and external-browser opening. Reject account, authorization, callback and session paths. No third-party URL is exported accidentally.
-- Security: sanitize even legacy stored bookmarks at JSON export, and sanitize older last-visited preferences at read time. Renderer recovery uses sanitized first-party URLs.
-- Navigation: explicit user confirmation for third-party links and HTTPS downloads. Background redirects cannot silently launch an external app.
-- Media: HTML fullscreen handling in WebChromeClient, status bar fullscreen flag, back navigation and teardown. Revoke outstanding microphone/camera requests when navigation changes.
-- Convenience: four one-tap, atomic browser profiles (balanced, compatibility, private, data saver) without clearing existing bookmarks/accounts.
-- Manual build readiness: read-only `scripts/doctor.sh` that reports Java, Gradle, Android SDK 36 and adb. No CI, background checks, automatic tasks or event triggers.
-- Expanded security and translation tests to 12 Python structural tests + 64 Kotlin policy assertions. No APK was compiled or run on an Android device.
+## Сборка
 
+Нужны Android Studio, **SDK Platform 36**, **JDK 17**, **Gradle 8.13**, **AGP 8.13.0**, **Kotlin 2.2.0**. Клонируйте весь репозиторий GitHub (включая проверенный Gradle Wrapper), откройте корень в Android Studio, выполните Sync и `Build → Build APK(s)` либо запустите вручную `bash scripts/build-apk.sh`. В облегчённом ZIP нет `gradle-wrapper.jar`; альтернативно нужен установленный Gradle 8.13. APK появляется в `app/build/outputs/apk/debug/app-debug.apk` **только после успешной сборки**. Приложение рассчитано на Android 10 и выше.
 
-## v0.3.0 — 2026-11-22 (source only)
+Ручная проверка инструментов: `bash scripts/doctor.sh` (ничего не устанавливает и не запускает автоматически). Локальные тесты без SDK: `bash scripts/test-offline.sh`. Список обязательных проверок на телефоне — [docs/QA.md](docs/QA.md). Исследования — [docs/RESEARCH.md](docs/RESEARCH.md); ограничения и безопасность — [docs/SECURITY.md](docs/SECURITY.md), изменения — [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
-- Android-only: no Windows components or service proxy.
-- Bookmark sanitizer rejects OAuth/provider URLs and unknown query keys, drops fragments, requires HTTPS and standard TLS port.
-- Bounded JSON input reader stops at 200,000 characters before creating the full string; import now writes one atomic SharedPreferences transaction.
-- Added opt-in last page restoration; sanitized local URL is **never** included in the settings export.
-- Added optional stricter tracker list (20 extra host rules, disabled by default) and optional image data saver (disabled by default).
-- Better SSL error containment for third-party requests; edge-to-edge system bar insets; more accessible navigation touch targets.
-- Added on-demand diagnostics of Android API, WebView package/version, Java heap size, blocked requests and filter rule count.
-- Native long-press shortcuts: copy page URL; clear cache/reload; shield settings.
-- Expanded RU/EN translations for advanced settings and navigation/footer.
-- Added Gradle distribution metadata; do not mistake this for a complete Gradle wrapper.
-- Removed accidentally tracked Python bytecode and updated `.gitignore`.
-- Offline validation now includes 9 Python structural tests + 49 Kotlin assertions.
+## v0.12.0-rc1 — улучшения Android 17 (исходники)
 
-**Unresolved:** SDK build and device verification, embedded OAuth, actual site chat/voice compatibility, accessibility tests and real measured performance.
-
-## v0.2.0 — 2026-11-22
-
-- Initial Kotlin Android WebView client with bookmarks, privacy host rules, media permissions, file picker, downloads and manual settings backups.
-
-## v0.16.0-rc1 — 2026-11-23 (Android source candidate)
-
-- Lazy WebView: native offline library no longer inflates Chromium at startup; browser initialized on explicit first-party navigation only.
-- Android Share Sheet links override the optional native launch screen; foreground `singleTop` sharing works without a preexisting WebView.
-- WebView initialization errors offer native error/retry/browser fallback; retry cannot dereference an uninitialized WebView.
-- Lifecycle handles absence of WebView during backgrounding and destruction; cookie flushing is avoided before browser creation.
-- New pure Kotlin startup policy and regression tests; 50 Python tests and 243 Kotlin checks passed. Full Android APK compilation, install and Android 17 performance/compatibility still pending.
+Добавлены корректное определение открытой клавиатуры через WindowInsets на Android 11–17, переход в браузер с экрана ошибки, обработка HTTP 5xx основной страницы и ручное копирование диагностического отчёта без URL, переписок, cookie и токенов. APK пока не собран и на Android 17 не проверен.

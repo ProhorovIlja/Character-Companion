@@ -160,4 +160,6 @@
     <string name="gecko_media_on">Запросы доступа включены. Отключить? Сайт по-прежнему будет запрашивать разрешение для каждого сеанса.</string>
     <string name="gecko_media_off">Запросы доступа выключены. Разрешить сайту запрашивать доступ к микрофону и камере?</string>
     <string name="gecko_error">Не удалось запустить GeckoView. Можно открыть прежние инструменты браузера.</string>
+    <string name="gecko_download_confirm">Сохранить %1$s через системный выбор документов? Не более 256 МиБ. Файл останется на устройстве.</string>
+    <string name="gecko_download_saved">Файл сохранён</string>
 </resources>
