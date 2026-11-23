@@ -153,4 +153,5 @@
     <string name="hub_bookmark_url_hint">https://character.ai/...</string>
     <string name="hub_bookmark_invalid">Only safe Character.AI links can be saved</string>
     <string name="hub_bookmark_rename">Rename bookmark</string>
+    <string name="device_compat_title">Device and ROM compatibility</string>
 </resources>

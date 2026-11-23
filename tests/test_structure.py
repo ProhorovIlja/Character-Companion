@@ -47,6 +47,26 @@ class Structure(unittest.TestCase):
         self.assertNotIn('WebSettings.getDefaultUserAgent(this)\n        installServiceWorkerFilter()', startup)
         self.assertFalse(list(ROOT.rglob('*.apk')))
 
+    def test_pixel8a_lineageos_runtime_diagnostics(self):
+        activity = (ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
+        probe = (ROOT/'app/src/main/java/dev/caicompanion/app/DeviceRuntimeProbe.kt').read_text()
+        policy = (ROOT/'app/src/main/java/dev/caicompanion/app/DeviceCompatibility.kt').read_text()
+        manifest = (ROOT/'app/src/main/AndroidManifest.xml').read_text()
+        script = (ROOT/'scripts/test-offline.sh').read_text()
+        self.assertIn('DeviceCompatibility.format(snapshot)', activity)
+        self.assertIn('DeviceRuntimeProbe.capture(this)', activity)
+        self.assertIn('DeviceCompatibility}.kt', script)
+        self.assertIn('Build.SUPPORTED_ABIS.toList()', probe)
+        self.assertIn('Os.sysconf(OsConstants._SC_PAGESIZE)', probe)
+        self.assertIn('Build.VERSION.SDK_INT', probe)
+        self.assertIn('WebView.getCurrentWebViewPackage()', probe)
+        self.assertIn('<package android:name="com.google.android.gms" />', manifest)
+        self.assertIn('gmsCompatiblePackageVisible', policy)
+        self.assertNotIn('Build.SERIAL', probe)
+        self.assertNotIn('Build.FINGERPRINT', probe)
+        self.assertNotIn('getAccounts(', probe)
+        self.assertFalse((ROOT/'.github/workflows').exists())
+
     def test_android_only(self):
         self.assertTrue((ROOT/'app/build.gradle.kts').exists())
         self.assertFalse((ROOT/'src/windows').exists())
@@ -212,7 +232,7 @@ class Structure(unittest.TestCase):
         self.assertIn('BoundedText.read(reader, RuleListParser.MAX_CHARACTERS)', activity)
         self.assertIn('IMPORT_FILTER_LIST ->', activity)
         self.assertIn('if (configuration == appliedConfiguration) return', engine)
-        self.assertIn('RuleListParser,IncomingLinkParser,BrowserSessionPolicy,RendererRecoveryBudget,SupportReport,NativeLibrarySearch,NativeWorkspaceNavigation,NativeStartupPolicy,DeferredWebReload,OfflineBookmarkEditor}.kt', script)
+        self.assertIn('RuleListParser,IncomingLinkParser,BrowserSessionPolicy,RendererRecoveryBudget,SupportReport,NativeLibrarySearch,NativeWorkspaceNavigation,NativeStartupPolicy,DeferredWebReload,OfflineBookmarkEditor,DeviceCompatibility}.kt', script)
         self.assertNotIn('https://easylist.to/easylist/easylist.txt', activity)
         self.assertNotIn('PeriodicWorkRequest', activity)
 
@@ -329,9 +349,9 @@ class Structure(unittest.TestCase):
     def test_browser_dependencies_are_pinned_without_new_permissions(self):
         build=(ROOT/'app/build.gradle.kts').read_text()
         manifest=(ROOT/'app/src/main/AndroidManifest.xml').read_text()
-        self.assertIn('versionName = "0.16.0-rc1"', build)
-        self.assertIn("VERSION='0.16.0-rc1'", (ROOT/'scripts/prepare-release.sh').read_text())
-        self.assertIn("versionCode='16'", (ROOT/'scripts/prepare-release.sh').read_text())
+        self.assertIn('versionName = "0.17.0-rc1"', build)
+        self.assertIn("VERSION='0.17.0-rc1'", (ROOT/'scripts/prepare-release.sh').read_text())
+        self.assertIn("versionCode='17'", (ROOT/'scripts/prepare-release.sh').read_text())
         self.assertIn('androidx.browser:browser:1.10.0', build)
         self.assertIn('androidx.webkit:webkit:1.18.0', build)
         self.assertNotIn('android.permission.QUERY_ALL_PACKAGES', manifest)

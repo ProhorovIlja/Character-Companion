@@ -12,6 +12,26 @@ if [[ -n "${ADB_SERIAL:-}" ]]; then args=(-s "$ADB_SERIAL"); fi
 api="$(adb "${args[@]}" shell getprop ro.build.version.sdk | tr -d '\r\n')"
 case "$api" in ''|*[!0-9]*) echo 'ANDROID_API=UNREADABLE' >&2; exit 2;; esac
 printf 'ANDROID_API=%s\n' "$api"
+# Only announce known, non-unique hardware classes (never print serials or build fingerprints).
+codename="$(adb "${args[@]}" shell getprop ro.product.device | tr -d '\r\n')"
+if [[ "$codename" == 'akita' ]]; then
+    echo 'PIXEL_8A_AKITA=YES'
+else
+    echo 'PIXEL_8A_AKITA=NOT_VERIFIED'
+fi
+abi="$(adb "${args[@]}" shell getprop ro.product.cpu.abilist | tr -d '\r\n')"
+if [[ ",$abi," == *,arm64-v8a,* ]]; then
+    echo 'ARM64_ABI=YES'
+else
+    echo 'ARM64_ABI=NOT_VERIFIED'
+fi
+# GMS-compatible packages (including some microG installations) use the same package ID.
+if adb "${args[@]}" shell pm path com.google.android.gms | grep -q '^package:'; then
+    echo 'GMS_COMPATIBLE_PACKAGE=VISIBLE_AUTH_NOT_VERIFIED'
+else
+    echo 'GMS_COMPATIBLE_PACKAGE=NOT_VISIBLE'
+fi
+
 if (( api == 37 )); then
     echo 'ANDROID_17_RUNTIME=DETECTED'
 else

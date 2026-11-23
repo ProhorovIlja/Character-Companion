@@ -153,4 +153,5 @@
     <string name="hub_bookmark_url_hint">https://character.ai/...</string>
     <string name="hub_bookmark_invalid">Можно сохранить только безопасную ссылку Character.AI</string>
     <string name="hub_bookmark_rename">Переименовать закладку</string>
+    <string name="device_compat_title">Совместимость устройства и прошивки</string>
 </resources>

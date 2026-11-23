@@ -1,5 +1,7 @@
 # Character Companion — Android
 
+**v0.17.0-rc1 — Pixel 8a / LineageOS 24.0 runtime compatibility (2026-11-23).** Added opt-in native device diagnostics (real Android API, `akita` detection, WebView provider, ABI, display refresh, memory page size and GMS-compatible package visibility), read-only manual ADB checks and 16-KiB/Android 17 compatibility research. **Google OAuth, Android 17 device validation, APK build and Play Protect prompts remain unverified.** [Pixel 8a / LineageOS dossier](docs/PIXEL8A_LINEAGEOS_24.md) · [Release notes](docs/RELEASE_NOTES_v0.17.0-rc1.md).
+
 **v0.16.0-rc1 — source candidate (23 November 2026).** Native cold start now defers WebView creation, Chromium startup, service worker and user-agent initialization until the first explicit website navigation. Android Share links bypass the offline home when valid; missing WebView provider errors can be retried without dereferencing an uninitialized WebView. 50 Python tests and 243 Kotlin smoke assertions pass offline. **APK not built or device tested.** [Notes](docs/RELEASE_NOTES_v0.16.0-rc1.md) · [Android 17](docs/ANDROID_17.md).
 
 **v0.15.0-rc1 source candidate · 23 November 2026.** Native offline bookmark creation and rename, deferred website refresh while offline, stricter imported bookmark titles, Russian/English strings and 49 passing Python tests plus JVM Kotlin policy tests. **Android-only; no signed or device-tested APK yet.** [Release notes](docs/RELEASE_NOTES_v0.15.0-rc1.md) · [Native architecture](docs/NATIVE_ARCHITECTURE.md) · [Android 17 checklist](docs/ANDROID_17.md).

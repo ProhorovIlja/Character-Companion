@@ -641,6 +641,22 @@ class MainActivity : Activity() {
             }
             .setPositiveButton(R.string.confirm, null).show()
     }
+    /** Manual Pixel/LineageOS compatibility check; never requests account or private data. */
+    private fun showDeviceCompatibility() {
+        val snapshot = DeviceRuntimeProbe.capture(this)
+        val report = DeviceCompatibility.format(snapshot)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.device_compat_title)
+            .setMessage(report)
+            .setNeutralButton(R.string.diagnostics_copy) { _, _ ->
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("Device compatibility", report))
+                showToast(getString(R.string.diagnostics_copied))
+            }
+            .setPositiveButton(R.string.confirm, null)
+            .show()
+    }
+
     private fun showPrivacyStats() {
         val top = filter.topBlockedRules()
         val content = if (top.isEmpty()) getString(R.string.privacy_stats_empty) else
@@ -786,6 +802,7 @@ class MainActivity : Activity() {
             createOfflineBookmark { refreshNativeBookmarks() }
         }
         addButton(layout, getString(R.string.hub_privacy)) { showPrivacyStats() }
+        addButton(layout, getString(R.string.device_compat_title)) { showDeviceCompatibility() }
         layout.addView(sectionLabel(getString(R.string.hub_library)))
         val search = EditText(this).apply {
             hint = getString(R.string.hub_search_hint)
@@ -1027,6 +1044,7 @@ class MainActivity : Activity() {
             addButton(layout, getString(R.string.clear_imported_filter)) { confirmClearImportedList() }
         }
         addButton(layout, getString(R.string.diagnostics)) { showDiagnostics() }
+        addButton(layout, getString(R.string.device_compat_title)) { showDeviceCompatibility() }
         addButton(layout, getString(R.string.privacy_stats)) { showPrivacyStats() }
         layout.addView(sectionLabel(getString(R.string.section_appearance)))
         addToggle(layout, getString(R.string.toggle_compact), getString(R.string.toggle_compact_desc), store.compactChrome) {

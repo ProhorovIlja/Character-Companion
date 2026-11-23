@@ -1,3 +1,5 @@
+**Manual Pixel 8a/Android 17 acceptance plan:** [Device-specific dossier](PIXEL8A_LINEAGEOS_24.md). The plan is not a passed device test.
+
 # Quality assurance · 2026-11-23 · v0.14.0-rc1
 
 ## Completed in offline environment

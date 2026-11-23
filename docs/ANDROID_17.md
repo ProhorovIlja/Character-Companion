@@ -1,3 +1,5 @@
+**Pixel 8a (akita), LineageOS 24.0:** [Verified device dossier and manual compatibility checks](PIXEL8A_LINEAGEOS_24.md).
+
 # Android 17 / LineageOS device verification — source-only plan
 
 **Status: UNVERIFIED on Android hardware.** The user reports a Pixel 8a running a recent LineageOS build with Android 17 (API 37). No device has been connected during this work. Do not represent a source review as proof of support.

@@ -5,6 +5,11 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <!-- Narrow Android 11+ package visibility for optional GMS compatibility diagnosis.
+         This does not grant access to other apps or to Google accounts. -->
+    <queries>
+        <package android:name="com.google.android.gms" />
+    </queries>
     <application android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"

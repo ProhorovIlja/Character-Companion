@@ -15,6 +15,9 @@ class Android17PreflightTest(unittest.TestCase):
             fake.write_text('''#!/usr/bin/env bash
 case "$*" in
   *ro.build.version.sdk*) printf '%s\\n' "$MOCK_API";;
+  *ro.product.device*) printf 'akita\\n';;
+  *ro.product.cpu.abilist*) printf 'arm64-v8a,armeabi-v7a\\n';;
+  *"pm path com.google.android.gms"*) printf 'package:/fake/google.apk\\n';;
   *ro.lineage.version*) printf '%s\\n' "$MOCK_LINEAGE";;
   *"pm path dev.caicompanion.app"*) if [[ "$MOCK_INSTALLED" == 1 ]]; then echo 'package:/fake/path.apk'; fi;;
   *) exit 3;;
@@ -30,6 +33,9 @@ esac
         p=self.run_fake()
         self.assertEqual(p.returncode,0,p.stderr)
         self.assertIn('ANDROID_17_RUNTIME=DETECTED',p.stdout)
+        self.assertIn('PIXEL_8A_AKITA=YES',p.stdout)
+        self.assertIn('ARM64_ABI=YES',p.stdout)
+        self.assertIn('GMS_COMPATIBLE_PACKAGE=VISIBLE_AUTH_NOT_VERIFIED',p.stdout)
         self.assertIn('LINEAGE_OS_PRESENT=YES',p.stdout)
         self.assertIn('COMPANION_INSTALLED=YES',p.stdout)
         self.assertIn('LOGIN_CHAT_VOICE_PERFORMANCE=NOT_TESTED',p.stdout)

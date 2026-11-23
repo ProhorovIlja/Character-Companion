@@ -16,6 +16,7 @@ import dev.caicompanion.app.NativeStartupPolicy
 import dev.caicompanion.app.DeferredWebReload
 import dev.caicompanion.app.OfflineBookmarkEditor
 import dev.caicompanion.app.SupportReport
+import dev.caicompanion.app.DeviceCompatibility
 import java.io.StringReader
 
 fun main() {
@@ -323,6 +324,47 @@ fun main() {
     check(!budgetForReport.allowAutomaticRestart(3000L))
     check(budgetForReport.recentRestartCount(11_000L) == 1)
     check(budgetForReport.recentRestartCount(12_000L) == 0)
+
+    // Android 17 Pixel 8a / LineageOS compatibility: only generic, local facts.
+    val pixel = DeviceCompatibility.Snapshot(
+        manufacturer = "Google", model = "Pixel 8a", device = "akita",
+        androidApi = 37, androidRelease = "17",
+        supportedAbis = listOf("arm64-v8a", "armeabi-v7a"),
+        refreshRateHz = 120.0f, memoryPageBytes = 16384L, webViewPackage = "com.google.android.webview",
+        webViewVersion = "150.0.0.1", gmsCompatiblePackageVisible = false
+    )
+    check(DeviceCompatibility.isPixel8a(pixel))
+    val pixelReport = DeviceCompatibility.format(pixel)
+    check("Pixel 8a (akita)" in pixelReport)
+    check("Android 17: detected by API" in pixelReport)
+    check("120 Hz" in pixelReport)
+    check("Kernel page size: 16 KiB" in pixelReport)
+    check("Kernel page size: 4 KiB" in DeviceCompatibility.format(pixel.copy(memoryPageBytes = 4096L)))
+    check("Kernel page size: unknown" in DeviceCompatibility.format(pixel.copy(memoryPageBytes = null)))
+    check("arm64-v8a" in pixelReport)
+    check("no (browser-based sign-in may differ)" in pixelReport)
+    check("LineageOS version: not attested" in pixelReport)
+    check("OAuth, voice, Play Protect and performance: NOT TESTED" in pixelReport)
+    check(!pixelReport.contains("serial="))
+    val unknownRom = pixel.copy(manufacturer = "Other", device = "akita", model = "My Phone")
+    check(!DeviceCompatibility.isPixel8a(unknownRom))
+    val suspicious = pixel.copy(
+        model = "Pixel 8a\nAuthorization: Bearer SECRET",
+        device = "akita\nhttps://bad.example/?token=LEAK",
+        webViewPackage = "com.android.webview\nhttps://attacker.example",
+        webViewVersion = "150.1\nBearer SECRET",
+        supportedAbis = listOf("arm64-v8a", "leak SECRET", "x86_64"),
+        refreshRateHz = Float.NaN, gmsCompatiblePackageVisible = null
+    )
+    val sanitized = DeviceCompatibility.format(suspicious)
+    check(!sanitized.contains("SECRET"))
+    check(!sanitized.contains("https://"))
+    check("Model: unknown" in sanitized)
+    check("Current display rate: unknown" in sanitized)
+    check("GMS-compatible package visible: unknown" in sanitized)
+    check("x86_64" in sanitized)
+    check(DeviceCompatibility.format(pixel.copy(androidApi = 36)).contains("Android 17: not detected"))
+    check(DeviceCompatibility.format(pixel.copy(refreshRateHz = 2401.0f)).contains("display rate: unknown"))
 
     val pendingRefresh = DeferredWebReload()
     check(!pendingRefresh.isPending())
