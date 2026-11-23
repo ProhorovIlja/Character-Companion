@@ -35,6 +35,8 @@ class ExternalBrowserSafety(unittest.TestCase):
         smoke = (ROOT / 'tests/PolicySmoke.kt').read_text()
         self.assertIn('val expanded = decodeLimited(query) ?: return HOME', policy)
         self.assertIn('embeddedKey.findAll(expanded)', policy)
+        self.assertIn('https?://', policy)
+        self.assertIn('auth.example%2Foauth%2Fauthorize', smoke)
         self.assertIn('payload=https%3A%2F%2Felse.test', smoke)
         self.assertIn('payload=one%26access_token%3DSECRET', smoke)
 

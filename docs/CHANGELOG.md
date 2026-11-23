@@ -1,3 +1,10 @@
+## 2026-11-23 · v0.36.0-source
+
+- Android GeckoView/legacy 0.27.0-rc1: domain-blocking statistics now attribute each blocked request to its most specific matching rule. Explicit allow rules still override blocking. This makes privacy diagnostics more useful when broad and narrow rules overlap.
+- Android external browser handoff refuses percent-encoded nested URLs, including URLs with hidden login paths but without conventional OAuth query keys. Plain public links and harmless text parameters remain supported.
+- Expanded real Kotlin/JVM regression cases and Python source assertions. Both Android renderer flavors still share the hardened policies; Windows source remains unchanged.
+- Source-only publication: Android SDK/Gradle compilation, device installation, Google auth/voice, and Play Protect behavior remain unverified. No scheduled tasks or CI were created. See [release notes](RELEASE_NOTES_v0.36.0-source.md).
+
 ## 2026-11-23 · v0.35.0-source
 
 - Windows 0.11.0-prealpha: self-host native CEF renderer/GPU/utility child processes with an explicit .NET 10 WPF entry point; configure the running app EXE as BrowserSubprocessPath.

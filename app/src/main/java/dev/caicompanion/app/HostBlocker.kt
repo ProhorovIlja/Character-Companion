@@ -20,7 +20,9 @@ class HostBlocker(
         var matched: String? = null
         while (true) {
             if (suffix in allowDomains) return null // exceptions always override other matches
-            if (suffix in blockedDomains) matched = suffix
+            // Attribute the block to the most specific matching domain.
+            // We walk from hostname to parent suffix, so keep the first hit.
+            if (matched == null && suffix in blockedDomains) matched = suffix
             val index = suffix.indexOf('.')
             if (index < 0) break
             suffix = suffix.substring(index + 1)
