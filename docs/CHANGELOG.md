@@ -1,3 +1,10 @@
+## 2026-11-23 · v0.37.0-source
+
+- Android GeckoView/legacy 0.28.0-rc1: native user-controlled voice draft, on-device speech recognition when an Android service is available; optional system-provider fallback requires a privacy warning.
+- RU/EN/device language, text editing, bounded accumulation, user-controlled clipboard copy and Android SAF TXT save; no recording persistence, automatic send or account access.
+- Microphone listening cancelled on Activity pause, on-device recognizer destroyed after results/errors; Android API 31+ package visibility, runtime microphone permission, source/Kotlin tests.
+- Android API 37 device testing and APK compilation still pending; Windows prototype unchanged. No background tasks. [Release notes](RELEASE_NOTES_v0.37.0-source.md).
+
 ## 2026-11-23 · v0.36.0-source
 
 - Android GeckoView/legacy 0.27.0-rc1: domain-blocking statistics now attribute each blocked request to its most specific matching rule. Explicit allow rules still override blocking. This makes privacy diagnostics more useful when broad and narrow rules overlap.

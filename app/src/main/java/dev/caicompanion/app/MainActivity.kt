@@ -802,6 +802,9 @@ class MainActivity : Activity() {
             createOfflineBookmark { refreshNativeBookmarks() }
         }
         addButton(layout, getString(R.string.hub_privacy)) { showPrivacyStats() }
+        addButton(layout, getString(R.string.voice_title)) {
+            startActivity(Intent(this, VoiceDraftActivity::class.java))
+        }
         addButton(layout, getString(R.string.device_compat_title)) { showDeviceCompatibility() }
         layout.addView(sectionLabel(getString(R.string.hub_library)))
         val search = EditText(this).apply {
@@ -1086,6 +1089,9 @@ class MainActivity : Activity() {
         addButton(layout, getString(R.string.import_settings)) { importSettings() }
         addButton(layout, getString(R.string.clear_cache)) { confirmClearCache() }
         addButton(layout, getString(R.string.clear_data)) { confirmClearSiteData() }
+        addButton(layout, getString(R.string.voice_title)) {
+            startActivity(Intent(this, VoiceDraftActivity::class.java))
+        }
         layout.addView(sectionLabel(getString(R.string.section_about)))
         layout.addView(infoLabel(getString(R.string.about_details, BuildConfig.VERSION_NAME,
             filter.blockedRequestCount.get())))

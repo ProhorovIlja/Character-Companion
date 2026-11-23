@@ -1,4 +1,5 @@
 import dev.caicompanion.app.ExternalBrowserPolicy
+import dev.caicompanion.app.VoiceDraftPolicy
 import dev.caicompanion.app.HostBlocker
 import dev.caicompanion.app.UrlPolicy
 import dev.caicompanion.app.FilterEngine
@@ -22,7 +23,18 @@ import dev.caicompanion.app.GeckoTransferOriginPolicy
 import dev.caicompanion.app.GeckoTransferPolicy
 import java.io.StringReader
 
+private fun verifyVoiceDraft() {
+    check(VoiceDraftPolicy.append("", "  Hello ") == "Hello")
+    check(VoiceDraftPolicy.append("Hello", "world") == "Hello\nworld")
+    check(VoiceDraftPolicy.append("Hello\n", "world") == "Hello\nworld")
+    check(VoiceDraftPolicy.append("abc", " ") == null)
+    check(VoiceDraftPolicy.append("abc", null) == null)
+    check(VoiceDraftPolicy.append("a".repeat(VoiceDraftPolicy.MAX_CHARS), "x") == null)
+    check(VoiceDraftPolicy.append("x", "a".repeat(VoiceDraftPolicy.MAX_CHARS)) == null)
+}
+
 fun main() {
+    verifyVoiceDraft()
     // A pending SAF operation may finish only for its original HTTPS page.
     check(GeckoTransferOriginPolicy.isSamePage("https://character.ai/chat/abc", "https://character.ai/chat/abc"))
     check(!GeckoTransferOriginPolicy.isSamePage("https://character.ai/chat/abc", "https://character.ai/chat/xyz"))

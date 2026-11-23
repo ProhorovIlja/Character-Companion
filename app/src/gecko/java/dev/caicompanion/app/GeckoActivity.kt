@@ -109,6 +109,10 @@ class GeckoActivity : Activity() {
             setPadding(dp(14), dp(10), dp(6), dp(8))
         }
         top.addView(locationLabel, LinearLayout.LayoutParams(0, dp(54), 1f))
+        top.addView(button("🎙") {
+            startActivity(Intent(this, VoiceDraftActivity::class.java))
+        }.apply { contentDescription = getString(R.string.voice_title) },
+            LinearLayout.LayoutParams(dp(48), dp(54)))
         top.addView(button("☆") { saveCurrentBookmark() }.apply {
             contentDescription = getString(R.string.bookmark_add)
         }, LinearLayout.LayoutParams(dp(48), dp(54)))
