@@ -9,3 +9,10 @@
 - No CI, schedules, background tasks, services or recurring work.
 
 In v0.5.0 the no-NuGet project also links the production `Pcm16Resampler.cs` and checks five deterministic audio cases. It still requires .NET 10 and has not been executed in this environment.
+
+
+In v0.8.0 pre-alpha the smoke project also links the **production**
+`WhisperCliTranscriber.cs`, including its bounded-memory stdout/stderr drain,
+so .NET compilation will cover the real code path. A missing-executable
+preflight case rejects invalid user-selected Whisper paths without execution.
+This check is written but **not executed** until a .NET 10 SDK is available.

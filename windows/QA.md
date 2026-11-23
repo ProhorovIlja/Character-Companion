@@ -1,3 +1,15 @@
+### v0.8.0 — manual build and CLI pipe-drain verification
+
+From the full checkout on a Windows 10/11 x64 desktop with official .NET 10 SDK and network/package cache ready:
+
+```powershell
+.\windows\build-windows.ps1 -Configuration Release
+```
+
+The build must **first run actual source-linked C# PolicySmoke**, compile the production Whisper subprocess runner, and then publish untrimmed CefSharp native assets. It must reject missing SDKs, failed PolicySmoke, missing `CharacterCompanion.Windows.exe`, `libcef.dll` and `locales`. Validate the reported SHA-256. This is an unsigned, unverified portable folder, not a release installer.
+
+On a real Windows test machine, run a trusted local `whisper-cli.exe` against a legitimate model and confirm multi-minute stdout/stderr streams do not grow the client process memory unboundedly; cancel and timeout must terminate the child and remove temporary text files. No synthetic test substitutes for this. No startup services or scheduled tasks.
+
 ### v0.4.0 manual security test gate
 
 Before trying a Windows installer, manually run `dotnet run --project windows/PolicySmoke/CharacterCompanion.PolicySmoke.csproj` with .NET 10 installed; require `PASS 24 external-handoff policy cases`. On Windows test browser handoffs with ordinary HTTPS links, Google/Apple/Auth0 sign-in, nested `%2563ode` keys, `#access_token`, encoded `/auth/callback` paths, and invalid schemes. Confirm that the browser never receives a source CEF OAuth callback or cookies. No real browser/API acceptance has been performed in this source-only environment.

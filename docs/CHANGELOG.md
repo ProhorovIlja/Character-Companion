@@ -1,3 +1,9 @@
+## v0.32.0-source — 2026-11-23
+
+- Windows v0.8.0-prealpha: use bounded-memory concurrent draining for whisper-cli stdout/stderr; preserve model timeout/cleanup.
+- Add foreground-only Windows PowerShell build/publish helper with .NET 10 PolicySmoke gate and CEF native-asset checks; link actual production Whisper subprocess runner into that C# gate.
+- Android 0.25.0-rc1 (GeckoView/legacy) unchanged. No APK/EXE, device verification, CI, signed installers or automatic tasks.
+
 ## 0.31.0-source (2026-11-23)
 
 - Windows 0.7.0-prealpha: prevent `ComposerBridge` clicking Send if website event callbacks synchronously navigate or detach/recreate the composer; five new Node runtime cases.

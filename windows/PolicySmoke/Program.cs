@@ -80,4 +80,15 @@ Check(Resample(Samples(short.MinValue, short.MaxValue), 48_000, 1)
     .Length == 1, "clipped values produce one sample");
 Console.WriteLine("PASS PCM16 capture-rate normalization cases (no hardware).");
 
-Console.WriteLine($"PASS {checkedCount} policy + PCM16 checks; linked production sources");
+// These rejects must happen before starting any executable or reading a model.
+await CheckWhisperPreflightAsync();
+async Task CheckWhisperPreflightAsync()
+{
+    try
+    {
+        await WhisperCliTranscriber.TranscribeAsync("missing.exe", "missing.bin", "missing.wav", "ru");
+        Check(false, "missing whisper executable rejected");
+    }
+    catch (FileNotFoundException) { Check(true, "missing whisper executable rejected"); }
+}
+Console.WriteLine($"PASS {checkedCount} policy + PCM16 + Whisper preflight checks; linked production sources");

@@ -36,11 +36,13 @@ public static class WhisperCliTranscriber
             if (!process.Start()) throw new InvalidOperationException("Cannot start whisper.cpp.");
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromMinutes(4));
-            // Drain pipes in parallel to avoid child-process deadlock.
-            var stdout = process.StandardOutput.ReadToEndAsync(timeout.Token);
-            var stderr = process.StandardError.ReadToEndAsync(timeout.Token);
-            await process.WaitForExitAsync(timeout.Token);
-            await Task.WhenAll(stdout, stderr);
+            // Drain the two child-process pipes concurrently using fixed-size buffers.
+            // ReadToEndAsync would retain an unbounded amount of model/debug output in RAM,
+            // even though recognition reads the separately written .txt file instead.
+            await Task.WhenAll(
+                process.WaitForExitAsync(timeout.Token),
+                DrainOutputAsync(process.StandardOutput, timeout.Token),
+                DrainOutputAsync(process.StandardError, timeout.Token));
             if (process.ExitCode != 0) throw new InvalidOperationException($"whisper.cpp exited with code {process.ExitCode}.");
             if (!File.Exists(resultPath)) throw new IOException("Whisper text output was not produced.");
             if (new FileInfo(resultPath).Length > 100_000) throw new IOException("Transcription output exceeds limit.");
@@ -69,6 +71,15 @@ public static class WhisperCliTranscriber
         {
             try { if (File.Exists(resultPath)) File.Delete(resultPath); } catch (IOException) { }
             catch (UnauthorizedAccessException) { }
+        }
+    }
+
+    private static async Task DrainOutputAsync(StreamReader reader, CancellationToken cancellationToken)
+    {
+        var buffer = new char[4 * 1024];
+        while (await reader.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false) != 0)
+        {
+            // No log/transcript retention: output is intentionally discarded.
         }
     }
 }
