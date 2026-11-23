@@ -8,7 +8,12 @@
     <Nullable>enable</Nullable>
     <AssemblyName>CharacterCompanion.Windows</AssemblyName>
     <RootNamespace>CharacterCompanion.Windows</RootNamespace>
-    <Version>0.10.0</Version>
+    <Version>0.11.0</Version>
+    <!-- A self-contained CefSharp publish needs the host EXE to run renderer/GPU children. -->
+    <StartupObject>CharacterCompanion.Windows.Program</StartupObject>
+    <!-- CEF subprocesses must execute this actual .exe, never dotnet.exe. -->
+    <UseAppHost>true</UseAppHost>
+    <CefSharpExcludeSubProcessExe>true</CefSharpExcludeSubProcessExe>
     <PlatformTarget>x64</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
     <ApplicationManifest>app.manifest</ApplicationManifest>

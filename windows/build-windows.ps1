@@ -36,8 +36,17 @@ Write-Output 'STEP=Publish WPF+CEF portable folder with native dependencies inta
 if ($LASTEXITCODE -ne 0) { Fail 'Windows publish failed; no verified EXE.' }
 $exe = Join-Path $published 'CharacterCompanion.Windows.exe'
 $cef = Join-Path $published 'libcef.dll'
+# CefSharp .NET Core self-contained publish uses our app EXE as its child host;
+# the managed BrowserSubprocess.Core assembly and CEF data files are mandatory.
+$requiredCef = @('CefSharp.BrowserSubprocess.Core.dll', 'icudtl.dat',
+                 'v8_context_snapshot.bin', 'chrome_100_percent.pak')
 if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { Fail 'Publish returned no EXE.' }
 if (-not (Test-Path -LiteralPath $cef -PathType Leaf)) { Fail 'CEF native runtime libcef.dll missing.' }
+foreach ($item in $requiredCef) {
+    if (-not (Test-Path -LiteralPath (Join-Path $published $item) -PathType Leaf)) {
+        Fail "CEF self-host runtime component missing: $item"
+    }
+}
 if (-not (Test-Path -LiteralPath (Join-Path $published 'locales') -PathType Container)) {
     Fail 'CEF locale resources missing; verify NuGet native asset copying.'
 }
@@ -45,5 +54,5 @@ $bytes = (Get-Item -LiteralPath $exe).Length
 if ($bytes -le 0) { Fail 'Published EXE is empty.' }
 Write-Output "WINDOWS_BUILD_PATH=$published"
 Write-Output "WINDOWS_EXE_SHA256=$((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant())"
-Write-Output 'SOURCE_VERIFICATION=PASS; RUNTIME_AND_SIGNING=NOT_VERIFIED'
+Write-Output 'SOURCE_VERIFICATION=PASS; CEF_SELF_HOST_FILES=PASS; RUNTIME_AND_SIGNING=NOT_VERIFIED'
 Write-Output 'Keep the ENTIRE folder; manually test browser, audio, login, CEF resources and Windows VC++ runtime.'

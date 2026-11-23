@@ -1,3 +1,10 @@
+### v0.11.0 self-host CEF child-process acceptance (manual on Windows)
+
+1. From the full checkout and trusted .NET 10 SDK, run `./windows/build-windows.ps1 -Configuration Release`. This must compile the real C# PolicySmoke, then build a complete self-contained x64 folder.
+2. Verify `CharacterCompanion.Windows.exe`, `CefSharp.BrowserSubprocess.Core.dll`, `libcef.dll`, `icudtl.dat`, `v8_context_snapshot.bin`, `chrome_100_percent.pak` and `locales/`. The script now fails closed on missing items.
+3. Launch **the built EXE directly**, not `dotnet.exe` on the DLL. In Task Manager confirm that Chromium renderer/GPU children use the same EXE with CEF `--type=` arguments, and no duplicate WPF windows appear. Close the app and check children exit.
+4. Verify navigating Character.AI, user-confirmed external links, authentication, the native whisper.cpp dictation workflow and manual shutdown. No compatibility, security, sandbox or signing claims until these checks succeed. No automatic jobs.
+
 ### v0.9.0 manual shutdown and external navigation checks
 
 On real Windows, during a long Whisper inference close the window: check Task Manager for absence of the orphaned `whisper-cli.exe`, absence of unintended message insertion/send, and cleanup of the temporary audio/text files. Repeat by closing immediately after pressing Transcribe & Send and after recognition finishes but before CEF dispatch. Verify normal user-clicked external links prompt for confirmation, while automatic popups/redirects do not. Test sign-in because OAuth redirects may not retain a CEF user gesture. Source tests cannot certify these scenarios.

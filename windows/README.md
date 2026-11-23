@@ -1,3 +1,7 @@
+### v0.11.0 source-only CEF self-contained process host
+
+An explicit WPF `Program.Main` handles CefSharp renderer/GPU/utility subprocesses with `SelfHost.Main(args)` before launching the main window. This is required by the manual `--self-contained true` folder publish; the existing `windows/build-windows.ps1` checks BrowserSubprocess.Core, Chromium data files, libcef and locales. Launch the **published CharacterCompanion.Windows.exe**, not `dotnet.exe CharacterCompanion.Windows.dll`. The code has not been compiled or runtime-tested on Windows. See [release notes](RELEASE_NOTES_v0.11.0-prealpha.md).
+
 ### v0.9.0 source-only shutdown and external-popup security
 
 Closing Windows now cancels active whisper.cpp processing and prevents later automatic-send dispatch. Non-user-initiated third-party CEF popup/navigation attempts no longer create an external-browser dialog. Windows authentication and process cancellation remain unverified on-device; [release notes](RELEASE_NOTES_v0.9.0-prealpha.md) and [QA](QA.md) describe required manual checks.

@@ -1,3 +1,9 @@
+## 2026-11-23 · v0.35.0-source
+
+- Windows 0.11.0-prealpha: self-host native CEF renderer/GPU/utility child processes with an explicit .NET 10 WPF entry point; configure the running app EXE as BrowserSubprocessPath.
+- Validate native and managed Chromium runtime assets in the manual Windows self-contained publish path; add four source-level regression audits.
+- Android remains 0.26.0-rc1. No real APK/EXE compilation or device/runtime sign-off; no CI or automations. [Release notes](RELEASE_NOTES_v0.35.0-source.md).
+
 ## 2026-11-23 · v0.34.0-source
 
 - Android GeckoView 0.26.0-rc1: bounded failure on repeated zero-byte reads from a malformed streaming download provider; a transient empty read does not corrupt output. Added executable Kotlin/JVM cases.

@@ -1,0 +1,7 @@
+# Windows Character Companion 0.11.0 pre-alpha — source only
+
+Fixed a self-contained CEF deployment blocker. The explicit `Program.Main` delegates `--type=renderer`, `--type=gpu-process` and other recognized CEF child roles to CefSharp's official `BrowserSubprocess.SelfHost.Main` **before WPF startup**. The normal browser process runs `App.InitializeComponent()` / `App.Run()`. App's `CefSettings.BrowserSubprocessPath` uses the actual application EXE and checks it is not `dotnet.exe`. The WPF project now declares `StartupObject`, `UseAppHost=true` and `CefSharpExcludeSubProcessExe=true`.
+
+The manual `windows/build-windows.ps1` publish gate now validates key CEF runtime assets (including managed BrowserSubprocess.Core and Chromium data), in addition to the EXE, libcef and locales. This is a **source fix**, not evidence of a successful publish. No C#/.NET build, CEF child process, microphone or live Character.AI sign-in was run.
+
+On a Windows x64 machine with .NET SDK 10 and restored NuGet dependencies, manually run `./windows/build-windows.ps1 -Configuration Release` from repository root, keep the **whole** publish folder, and test CEF subprocess launch and task-manager process tree before distributing. For details see `windows/QA.md`. No WebView2 runtime is required; no automatic tasks are set up. CefSharp lacks a Chromium sandbox, so review security before any real-world release.
