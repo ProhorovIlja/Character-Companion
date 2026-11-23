@@ -13,11 +13,14 @@ object DeviceRuntimeProbe {
         val provider = if (Build.VERSION.SDK_INT >= 26) {
             runCatching { WebView.getCurrentWebViewPackage() }.getOrNull()
         } else null
-        // Morphe's MicroG-RE uses an independent application ID. It can be installed
-        // alongside MindTheGapps without replacing com.google.android.gms.
-        // Package presence is informational only; neither package proves OAuth.
+        // Morphe MicroG-RE changed its Android applicationId to
+        // app.revanced.android.gms (upstream commit 2910276, August 2026).
+        // Some older distributions use app.morphe.android.gms. These are NOT
+        // the system com.google.android.gms service, and package presence alone
+        // never attests OAuth, signature, or authentication compatibility.
         val googleServices = probePackage(activity.packageManager, "com.google.android.gms")
-        val morpheServices = probePackage(activity.packageManager, "app.morphe.android.gms")
+        val morpheCurrent = probePackage(activity.packageManager, "app.revanced.android.gms")
+        val morpheLegacy = probePackage(activity.packageManager, "app.morphe.android.gms")
         val refresh = runCatching {
             if (Build.VERSION.SDK_INT >= 30) activity.display?.refreshRate
             else {
@@ -38,8 +41,10 @@ object DeviceRuntimeProbe {
             webViewVersion = provider?.versionName,
             gmsCompatiblePackageVisible = googleServices.first,
             gmsPackageVersion = googleServices.second,
-            morpheMicrogVisible = morpheServices.first,
-            morpheMicrogVersion = morpheServices.second
+            morpheMicrogCurrentVisible = morpheCurrent.first,
+            morpheMicrogCurrentVersion = morpheCurrent.second,
+            morpheMicrogVisible = morpheLegacy.first,
+            morpheMicrogVersion = morpheLegacy.second
         )
     }
     /** Returns null visibility only when Android explicitly denies inspection. */

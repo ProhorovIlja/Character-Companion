@@ -26,11 +26,19 @@ else
     echo 'ARM64_ABI=NOT_VERIFIED'
 fi
 # GMS-compatible packages (including some microG installations) use the same package ID.
-if adb "${args[@]}" shell pm path com.google.android.gms | grep -q '^package:'; then
-    echo 'GMS_COMPATIBLE_PACKAGE=VISIBLE_AUTH_NOT_VERIFIED'
-else
-    echo 'GMS_COMPATIBLE_PACKAGE=NOT_VISIBLE'
-fi
+# Explicit, read-only per-package checks: no global package-list scan.
+# These IDs come from the upstream Morphe MicroG-RE build configuration.
+check_package() {
+    local package="$1" label="$2"
+    if adb "${args[@]}" shell pm path "$package" | grep -q '^package:'; then
+        printf '%s=VISIBLE_AUTH_NOT_VERIFIED\n' "$label"
+    else
+        printf '%s=NOT_VISIBLE_OR_UNAVAILABLE\n' "$label"
+    fi
+}
+check_package com.google.android.gms GMS_COMPATIBLE_PACKAGE
+check_package app.revanced.android.gms MORPHE_MICROG_CURRENT
+check_package app.morphe.android.gms MORPHE_MICROG_LEGACY
 
 if (( api == 37 )); then
     echo 'ANDROID_17_RUNTIME=DETECTED'

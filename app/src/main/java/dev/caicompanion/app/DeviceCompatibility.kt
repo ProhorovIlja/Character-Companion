@@ -23,7 +23,10 @@ object DeviceCompatibility {
         /** A package called com.google.android.gms; NOT evidence of genuine GMS or working OAuth. */
         val gmsCompatiblePackageVisible: Boolean?,
         val gmsPackageVersion: String? = null,
-        /** Morphe microG is app-specific and is not a replacement for system GMS. */
+        /** Modern Morphe MicroG-RE application ID; unrelated to system Google Play Services. */
+        val morpheMicrogCurrentVisible: Boolean? = null,
+        val morpheMicrogCurrentVersion: String? = null,
+        /** Historical Morphe ID; kept for older installations, not a GMS replacement. */
         val morpheMicrogVisible: Boolean? = null,
         val morpheMicrogVersion: String? = null
     )
@@ -69,12 +72,18 @@ object DeviceCompatibility {
             null -> "unknown"
         }}")
         appendLine("System GMS package version: ${if (snapshot.gmsCompatiblePackageVisible == true) version(snapshot.gmsPackageVersion) else "not available"}")
-        appendLine("Morphe microG (app.morphe.android.gms): ${when (snapshot.morpheMicrogVisible) {
-            true -> "visible (Morphe-specific; does NOT prove Character.AI sign-in)"
+        appendLine("Morphe microG current (app.revanced.android.gms): ${when (snapshot.morpheMicrogCurrentVisible) {
+            true -> "visible (package identity only; vendor unknown; does NOT prove Character.AI sign-in)"
             false -> "not visible"
             null -> "unknown"
         }}")
-        appendLine("Morphe microG version: ${if (snapshot.morpheMicrogVisible == true) version(snapshot.morpheMicrogVersion) else "not available"}")
+        appendLine("Morphe current package version: ${if (snapshot.morpheMicrogCurrentVisible == true) version(snapshot.morpheMicrogCurrentVersion) else "not available"}")
+        appendLine("Morphe microG legacy (app.morphe.android.gms): ${when (snapshot.morpheMicrogVisible) {
+            true -> "visible (older ID; does NOT prove Character.AI sign-in)"
+            false -> "not visible"
+            null -> "unknown"
+        }}")
+        appendLine("Morphe legacy package version: ${if (snapshot.morpheMicrogVisible == true) version(snapshot.morpheMicrogVersion) else "not available"}")
         appendLine("GMS and Morphe microG have different package IDs; do not substitute one for the other.")
         appendLine("LineageOS version: not attested by app; check System Settings or manual ADB diagnostic")
         appendLine("OAuth, voice, Play Protect and performance: NOT TESTED by this report")

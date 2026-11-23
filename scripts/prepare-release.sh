@@ -3,7 +3,14 @@
 # Never creates a GitHub Release, starts CI, schedules tasks or stores signing keys.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-VERSION='0.17.0-rc1'
+# Read the version from the same Gradle metadata used by the APK build.
+# This prevents a stale hard-coded version from incorrectly labeling an APK.
+VERSION="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts)"
+VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' app/build.gradle.kts)"
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?$ || ! "$VERSION_CODE" =~ ^[1-9][0-9]*$ ]]; then
+  echo 'Gradle versionName/versionCode is missing or ambiguous; release refused.' >&2
+  exit 2
+fi
 PKG='dev.caicompanion.app'
 APK="${1:-}"
 SIGNOFF="${2:-}"
@@ -40,7 +47,7 @@ fi
 BADGING="$($AAPT dump badging "$APK" 2>&1)" || {
   echo 'APK manifest inspection failed.' >&2; exit 2;
 }
-if ! grep -Eq "^package: name='$PKG' versionCode='17' versionName='$VERSION'" <<< "$BADGING"; then
+if ! grep -Eq "^package: name='$PKG' versionCode='$VERSION_CODE' versionName='$VERSION'" <<< "$BADGING"; then
   echo 'Package ID/version mismatch. Refusing to label APK as this version.' >&2; exit 2
 fi
 if ! command -v unzip >/dev/null || ! unzip -tq "$APK" >/dev/null; then

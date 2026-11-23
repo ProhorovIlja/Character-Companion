@@ -1,3 +1,10 @@
+## v0.19.0-rc1 (2026-11-23) — source candidate; no APK
+
+- Correct Morphe MicroG-RE package detection following its August 2026 application ID migration to `app.revanced.android.gms`; preserve older `app.morphe.android.gms` support alongside `com.google.android.gms`.
+- Update manual, read-only ADB preflight and Android manifest visibility for exactly those three packages. Do not enumerate accounts or installed apps.
+- Fix stale manual release script version (previously v0.17) by deriving versionCode/versionName directly from app Gradle metadata; keep unsigned/debug/no-device-signoff rejection.
+- Expand Kotlin and Python regression checks. No proven OAuth, Play Protect suppression, official APK code merge or on-device validation.
+
 ## 0.18.0-rc1 (2026-11-23)
 
 - Distinguish Morphe MicroG-RE (`app.morphe.android.gms`) from the system GMS package (`com.google.android.gms`) in manual Android device compatibility diagnostics.

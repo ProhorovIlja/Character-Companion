@@ -342,19 +342,30 @@ fun main() {
     val morpheStack = pixel.copy(
         gmsCompatiblePackageVisible = true,
         gmsPackageVersion = "25.38.40",
+        morpheMicrogCurrentVisible = true,
+        morpheMicrogCurrentVersion = "7.3.2",
         morpheMicrogVisible = true,
         morpheMicrogVersion = "0.3.1.4"
     )
     val morpheReport = DeviceCompatibility.format(morpheStack)
     check("System GMS package version: 25.38.40" in morpheReport)
-    check("Morphe microG (app.morphe.android.gms): visible" in morpheReport)
-    check("Morphe microG version: 0.3.1.4" in morpheReport)
+    check("Morphe microG current (app.revanced.android.gms): visible" in morpheReport)
+    check("Morphe current package version: 7.3.2" in morpheReport)
+    check("Morphe microG legacy (app.morphe.android.gms): visible" in morpheReport)
+    check("Morphe legacy package version: 0.3.1.4" in morpheReport)
     check("does NOT prove Character.AI sign-in" in morpheReport)
-    check("Morphe microG (app.morphe.android.gms): not visible" in
+    check("Morphe microG current (app.revanced.android.gms): not visible" in
+        DeviceCompatibility.format(pixel.copy(morpheMicrogCurrentVisible = false)))
+    check("Morphe microG current (app.revanced.android.gms): unknown" in
+        DeviceCompatibility.format(pixel.copy(morpheMicrogCurrentVisible = null)))
+    check("Morphe microG legacy (app.morphe.android.gms): not visible" in
         DeviceCompatibility.format(pixel.copy(morpheMicrogVisible = false)))
-    check("Morphe microG (app.morphe.android.gms): unknown" in
+    check("Morphe microG legacy (app.morphe.android.gms): unknown" in
         DeviceCompatibility.format(pixel.copy(morpheMicrogVisible = null)))
-    check("Morphe microG version: unknown" in DeviceCompatibility.format(
+    check("Morphe current package version: unknown" in DeviceCompatibility.format(
+        morpheStack.copy(morpheMicrogCurrentVersion = "7.3.2\nSECRETS")
+    ))
+    check("Morphe legacy package version: unknown" in DeviceCompatibility.format(
         morpheStack.copy(morpheMicrogVersion = "0.3.1\nSECRETS")
     ))
     check("Kernel page size: 4 KiB" in DeviceCompatibility.format(pixel.copy(memoryPageBytes = 4096L)))

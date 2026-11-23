@@ -29,7 +29,7 @@ Shared platform: https://github.com/LineageOS/android_device_google_zuma/tree/li
 Kernel packaging: https://github.com/LineageOS/android_device_google_akita-kernels
 LineageOS target registry: https://github.com/LineageOS/hudson/blob/main/lineage-build-targets
 
-## What Character Companion v0.18 can check on demand
+## What Character Companion v0.19 can check on demand
 
 Native interface -> **Device and ROM compatibility** (also in Settings). This is a **manual** report; nothing is collected or uploaded automatically.
 
@@ -40,7 +40,7 @@ Native interface -> **Device and ROM compatibility** (also in Settings). This is
 - Actual running kernel page size using `Os.sysconf(_SC_PAGESIZE)` (4/16/64 KiB or unknown).
 - Current Android WebView package and version. The provider can differ between LineageOS configurations.
 - Presence/version of `com.google.android.gms`, which might be real Google Play Services or a replacement with the same package name. It does **not** establish valid Google OAuth or Play Integrity.
-- **Separate** presence/version of Morphe MicroG-RE `app.morphe.android.gms` (from MorpheApp/MicroG-RE). This specifically provides compatibility for Morphe-patched apps, not Character.AI authentication. It may coexist with MindTheGapps because it has a different package ID. The probe performs two exact package-name lookups, not an installed-app scan.
+- **Separate** presence/version of Morphe MicroG-RE current `app.revanced.android.gms` and older `app.morphe.android.gms` (from MorpheApp/MicroG-RE). The upstream repository migrated the main Android application ID in commit `2910276` on 2026-08-13. It is intended for modified applications, not evidence of Character.AI authorization. Both IDs differ from MindTheGapps `com.google.android.gms`; the probe checks three exact names without scanning other applications.
 
 The report is shown only on demand and can be copied manually. It contains no account name, serial, fingerprint, chat contents, cookies, auth token or chat URL. It does not establish that the ROM is genuinely LineageOS 24.0, that a WebView is healthy, or that Character.AI services function correctly.
 
@@ -73,9 +73,11 @@ Android Gradle Plugin minimums: https://developer.android.com/build/releases/abo
 
 **Status:** all of the above are planned device tests, not passed device tests. No APK or GitHub Release is claimed.
 
-## Morphe microG + MindTheGapps note (v0.18 source revision)
+## Morphe microG + MindTheGapps note (v0.19 source revision)
 
-The user's reported combination is not the same as installing two apps named `com.google.android.gms`. Morphe's dedicated module is distributed under `app.morphe.android.gms`, while MindTheGapps provides Google Play Services as `com.google.android.gms`. Detect both separately in the manual on-device diagnostics. Do not infer whether either package is installed on this phone until the report is run.
+The user's reported combination is not the same as installing two apps named `com.google.android.gms`. Morphe MicroG-RE currently builds with `app.revanced.android.gms` (verified in the upstream main branch `build.gradle`); older builds have used `app.morphe.android.gms`. MindTheGapps supplies `com.google.android.gms`. Detect all three package IDs separately in manual on-device diagnostics. No phone installation is inferred until the report is run. A package name alone does not establish software provenance or a Google sign-in capability.
+
+Verified upstream renaming commit: https://github.com/MorpheApp/MicroG-RE/commit/29102769010c48e4027a4159760dbf1396285a57
 
 References:
 - https://github.com/MorpheApp/MicroG-RE

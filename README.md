@@ -1,4 +1,4 @@
-> **v0.18.0-rc1 source candidate:** read-only Android device diagnostics now distinguish Morphe microG from system GMS. No tested APK or guaranteed Google login yet.
+> **v0.19.0-rc1 source candidate:** updated Morphe MicroG-RE package detection for the current `app.revanced.android.gms` and legacy IDs; fixed manual APK release-version drift. No tested APK or guaranteed Google login yet.
 
 # Character Companion — Android
 
