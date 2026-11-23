@@ -45,7 +45,7 @@ class VoiceDraftActivity : Activity() {
     private val recognitionGuard = VoiceRecognitionGuard()
     // Only an explicit save action creates a document. Never save a transcript to Bundle.
     private var pendingSaveText: String? = null
-    private data class RetainedDraft(val text: String, val pendingSave: String?)
+    private data class RetainedDraft(val text: String, val pendingSave: String?, val languageIndex: Int)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -102,6 +102,7 @@ class VoiceDraftActivity : Activity() {
             editor.setText(retained.text)
             editor.setSelection(editor.text.length)
             pendingSaveText = retained.pendingSave
+            languageSpinner.setSelection(VoiceDraftPolicy.languageIndex(retained.languageIndex))
         }
         root.addView(editor, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
@@ -175,7 +176,16 @@ class VoiceDraftActivity : Activity() {
                 override fun onError(error: Int) {
                     if (!recognitionGuard.finish(sessionToken)) return
                     finishListening()
-                    status.text = getString(R.string.voice_recognition_error, error)
+                    status.text = when (VoiceRecognitionFeedback.issue(error)) {
+                        VoiceIssue.NO_SPEECH -> getString(R.string.voice_error_no_speech)
+                        VoiceIssue.LANGUAGE_NOT_SUPPORTED -> getString(R.string.voice_error_language_unsupported)
+                        VoiceIssue.MODEL_MISSING -> getString(R.string.voice_error_model_missing)
+                        VoiceIssue.BUSY -> getString(R.string.voice_error_busy)
+                        VoiceIssue.PERMISSION -> getString(R.string.voice_permission_denied)
+                        VoiceIssue.MICROPHONE -> getString(R.string.voice_error_microphone)
+                        VoiceIssue.NETWORK_OR_SERVICE -> getString(R.string.voice_error_service)
+                        VoiceIssue.OTHER -> getString(R.string.voice_recognition_error, error)
+                    }
                 }
                 override fun onResults(results: Bundle?) {
                     if (!recognitionGuard.finish(sessionToken)) return
@@ -316,7 +326,7 @@ class VoiceDraftActivity : Activity() {
 
     @Deprecated("Keep transient private draft in memory only across configuration changes")
     override fun onRetainNonConfigurationInstance(): Any =
-        RetainedDraft(editor.text.toString(), pendingSaveText)
+        RetainedDraft(editor.text.toString(), pendingSaveText, languageSpinner.selectedItemPosition)
 
     override fun onPause() {
         // No listening while another Activity, the home screen or app switcher has focus.

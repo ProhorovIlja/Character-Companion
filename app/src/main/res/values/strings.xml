@@ -182,6 +182,12 @@
     <string name="voice_listening">Listening on device…</string>
     <string name="voice_processing">Recognizing…</string>
     <string name="voice_recognition_error">Recognition error (%1$d). Existing draft preserved.</string>
+    <string name="voice_error_no_speech">No recognizable speech. Try again; the draft is unchanged.</string>
+    <string name="voice_error_language_unsupported">This recognizer does not support the selected language. Choose another language.</string>
+    <string name="voice_error_model_missing">The on-device language model is unavailable. Choose another language or install its offline speech model in Android settings.</string>
+    <string name="voice_error_busy">Speech service is busy or rate-limited. Try again manually later.</string>
+    <string name="voice_error_microphone">The speech service could not use the microphone. Check microphone access in Android settings.</string>
+    <string name="voice_error_service">Speech service or connection error. No text was added; retry or check the available on-device service.</string>
     <string name="voice_system_missing">No system speech recognition activity was found.</string>
     <string name="voice_empty_or_full">No recognized text, or the 16,000-character draft limit was reached.</string>
     <string name="voice_ready">Recognized text added to the draft. Review it before use.</string>

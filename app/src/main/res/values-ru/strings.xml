@@ -182,6 +182,12 @@
     <string name="voice_listening">Слушаю на устройстве…</string>
     <string name="voice_processing">Распознаю…</string>
     <string name="voice_recognition_error">Ошибка распознавания (%1$d). Черновик сохранён.</string>
+    <string name="voice_error_no_speech">Речь не распознана. Попробуйте ещё раз; черновик не изменён.</string>
+    <string name="voice_error_language_unsupported">Распознаватель не поддерживает выбранный язык. Выберите другой.</string>
+    <string name="voice_error_model_missing">Локальная модель выбранного языка недоступна. Выберите другой язык или установите автономную речевую модель в настройках Android.</string>
+    <string name="voice_error_busy">Служба распознавания занята или ограничила запросы. Повторите попытку вручную позднее.</string>
+    <string name="voice_error_microphone">Служба распознавания не смогла использовать микрофон. Проверьте доступ к микрофону в настройках Android.</string>
+    <string name="voice_error_service">Ошибка службы распознавания или подключения. Текст не добавлен; проверьте локальную службу и повторите попытку.</string>
     <string name="voice_system_missing">Не найдено системное приложение распознавания речи.</string>
     <string name="voice_empty_or_full">Текст не распознан или превышен лимит черновика в 16 000 символов.</string>
     <string name="voice_ready">Распознанный текст добавлен в черновик. Проверьте его.</string>

@@ -1,6 +1,8 @@
 import dev.caicompanion.app.ExternalBrowserPolicy
 import dev.caicompanion.app.VoiceDraftPolicy
 import dev.caicompanion.app.VoiceRecognitionGuard
+import dev.caicompanion.app.VoiceRecognitionFeedback
+import dev.caicompanion.app.VoiceIssue
 import dev.caicompanion.app.HostBlocker
 import dev.caicompanion.app.UrlPolicy
 import dev.caicompanion.app.FilterEngine
@@ -28,6 +30,24 @@ private fun verifyVoiceDraft() {
     check(VoiceDraftPolicy.append("", "  Hello ") == "Hello")
     check(VoiceDraftPolicy.append("Hello", "world") == "Hello\nworld")
     check(VoiceDraftPolicy.append("Hello\n", "world") == "Hello\nworld")
+    // Language selection survives an Activity configuration change in memory only.
+    check(VoiceDraftPolicy.languageIndex(0) == 0)
+    check(VoiceDraftPolicy.languageIndex(1) == 1)
+    check(VoiceDraftPolicy.languageIndex(2) == 2)
+    check(VoiceDraftPolicy.languageIndex(-1) == 0)
+    check(VoiceDraftPolicy.languageIndex(99) == 0)
+    // Android SpeechRecognizer public ERROR_* constants, no Android runtime needed.
+    check(VoiceRecognitionFeedback.issue(6) == VoiceIssue.NO_SPEECH)
+    check(VoiceRecognitionFeedback.issue(7) == VoiceIssue.NO_SPEECH)
+    check(VoiceRecognitionFeedback.issue(12) == VoiceIssue.LANGUAGE_NOT_SUPPORTED)
+    check(VoiceRecognitionFeedback.issue(13) == VoiceIssue.MODEL_MISSING)
+    check(VoiceRecognitionFeedback.issue(8) == VoiceIssue.BUSY)
+    check(VoiceRecognitionFeedback.issue(10) == VoiceIssue.BUSY)
+    check(VoiceRecognitionFeedback.issue(9) == VoiceIssue.PERMISSION)
+    check(VoiceRecognitionFeedback.issue(3) == VoiceIssue.MICROPHONE)
+    for (code in listOf(1, 2, 4, 11)) check(VoiceRecognitionFeedback.issue(code) == VoiceIssue.NETWORK_OR_SERVICE)
+    check(VoiceRecognitionFeedback.issue(5) == VoiceIssue.OTHER)
+    check(VoiceRecognitionFeedback.issue(1000) == VoiceIssue.OTHER)
     check(VoiceDraftPolicy.append("abc", " ") == null)
     check(VoiceDraftPolicy.append("abc", null) == null)
     check(VoiceDraftPolicy.append("a".repeat(VoiceDraftPolicy.MAX_CHARS), "x") == null)

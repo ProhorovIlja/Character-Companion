@@ -9,6 +9,7 @@ GECKO = (ROOT/'app/src/gecko/java/dev/caicompanion/app/GeckoActivity.kt').read_t
 LEGACY = (ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
 MANIFEST = (ROOT/'app/src/main/AndroidManifest.xml').read_text()
 GUARD = (ROOT/'app/src/main/java/dev/caicompanion/app/VoiceRecognitionGuard.kt').read_text()
+FEEDBACK = (ROOT/'app/src/main/java/dev/caicompanion/app/VoiceRecognitionFeedback.kt').read_text()
 
 class VoiceDraft(unittest.TestCase):
     def test_all_flavors_have_explicit_entrypoint(self):
@@ -55,6 +56,35 @@ class VoiceDraft(unittest.TestCase):
         self.assertIn('override fun onRetainNonConfigurationInstance()', ACTIVITY)
         self.assertIn('lastNonConfigurationInstance as? RetainedDraft', ACTIVITY)
         self.assertNotIn('onSaveInstanceState', ACTIVITY)
+
+    def test_language_choice_is_retained_only_in_memory(self):
+        self.assertIn('val languageIndex: Int', ACTIVITY)
+        self.assertIn('languageSpinner.setSelection(VoiceDraftPolicy.languageIndex(retained.languageIndex))', ACTIVITY)
+        self.assertIn('RetainedDraft(editor.text.toString(), pendingSaveText, languageSpinner.selectedItemPosition)', ACTIVITY)
+        self.assertNotIn('onSaveInstanceState', ACTIVITY)
+        self.assertNotIn('SharedPreferences', ACTIVITY)
+
+    def test_actionable_recognizer_errors_keep_private_draft_unchanged(self):
+        self.assertIn('VoiceRecognitionFeedback.issue(error)', ACTIVITY)
+        self.assertIn('VoiceIssue.MODEL_MISSING', ACTIVITY)
+        self.assertIn('VoiceIssue.LANGUAGE_NOT_SUPPORTED', ACTIVITY)
+        self.assertIn('VoiceIssue.PERMISSION', ACTIVITY)
+        self.assertIn('12 -> VoiceIssue.LANGUAGE_NOT_SUPPORTED', FEEDBACK)
+        self.assertIn('13 -> VoiceIssue.MODEL_MISSING', FEEDBACK)
+        self.assertIn('9 -> VoiceIssue.PERMISSION', FEEDBACK)
+        # The numeric classifier cannot carry audio, transcript or credentials.
+        for token in ['Context', 'Bundle', 'InputStream', 'SpeechRecognizer', 'StringBuilder']:
+            if token == 'SpeechRecognizer':
+                self.assertNotIn('import android.speech', FEEDBACK)
+            else:
+                self.assertNotIn(token, FEEDBACK)
+        for rel in ('values', 'values-ru'):
+            strings = ET.parse(ROOT/f'app/src/main/res/{rel}/strings.xml').getroot()
+            names = {e.attrib['name'] for e in strings.findall('string')}
+            for key in ('voice_error_no_speech', 'voice_error_language_unsupported',
+                        'voice_error_model_missing', 'voice_error_busy',
+                        'voice_error_microphone', 'voice_error_service'):
+                self.assertIn(key, names)
 
     def test_locales_expose_same_strings(self):
         en = ET.parse(ROOT/'app/src/main/res/values/strings.xml').getroot()

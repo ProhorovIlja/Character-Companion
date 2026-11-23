@@ -1,3 +1,9 @@
+## v0.39.0-source — 2026-11-23
+
+- Android 0.30.0-rc1: retain voice dictation language selection across configuration changes in volatile memory and show localized, actionable Android speech recognition errors (including unavailable or unsupported offline language packs).
+- Expand executable Kotlin/JVM checks for Android SpeechRecognizer error mappings and two Python structural regression cases; preserve both renderer flavors and Windows source.
+- Android 17 API 37 toolchain migration remains blocked until a real SDK/AGP build. No APK, device testing, CI or scheduled tasks. [Release notes](RELEASE_NOTES_v0.39.0-source.md).
+
 ## 2026-11-23 · v0.38.0-source
 
 - Android 0.29.0-rc1: reject delayed SpeechRecognizer callbacks from cancelled/old sessions, including errors and events after a new recognition starts. A small Android-free generation guard is exercised by Kotlin/JVM tests.
