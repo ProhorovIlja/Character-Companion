@@ -1,3 +1,9 @@
+## 0.18.0-rc1 (2026-11-23)
+
+- Distinguish Morphe MicroG-RE (`app.morphe.android.gms`) from the system GMS package (`com.google.android.gms`) in manual Android device compatibility diagnostics.
+- Display sanitized package versions and maintain exact Android package visibility, with no package enumeration or account access.
+- Add regression checks and document MindTheGapps/Morphe coexistence and OAuth caveats. No APK build signoff.
+
 ### v0.17.0-rc1 (2026-11-23) — source preview
 Added manual Pixel 8a / LineageOS 24.0 compatibility diagnostics and ADB checks, runtime 4/16-KiB page-size detection, GMS package uncertainty and source-backed hardware research. Offline tests only, no APK.
 

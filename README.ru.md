@@ -1,3 +1,5 @@
+> **v0.18.0-rc1 — кандидат исходников:** диагностика Android теперь различает microG от Morphe и системные GMS. Проверенного APK и гарантированного входа через Google пока нет.
+
 # Character Companion — Android
 
 **v0.17.0-rc1 — Pixel 8a / LineageOS 24.0 / Android 17 (23 ноября 2026).** Добавлена ручная диагностика модели `akita`, API Android, провайдера WebView, ABI, частоты дисплея, реального размера страниц памяти и видимости GMS-совместимого пакета (его наличие не доказывает работу Google OAuth). Расширен ручной ADB-аудит, подготовлен план тестов 16-КиБ и Android 17. **Работоспособность на телефоне, APK и предупреждения Play Protect ещё не проверены.** [Pixel 8a / LineageOS dossier](docs/PIXEL8A_LINEAGEOS_24.md) · [Release notes](docs/RELEASE_NOTES_v0.17.0-rc1.md).

@@ -29,7 +29,7 @@ Shared platform: https://github.com/LineageOS/android_device_google_zuma/tree/li
 Kernel packaging: https://github.com/LineageOS/android_device_google_akita-kernels
 LineageOS target registry: https://github.com/LineageOS/hudson/blob/main/lineage-build-targets
 
-## What Character Companion v0.17 can check on demand
+## What Character Companion v0.18 can check on demand
 
 Native interface -> **Device and ROM compatibility** (also in Settings). This is a **manual** report; nothing is collected or uploaded automatically.
 
@@ -39,7 +39,8 @@ Native interface -> **Device and ROM compatibility** (also in Settings). This is
 - **Current** display refresh rate, not a forced 120 Hz.
 - Actual running kernel page size using `Os.sysconf(_SC_PAGESIZE)` (4/16/64 KiB or unknown).
 - Current Android WebView package and version. The provider can differ between LineageOS configurations.
-- Presence/visibility of `com.google.android.gms`. **microG may use this package name. Presence does not establish official Google Play Services, working Google OAuth, Play Integrity or permission to access an account.**
+- Presence/version of `com.google.android.gms`, which might be real Google Play Services or a replacement with the same package name. It does **not** establish valid Google OAuth or Play Integrity.
+- **Separate** presence/version of Morphe MicroG-RE `app.morphe.android.gms` (from MorpheApp/MicroG-RE). This specifically provides compatibility for Morphe-patched apps, not Character.AI authentication. It may coexist with MindTheGapps because it has a different package ID. The probe performs two exact package-name lookups, not an installed-app scan.
 
 The report is shown only on demand and can be copied manually. It contains no account name, serial, fingerprint, chat contents, cookies, auth token or chat URL. It does not establish that the ROM is genuinely LineageOS 24.0, that a WebView is healthy, or that Character.AI services function correctly.
 
@@ -71,3 +72,14 @@ Android Gradle Plugin minimums: https://developer.android.com/build/releases/abo
 - Measure cold launch, PSS memory, WebView renderer crashes, scrolling/frame pacing and battery impact before describing it as faster than the official app.
 
 **Status:** all of the above are planned device tests, not passed device tests. No APK or GitHub Release is claimed.
+
+## Morphe microG + MindTheGapps note (v0.18 source revision)
+
+The user's reported combination is not the same as installing two apps named `com.google.android.gms`. Morphe's dedicated module is distributed under `app.morphe.android.gms`, while MindTheGapps provides Google Play Services as `com.google.android.gms`. Detect both separately in the manual on-device diagnostics. Do not infer whether either package is installed on this phone until the report is run.
+
+References:
+- https://github.com/MorpheApp/MicroG-RE
+- https://morpheapp.net/microg
+- https://lineageos.github.io/lineage_wiki/gapps/
+
+No installed package data is uploaded; there are no new background services or scheduled scans.

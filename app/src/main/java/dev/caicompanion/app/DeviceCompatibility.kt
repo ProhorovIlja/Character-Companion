@@ -21,7 +21,11 @@ object DeviceCompatibility {
         val webViewPackage: String?,
         val webViewVersion: String?,
         /** A package called com.google.android.gms; NOT evidence of genuine GMS or working OAuth. */
-        val gmsCompatiblePackageVisible: Boolean?
+        val gmsCompatiblePackageVisible: Boolean?,
+        val gmsPackageVersion: String? = null,
+        /** Morphe microG is app-specific and is not a replacement for system GMS. */
+        val morpheMicrogVisible: Boolean? = null,
+        val morpheMicrogVersion: String? = null
     )
 
     private val safeLabel = Regex("^[A-Za-z0-9._+ -]{1,64}$")
@@ -64,6 +68,14 @@ object DeviceCompatibility {
             false -> "no (browser-based sign-in may differ)"
             null -> "unknown"
         }}")
+        appendLine("System GMS package version: ${if (snapshot.gmsCompatiblePackageVisible == true) version(snapshot.gmsPackageVersion) else "not available"}")
+        appendLine("Morphe microG (app.morphe.android.gms): ${when (snapshot.morpheMicrogVisible) {
+            true -> "visible (Morphe-specific; does NOT prove Character.AI sign-in)"
+            false -> "not visible"
+            null -> "unknown"
+        }}")
+        appendLine("Morphe microG version: ${if (snapshot.morpheMicrogVisible == true) version(snapshot.morpheMicrogVersion) else "not available"}")
+        appendLine("GMS and Morphe microG have different package IDs; do not substitute one for the other.")
         appendLine("LineageOS version: not attested by app; check System Settings or manual ADB diagnostic")
         appendLine("OAuth, voice, Play Protect and performance: NOT TESTED by this report")
         append("No device serial, build fingerprint, account, conversation, URL or auth token is collected.")

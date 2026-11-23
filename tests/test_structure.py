@@ -62,6 +62,12 @@ class Structure(unittest.TestCase):
         self.assertIn('WebView.getCurrentWebViewPackage()', probe)
         self.assertIn('<package android:name="com.google.android.gms" />', manifest)
         self.assertIn('gmsCompatiblePackageVisible', policy)
+        self.assertIn('app.morphe.android.gms', manifest)
+        self.assertIn('app.morphe.android.gms', probe)
+        self.assertIn('probePackage(activity.packageManager', probe)
+        self.assertIn('morpheMicrogVisible', policy)
+        self.assertIn('GMS and Morphe microG have different package IDs', policy)
+
         self.assertNotIn('Build.SERIAL', probe)
         self.assertNotIn('Build.FINGERPRINT', probe)
         self.assertNotIn('getAccounts(', probe)
@@ -349,7 +355,7 @@ class Structure(unittest.TestCase):
     def test_browser_dependencies_are_pinned_without_new_permissions(self):
         build=(ROOT/'app/build.gradle.kts').read_text()
         manifest=(ROOT/'app/src/main/AndroidManifest.xml').read_text()
-        self.assertIn('versionName = "0.17.0-rc1"', build)
+        self.assertIn('versionName = "0.18.0-rc1"', build)
         self.assertIn("VERSION='0.17.0-rc1'", (ROOT/'scripts/prepare-release.sh').read_text())
         self.assertIn("versionCode='17'", (ROOT/'scripts/prepare-release.sh').read_text())
         self.assertIn('androidx.browser:browser:1.10.0', build)

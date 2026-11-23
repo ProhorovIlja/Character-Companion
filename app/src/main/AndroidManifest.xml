@@ -9,6 +9,8 @@
          This does not grant access to other apps or to Google accounts. -->
     <queries>
         <package android:name="com.google.android.gms" />
+        <!-- Morphe's dedicated MicroG-RE for patched apps; not system GMS. -->
+        <package android:name="app.morphe.android.gms" />
     </queries>
     <application android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"

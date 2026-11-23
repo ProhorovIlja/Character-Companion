@@ -339,6 +339,24 @@ fun main() {
     check("Android 17: detected by API" in pixelReport)
     check("120 Hz" in pixelReport)
     check("Kernel page size: 16 KiB" in pixelReport)
+    val morpheStack = pixel.copy(
+        gmsCompatiblePackageVisible = true,
+        gmsPackageVersion = "25.38.40",
+        morpheMicrogVisible = true,
+        morpheMicrogVersion = "0.3.1.4"
+    )
+    val morpheReport = DeviceCompatibility.format(morpheStack)
+    check("System GMS package version: 25.38.40" in morpheReport)
+    check("Morphe microG (app.morphe.android.gms): visible" in morpheReport)
+    check("Morphe microG version: 0.3.1.4" in morpheReport)
+    check("does NOT prove Character.AI sign-in" in morpheReport)
+    check("Morphe microG (app.morphe.android.gms): not visible" in
+        DeviceCompatibility.format(pixel.copy(morpheMicrogVisible = false)))
+    check("Morphe microG (app.morphe.android.gms): unknown" in
+        DeviceCompatibility.format(pixel.copy(morpheMicrogVisible = null)))
+    check("Morphe microG version: unknown" in DeviceCompatibility.format(
+        morpheStack.copy(morpheMicrogVersion = "0.3.1\nSECRETS")
+    ))
     check("Kernel page size: 4 KiB" in DeviceCompatibility.format(pixel.copy(memoryPageBytes = 4096L)))
     check("Kernel page size: unknown" in DeviceCompatibility.format(pixel.copy(memoryPageBytes = null)))
     check("arm64-v8a" in pixelReport)

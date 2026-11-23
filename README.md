@@ -1,3 +1,5 @@
+> **v0.18.0-rc1 source candidate:** read-only Android device diagnostics now distinguish Morphe microG from system GMS. No tested APK or guaranteed Google login yet.
+
 # Character Companion — Android
 
 **v0.17.0-rc1 — Pixel 8a / LineageOS 24.0 runtime compatibility (2026-11-23).** Added opt-in native device diagnostics (real Android API, `akita` detection, WebView provider, ABI, display refresh, memory page size and GMS-compatible package visibility), read-only manual ADB checks and 16-KiB/Android 17 compatibility research. **Google OAuth, Android 17 device validation, APK build and Play Protect prompts remain unverified.** [Pixel 8a / LineageOS dossier](docs/PIXEL8A_LINEAGEOS_24.md) · [Release notes](docs/RELEASE_NOTES_v0.17.0-rc1.md).
