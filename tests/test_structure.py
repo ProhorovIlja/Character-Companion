@@ -68,7 +68,7 @@ class Structure(unittest.TestCase):
         script = (ROOT/'scripts/test-offline.sh').read_text()
         self.assertIn('DeviceCompatibility.format(snapshot)', activity)
         self.assertIn('DeviceRuntimeProbe.capture(this)', activity)
-        self.assertIn('DeviceCompatibility,GeckoNavigationPolicy,GeckoTransferPolicy,GeckoTransferOriginPolicy,ExternalBrowserPolicy,VoiceDraftPolicy}.kt', script)
+        self.assertIn('DeviceCompatibility,GeckoNavigationPolicy,GeckoTransferPolicy,GeckoTransferOriginPolicy,ExternalBrowserPolicy,VoiceDraftPolicy,VoiceRecognitionGuard}.kt', script)
         self.assertIn('Build.SUPPORTED_ABIS.toList()', probe)
         self.assertIn('Os.sysconf(OsConstants._SC_PAGESIZE)', probe)
         self.assertIn('Build.VERSION.SDK_INT', probe)
@@ -259,7 +259,7 @@ class Structure(unittest.TestCase):
         self.assertIn('BoundedText.read(reader, RuleListParser.MAX_CHARACTERS)', activity)
         self.assertIn('IMPORT_FILTER_LIST ->', activity)
         self.assertIn('if (configuration == appliedConfiguration) return', engine)
-        self.assertIn('RuleListParser,IncomingLinkParser,BrowserSessionPolicy,RendererRecoveryBudget,SupportReport,NativeLibrarySearch,NativeWorkspaceNavigation,NativeStartupPolicy,DeferredWebReload,OfflineBookmarkEditor,DeviceCompatibility,GeckoNavigationPolicy,GeckoTransferPolicy,GeckoTransferOriginPolicy,ExternalBrowserPolicy,VoiceDraftPolicy}.kt', script)
+        self.assertIn('RuleListParser,IncomingLinkParser,BrowserSessionPolicy,RendererRecoveryBudget,SupportReport,NativeLibrarySearch,NativeWorkspaceNavigation,NativeStartupPolicy,DeferredWebReload,OfflineBookmarkEditor,DeviceCompatibility,GeckoNavigationPolicy,GeckoTransferPolicy,GeckoTransferOriginPolicy,ExternalBrowserPolicy,VoiceDraftPolicy,VoiceRecognitionGuard}.kt', script)
         self.assertNotIn('https://easylist.to/easylist/easylist.txt', activity)
         self.assertNotIn('PeriodicWorkRequest', activity)
 
@@ -377,8 +377,8 @@ class Structure(unittest.TestCase):
     def test_browser_dependencies_are_pinned_without_new_permissions(self):
         build=(ROOT/'app/build.gradle.kts').read_text()
         manifest=(ROOT/'app/src/main/AndroidManifest.xml').read_text()
-        self.assertIn('versionName = "0.28.0-rc1"', build)
-        self.assertIn('versionCode = 28', build)
+        self.assertIn('versionName = "0.29.0-rc1"', build)
+        self.assertIn('versionCode = 29', build)
         release = (ROOT/'scripts/prepare-release.sh').read_text()
         self.assertIn('VERSION="$(sed -nE', release)
         self.assertIn('VERSION_CODE="$(sed -nE', release)

@@ -42,6 +42,10 @@ class VoiceDraftActivity : Activity() {
     private lateinit var languageSpinner: Spinner
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
+    private val recognitionGuard = VoiceRecognitionGuard()
+    // Only an explicit save action creates a document. Never save a transcript to Bundle.
+    private var pendingSaveText: String? = null
+    private data class RetainedDraft(val text: String, val pendingSave: String?)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -91,6 +95,13 @@ class VoiceDraftActivity : Activity() {
             minLines = 5
             maxLines = 16
             filters = arrayOf(android.text.InputFilter.LengthFilter(VoiceDraftPolicy.MAX_CHARS))
+        }
+        // Only retain the draft in the Activity's in-memory non-configuration instance.
+        // Process death still clears it, rather than writing private words into OS state.
+        (lastNonConfigurationInstance as? RetainedDraft)?.let { retained ->
+            editor.setText(retained.text)
+            editor.setSelection(editor.text.length)
+            pendingSaveText = retained.pendingSave
         }
         root.addView(editor, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
@@ -147,19 +158,31 @@ class VoiceDraftActivity : Activity() {
         try {
             val created = SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
             recognizer = created
+            val sessionToken = recognitionGuard.start()
             created.setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) { status.setText(R.string.voice_listening) }
-                override fun onBeginningOfSpeech() { status.setText(R.string.voice_listening) }
+                private fun active() = recognitionGuard.isCurrent(sessionToken)
+                override fun onReadyForSpeech(params: Bundle?) {
+                    if (active()) status.setText(R.string.voice_listening)
+                }
+                override fun onBeginningOfSpeech() {
+                    if (active()) status.setText(R.string.voice_listening)
+                }
                 override fun onRmsChanged(rmsdB: Float) {}
                 override fun onBufferReceived(buffer: ByteArray?) {}
-                override fun onEndOfSpeech() { status.setText(R.string.voice_processing) }
+                override fun onEndOfSpeech() {
+                    if (active()) status.setText(R.string.voice_processing)
+                }
                 override fun onError(error: Int) {
+                    if (!recognitionGuard.finish(sessionToken)) return
                     finishListening()
                     status.text = getString(R.string.voice_recognition_error, error)
                 }
                 override fun onResults(results: Bundle?) {
+                    if (!recognitionGuard.finish(sessionToken)) return
+                    val candidate = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        ?.firstOrNull()
                     finishListening()
-                    acceptRecognition(results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull())
+                    acceptRecognition(candidate)
                 }
                 override fun onPartialResults(partialResults: Bundle?) {}
                 override fun onEvent(eventType: Int, params: Bundle?) {}
@@ -176,12 +199,15 @@ class VoiceDraftActivity : Activity() {
 
     private fun stopListening() {
         // Cancel does not return an incomplete transcript; the prior draft is untouched.
+        // Invalidate first: cancelled providers may still deliver a queued result.
+        recognitionGuard.cancel()
         runCatching { recognizer?.cancel() }
         finishListening()
         status.setText(R.string.voice_idle)
     }
 
     private fun finishListening() {
+        recognitionGuard.cancel()
         listening = false
         if (::listenButton.isInitialized) listenButton.setText(R.string.voice_start_local)
         runCatching { recognizer?.destroy() }
@@ -224,7 +250,11 @@ class VoiceDraftActivity : Activity() {
     }
 
     private fun saveDraft() {
-        if (editor.text.isBlank()) return
+        val snapshot = editor.text.toString().takeIf { it.isNotBlank() } ?: return
+        if (pendingSaveText != null) return
+        // SAF picker can outlive an Activity recreation. Keep the exact user-approved
+        // text in memory; never write a blank/replaced draft after process death.
+        pendingSaveText = snapshot
         try {
             startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
@@ -232,8 +262,10 @@ class VoiceDraftActivity : Activity() {
                 putExtra(Intent.EXTRA_TITLE, "character-companion-draft.txt")
             }, SAVE_TEXT_REQUEST)
         } catch (_: ActivityNotFoundException) {
+            pendingSaveText = null
             status.setText(R.string.voice_save_failed)
         } catch (_: SecurityException) {
+            pendingSaveText = null
             status.setText(R.string.voice_save_failed)
         }
     }
@@ -252,16 +284,21 @@ class VoiceDraftActivity : Activity() {
     @Deprecated("Activity Result API works with all supported Android versions")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode != RESULT_OK) return
         when (requestCode) {
-            SYSTEM_RECOGNITION_REQUEST -> acceptRecognition(
+            SYSTEM_RECOGNITION_REQUEST -> if (resultCode == RESULT_OK) acceptRecognition(
                 data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull())
             SAVE_TEXT_REQUEST -> {
+                val snapshot = pendingSaveText
+                pendingSaveText = null
+                if (resultCode != RESULT_OK) return
+                // Process-death restoration does not recover private draft text.
+                // Never open/truncate the output stream in that case.
+                if (snapshot == null) { status.setText(R.string.voice_save_failed); return }
                 val target = data?.data ?: return
                 try {
                     val output = contentResolver.openOutputStream(target, "w")
                         ?: throw IOException("No output stream")
-                    output.use { it.write(editor.text.toString().toByteArray(Charsets.UTF_8)) }
+                    output.use { it.write(snapshot.toByteArray(Charsets.UTF_8)) }
                     status.setText(R.string.voice_saved)
                 } catch (_: Exception) { status.setText(R.string.voice_save_failed) }
             }
@@ -276,6 +313,10 @@ class VoiceDraftActivity : Activity() {
             else status.setText(R.string.voice_permission_denied)
         }
     }
+
+    @Deprecated("Keep transient private draft in memory only across configuration changes")
+    override fun onRetainNonConfigurationInstance(): Any =
+        RetainedDraft(editor.text.toString(), pendingSaveText)
 
     override fun onPause() {
         // No listening while another Activity, the home screen or app switcher has focus.

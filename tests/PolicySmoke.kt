@@ -1,5 +1,6 @@
 import dev.caicompanion.app.ExternalBrowserPolicy
 import dev.caicompanion.app.VoiceDraftPolicy
+import dev.caicompanion.app.VoiceRecognitionGuard
 import dev.caicompanion.app.HostBlocker
 import dev.caicompanion.app.UrlPolicy
 import dev.caicompanion.app.FilterEngine
@@ -31,6 +32,24 @@ private fun verifyVoiceDraft() {
     check(VoiceDraftPolicy.append("abc", null) == null)
     check(VoiceDraftPolicy.append("a".repeat(VoiceDraftPolicy.MAX_CHARS), "x") == null)
     check(VoiceDraftPolicy.append("x", "a".repeat(VoiceDraftPolicy.MAX_CHARS)) == null)
+    // Old recognizer callbacks must never override or append to a newer session.
+    val guard = VoiceRecognitionGuard()
+    val first = guard.start()
+    check(guard.isCurrent(first))
+    guard.cancel()
+    check(!guard.isCurrent(first))
+    check(!guard.finish(first))
+    val second = guard.start()
+    check(second != first)
+    check(guard.isCurrent(second))
+    check(!guard.finish(first))
+    check(guard.isCurrent(second))
+    check(guard.finish(second))
+    check(!guard.finish(second))
+    val third = guard.start()
+    check(guard.isCurrent(third))
+    guard.cancel()
+    check(!guard.finish(third))
 }
 
 fun main() {

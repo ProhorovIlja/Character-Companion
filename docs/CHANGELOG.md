@@ -1,3 +1,10 @@
+## 2026-11-23 · v0.38.0-source
+
+- Android 0.29.0-rc1: reject delayed SpeechRecognizer callbacks from cancelled/old sessions, including errors and events after a new recognition starts. A small Android-free generation guard is exercised by Kotlin/JVM tests.
+- SAF TXT saves use an immutable, user-approved in-memory text snapshot. On activity recreation the draft/save snapshot survives configuration changes without entering a persistent Bundle; after process death the picker result fails closed rather than writing an empty or newer draft.
+- Added two structural regression tests and expanded existing Kotlin smoke assertions. Android SDK/Gradle and device-side verification still unavailable; no APK published. Windows unchanged. No CI, scheduled tasks or background monitoring.
+- [Release notes](RELEASE_NOTES_v0.38.0-source.md).
+
 ## 2026-11-23 · v0.37.0-source
 
 - Android GeckoView/legacy 0.28.0-rc1: native user-controlled voice draft, on-device speech recognition when an Android service is available; optional system-provider fallback requires a privacy warning.

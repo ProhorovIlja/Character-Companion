@@ -8,6 +8,7 @@ ACTIVITY = (ROOT/'app/src/main/java/dev/caicompanion/app/VoiceDraftActivity.kt')
 GECKO = (ROOT/'app/src/gecko/java/dev/caicompanion/app/GeckoActivity.kt').read_text()
 LEGACY = (ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
 MANIFEST = (ROOT/'app/src/main/AndroidManifest.xml').read_text()
+GUARD = (ROOT/'app/src/main/java/dev/caicompanion/app/VoiceRecognitionGuard.kt').read_text()
 
 class VoiceDraft(unittest.TestCase):
     def test_all_flavors_have_explicit_entrypoint(self):
@@ -37,6 +38,23 @@ class VoiceDraft(unittest.TestCase):
         self.assertNotIn('onSaveInstanceState', ACTIVITY)
         self.assertNotIn('SharedPreferences', ACTIVITY)
         self.assertNotIn('session.loadUri', ACTIVITY)
+
+    def test_stale_recognition_callbacks_cannot_mutate_a_new_session(self):
+        self.assertIn('val sessionToken = recognitionGuard.start()', ACTIVITY)
+        self.assertIn('if (!recognitionGuard.finish(sessionToken)) return', ACTIVITY)
+        self.assertGreaterEqual(ACTIVITY.count('if (active())'), 3)
+        self.assertIn('recognitionGuard.cancel()\n        runCatching { recognizer?.cancel() }', ACTIVITY)
+        self.assertIn('fun finish(token: Long): Boolean', GUARD)
+        self.assertIn('if (!isCurrent(token)) return false', GUARD)
+
+    def test_save_is_snapshot_and_process_death_fails_closed(self):
+        self.assertIn('pendingSaveText = snapshot', ACTIVITY)
+        self.assertIn('val snapshot = pendingSaveText', ACTIVITY)
+        self.assertIn('if (snapshot == null) { status.setText(R.string.voice_save_failed); return }', ACTIVITY)
+        self.assertIn('snapshot.toByteArray(Charsets.UTF_8)', ACTIVITY)
+        self.assertIn('override fun onRetainNonConfigurationInstance()', ACTIVITY)
+        self.assertIn('lastNonConfigurationInstance as? RetainedDraft', ACTIVITY)
+        self.assertNotIn('onSaveInstanceState', ACTIVITY)
 
     def test_locales_expose_same_strings(self):
         en = ET.parse(ROOT/'app/src/main/res/values/strings.xml').getroot()
