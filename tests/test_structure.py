@@ -12,6 +12,20 @@ class Structure(unittest.TestCase):
                 ET.parse(path)
         ET.parse(ROOT/'app/src/main/AndroidManifest.xml')
 
+    def test_offline_native_bookmark_editor_and_deferred_reload(self):
+        activity = (ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
+        self.assertIn('createOfflineBookmark { refreshNativeBookmarks() }', activity)
+        self.assertIn('deferredWebReload.markPending()', activity)
+        self.assertIn('flushDeferredWebReload()', activity)
+        self.assertIn('deferredWebReload.consumedByNavigation()', activity)
+        self.assertNotIn('closeNativeHub()\n                showNativeHub()', activity)
+        self.assertNotIn('if (reload) webView.reload()', activity)
+        self.assertIn('OfflineBookmarkEditor.normalize(', activity)
+        self.assertIn('R.string.hub_bookmark_rename', activity)
+        self.assertLess(activity.index('deferredWebReload.consumedByNavigation()\n        closeNativeHub('), activity.index('webView.loadUrl(safeUrl)'))
+        self.assertIn('OfflineBookmarkEditor.normalize(entry.optString("title"), url)', (ROOT/'app/src/main/java/dev/caicompanion/app/SettingsStore.kt').read_text())
+        self.assertIn('keyboardVisible || fullscreenView != null || nativeHub != null', activity)
+
     def test_android_only(self):
         self.assertTrue((ROOT/'app/build.gradle.kts').exists())
         self.assertFalse((ROOT/'src/windows').exists())
@@ -101,7 +115,7 @@ class Structure(unittest.TestCase):
         self.assertIn('BoundedText.read(it, 200_000)', activity)
         self.assertNotIn('it.readText().take(200_001)', activity)
         self.assertIn('prefs.edit()\n            .putBoolean("blocking"', store)
-        self.assertIn('UrlPolicy.sanitizeBookmark(u)', store)
+        self.assertIn('OfflineBookmarkEditor.normalize(obj.optString("title"), u)', store)
         self.assertIn('put("bookmarks", sanitizedBookmarkArray())', store)
         self.assertIn('get() = UrlPolicy.sanitizeBookmark(prefs.getString("last_visited", "")).orEmpty()', store)
 
@@ -177,7 +191,7 @@ class Structure(unittest.TestCase):
         self.assertIn('BoundedText.read(reader, RuleListParser.MAX_CHARACTERS)', activity)
         self.assertIn('IMPORT_FILTER_LIST ->', activity)
         self.assertIn('if (configuration == appliedConfiguration) return', engine)
-        self.assertIn('RuleListParser,IncomingLinkParser,BrowserSessionPolicy,RendererRecoveryBudget,SupportReport,NativeLibrarySearch,NativeWorkspaceNavigation}.kt', script)
+        self.assertIn('RuleListParser,IncomingLinkParser,BrowserSessionPolicy,RendererRecoveryBudget,SupportReport,NativeLibrarySearch,NativeWorkspaceNavigation,DeferredWebReload,OfflineBookmarkEditor}.kt', script)
         self.assertNotIn('https://easylist.to/easylist/easylist.txt', activity)
         self.assertNotIn('PeriodicWorkRequest', activity)
 
@@ -294,9 +308,9 @@ class Structure(unittest.TestCase):
     def test_browser_dependencies_are_pinned_without_new_permissions(self):
         build=(ROOT/'app/build.gradle.kts').read_text()
         manifest=(ROOT/'app/src/main/AndroidManifest.xml').read_text()
-        self.assertIn('versionName = "0.14.0-rc1"', build)
-        self.assertIn("VERSION='0.14.0-rc1'", (ROOT/'scripts/prepare-release.sh').read_text())
-        self.assertIn("versionCode='14'", (ROOT/'scripts/prepare-release.sh').read_text())
+        self.assertIn('versionName = "0.15.0-rc1"', build)
+        self.assertIn("VERSION='0.15.0-rc1'", (ROOT/'scripts/prepare-release.sh').read_text())
+        self.assertIn("versionCode='15'", (ROOT/'scripts/prepare-release.sh').read_text())
         self.assertIn('androidx.browser:browser:1.10.0', build)
         self.assertIn('androidx.webkit:webkit:1.18.0', build)
         self.assertNotIn('android.permission.QUERY_ALL_PACKAGES', manifest)

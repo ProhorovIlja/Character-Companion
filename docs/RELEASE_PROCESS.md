@@ -7,7 +7,7 @@ This repository has no GitHub Actions, schedules, upload hooks, services or auto
 - Official Gradle 8.13 Wrapper binary (full GitHub checkout), JDK 17+, Android SDK Platform 36, build-tools with ``aapt` (for dump badging) and `apksigner`.
 - Release signing key owned by the maintainer. Never commit `.jks`, keystore properties, passwords or service-account credentials.
 - A configured build/signing method under maintainer control. `:app:assembleRelease` is not assumed to create a signed APK by default.
-- Real Android devices or emulators on API 29, 33, 35, 36; a separate manual device signoff.
+- Real Android devices or emulators on API 29, 33, 35, 36 and 37; a separate manual device signoff.
 
 ## Commands
 
@@ -34,10 +34,18 @@ Use the repository's **GitHub Releases** page only after verifying the source ar
 - Voice calls and camera/microphone permissions only as exposed by the website; verify cancellation on stop.
 - Validate offline/network-loss/TLS handling and renderer crash recovery on 3+ failure attempts.
 - Test imported filters, exceptions, huge malformed imports, export TXT, settings JSON roundtrip.
-- Measure cold start/heap/battery on representative Android 10–16 phones; check TalkBack and small screens.
+- Measure cold start/heap/battery on representative Android 10–17 phones, including Pixel 8a / LineageOS; check TalkBack and small screens.
 - Confirm source license notices, release notes, hashes and no signing secrets are shipped.
 
 
 ## Android 17 and official-XAPK analysis
 
 `docs/ANDROID_17.md` describes a manual Pixel 8a/LineageOS API 37 device matrix. The current app targets API 36 intentionally; merely setting API 37 under AGP 8.13 is not a valid migration. `docs/XAPK_AUDIT.md` explains the 256-MiB Drive connector limit and safe, manual XAPK splitting and static inspection. Do not include third-party app APKs/Dex/assets in releases or claim successful reverse analysis before bytes are available.
+
+## Offline native bookmark QA (0.15.0 source candidate)
+
+- Launch with native home enabled while offline; create a bookmark to a public Character.AI link; confirm no WebView navigation occurs.
+- Reject `https://evil.example/`, login/OAuth pages, oversized URLs and malformed schemes.
+- Rename an existing bookmark; verify search refreshes and the old URL remains canonical.
+- Toggle filters while the native home is open; verify no network reload until the web surface becomes visible. A direct navigation should load the new page once, never reload the old one first.
+- Return from background and fullscreen keyboard interactions; verify browser chrome and media permissions remain safe.

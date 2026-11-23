@@ -34,3 +34,7 @@
 2. APK signature, manifest permissions, version and archive validation.
 3. Device QA: login, chat, keyboard/IME, media, deep links, network transitions, rendering, Android 17 and LineageOS.
 4. Only then: signed APK, ZIP/TAR source, SHA256SUMS, release notes in GitHub Releases.
+
+## v0.15.0: native offline bookmark editor and refresh policy
+
+`OfflineBookmarkEditor` normalizes user-supplied titles and passes links through the strict first-party bookmark URL policy; this also applies to imported bookmarks in `SettingsStore`. `DeferredWebReload` is a pure Kotlin controller that records user-driven settings changes while the Activity is stopped or its offline workspace is visible, and consumes them only when appropriate. Explicit first-party navigation clears the pending refresh before moving to WebView. Neither class contacts Character.AI or invokes a native library.

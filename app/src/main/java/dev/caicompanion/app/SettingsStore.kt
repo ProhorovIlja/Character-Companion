@@ -80,13 +80,13 @@ class SettingsStore(context: Context) {
         for (i in 0 until data.length()) {
             val entry = data.optJSONObject(i) ?: continue
             val url = entry.optString("url")
-            UrlPolicy.sanitizeBookmark(url)?.let { add(entry.optString("title").take(90) to it) }
+            OfflineBookmarkEditor.normalize(entry.optString("title"), url)?.let { add(it) }
         }
     }
     fun addBookmark(title: String, url: String): Boolean {
-        val safeUrl = UrlPolicy.sanitizeBookmark(url) ?: return false
-        val data = listBookmarks().filterNot { it.second == safeUrl }.takeLast(99).toMutableList()
-        data.add(title.take(90).ifBlank { "Character.AI" } to safeUrl)
+        val normalized = OfflineBookmarkEditor.normalize(title, url) ?: return false
+        val data = listBookmarks().filterNot { it.second == normalized.second }.takeLast(99).toMutableList()
+        data.add(normalized)
         writeBookmarks(data)
         return true
     }
@@ -138,7 +138,7 @@ class SettingsStore(context: Context) {
         for (i in 0 until minOf(array.length(), 100)) {
             val obj = array.optJSONObject(i) ?: continue
             val u = obj.optString("url")
-            UrlPolicy.sanitizeBookmark(u)?.let { saved.add(obj.optString("title").take(90) to it) }
+            OfflineBookmarkEditor.normalize(obj.optString("title"), u)?.let { saved.add(it) }
         }
         // Publish one atomic preference transaction: a crash cannot leave a half-imported profile.
         val bookmarkArray = JSONArray()

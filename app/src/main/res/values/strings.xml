@@ -148,4 +148,9 @@
     <string name="hub_bookmark_browser">Open in system browser</string>
     <string name="hub_bookmark_delete">Remove this bookmark</string>
     <string name="hub_bookmark_confirm_delete">Remove this saved link from the offline library? This does not delete any Character.AI conversation.</string>
+    <string name="hub_bookmark_manual_add">Add bookmark offline</string>
+    <string name="hub_bookmark_name_hint">Character or page name</string>
+    <string name="hub_bookmark_url_hint">https://character.ai/...</string>
+    <string name="hub_bookmark_invalid">Only safe Character.AI links can be saved</string>
+    <string name="hub_bookmark_rename">Rename bookmark</string>
 </resources>

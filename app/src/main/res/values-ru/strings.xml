@@ -148,4 +148,9 @@
     <string name="hub_bookmark_browser">Открыть в системном браузере</string>
     <string name="hub_bookmark_delete">Удалить эту закладку</string>
     <string name="hub_bookmark_confirm_delete">Удалить сохранённую ссылку из офлайн-библиотеки? Переписка в Character.AI не удаляется.</string>
+    <string name="hub_bookmark_manual_add">Добавить закладку без сети</string>
+    <string name="hub_bookmark_name_hint">Название персонажа или страницы</string>
+    <string name="hub_bookmark_url_hint">https://character.ai/...</string>
+    <string name="hub_bookmark_invalid">Можно сохранить только безопасную ссылку Character.AI</string>
+    <string name="hub_bookmark_rename">Переименовать закладку</string>
 </resources>

@@ -12,6 +12,8 @@ import dev.caicompanion.app.BrowserSessionPolicy
 import dev.caicompanion.app.RendererRecoveryBudget
 import dev.caicompanion.app.NativeLibrarySearch
 import dev.caicompanion.app.NativeWorkspaceNavigation
+import dev.caicompanion.app.DeferredWebReload
+import dev.caicompanion.app.OfflineBookmarkEditor
 import dev.caicompanion.app.SupportReport
 import java.io.StringReader
 
@@ -315,5 +317,28 @@ fun main() {
     check(!budgetForReport.allowAutomaticRestart(3000L))
     check(budgetForReport.recentRestartCount(11_000L) == 1)
     check(budgetForReport.recentRestartCount(12_000L) == 0)
+
+    val pendingRefresh = DeferredWebReload()
+    check(!pendingRefresh.isPending())
+    pendingRefresh.markPending()
+    check(pendingRefresh.isPending())
+    check(!pendingRefresh.consumeIfVisible(activityResumed = false, workspaceVisible = false))
+    check(!pendingRefresh.consumeIfVisible(activityResumed = true, workspaceVisible = true))
+    check(pendingRefresh.isPending())
+    check(pendingRefresh.consumeIfVisible(activityResumed = true, workspaceVisible = false))
+    check(!pendingRefresh.consumeIfVisible(activityResumed = true, workspaceVisible = false))
+    pendingRefresh.markPending()
+    pendingRefresh.consumedByNavigation()
+    check(!pendingRefresh.isPending())
+
+    check(OfflineBookmarkEditor.normalize(" Hunter ", " https://character.ai/ ") ==
+        ("Hunter" to "https://character.ai/"))
+    check(OfflineBookmarkEditor.normalize("", "https://character.ai/") ==
+        ("Character.AI" to "https://character.ai/"))
+    check(OfflineBookmarkEditor.normalize("A\u202eB\u2066C", "https://character.ai/")?.first == "ABC")
+    check(OfflineBookmarkEditor.normalize("hunter", "https://evil.example/") == null)
+    check(OfflineBookmarkEditor.normalize("hunter", "https://character.ai/oauth/callback") == null)
+    check(OfflineBookmarkEditor.normalize("hunter", "https://character.ai/?token=secret")?.second == "https://character.ai/")
+    check(OfflineBookmarkEditor.normalize("x".repeat(200), "https://c.ai/")?.first?.length == 90)
     println("PolicySmoke: browser policy, concurrency, URL safety and local statistics assertions passed")
 }

@@ -6,7 +6,7 @@
 
 - Android 17 = **API 37**. Android 17 was publicly released in June 2026. [Android official release](https://developer.android.com/blog/posts/android-17-is-here).
 - This project intentionally retains `compileSdk = 36` and `targetSdk = 36` for the current candidate. An Android 17 runtime can normally install apps targeting earlier APIs; running is **not yet tested**.
-- AGP **8.13** lists its maximum supported API as **36.1** ([AGP 8.13 notes](https://developer.android.com/build/releases/agp-8-13-0-release-notes)). Do **not** change `compileSdk = 37` alone. When changing to target API 37, migrate Android SDK Platform 37, build-tools, AGP **9.1.1+** (and a compatible Gradle/JDK/Kotlin configuration) as a coordinated, separately verified upgrade. [AGP 9.4 support](https://developer.android.com/build/releases/agp-9-4-0-release-notes).
+- AGP **8.13** lists its maximum supported API as **36.1** ([AGP 8.13 notes](https://developer.android.com/build/releases/agp-8-13-0-release-notes)). Do **not** change `compileSdk = 37` alone. When changing to target API 37, migrate Android SDK Platform 37, build-tools, AGP **9.4.0** (or another verified API-37-compatible stable release) (and a compatible Gradle/JDK/Kotlin configuration) as a coordinated, separately verified upgrade. [AGP 9.4 support](https://developer.android.com/build/releases/agp-9-4-0-release-notes).
 - Android 17 adds changes to audio focus/background playback and, when targeting API 37, certificate transparency and mandatory large-screen resizability. This app does not start a background audio service. Validate Character.AI's browser-controlled audio/voice features while foregrounded. [All apps](https://developer.android.com/about/versions/17/behavior-changes-all), [Target API 37](https://developer.android.com/about/versions/17/behavior-changes-17).
 - Manifest marks the Activity as resizeable and does not lock orientation; device rotation, IME insets, split screen, and edge-to-edge padding require on-device tests.
 
@@ -37,3 +37,7 @@ There is **no legitimate technical switch that guarantees suppressing installati
 ## v0.12.0 source update
 
 For Android 11–17, the shell now checks `WindowInsets.Type.ime()` instead of using window-height heuristics. The footer remains hidden until both fullscreen media and IME are dismissed. This is source-level behavior and remains unverified on the owner's Pixel 8a. The error screen can open an isolated browser session; the diagnostic report is copied only by explicit user action and excludes account/URL content.
+
+## v0.15.0 source check
+
+The native library can create and rename sanitized first-party bookmarks without WebView traffic. Configuration changes while the offline library is visible are queued until the web surface resumes; explicit navigation consumes the queued refresh instead of loading twice. These are JVM-tested policies only, **not Android 17 device validation**.

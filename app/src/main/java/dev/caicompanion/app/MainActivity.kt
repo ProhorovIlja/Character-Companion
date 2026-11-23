@@ -99,6 +99,7 @@ class MainActivity : Activity() {
     private var nativeHub: View? = null
     private var modernBackCallback: OnBackInvokedCallback? = null
     private val rendererRecovery = RendererRecoveryBudget()
+    private val deferredWebReload = DeferredWebReload()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -382,7 +383,7 @@ class MainActivity : Activity() {
     /** Shared by IME insets, fullscreen video and settings; never obscure active text fields. */
     private fun updateFooterVisibility() {
         if (::footer.isInitialized) {
-            footer.visibility = if (keyboardVisible || fullscreenView != null) View.GONE else View.VISIBLE
+            footer.visibility = if (keyboardVisible || fullscreenView != null || nativeHub != null) View.GONE else View.VISIBLE
         }
     }
 
@@ -672,10 +673,62 @@ class MainActivity : Activity() {
             webView.settings.loadWithOverviewMode = store.desktopMode
             webView.settings.userAgentString = if (store.desktopMode) desktopAgent() else defaultAgent
             CookieManager.getInstance().setAcceptThirdPartyCookies(webView, store.cookies)
-            if (reload) webView.reload()
+            if (reload) {
+                deferredWebReload.markPending()
+                flushDeferredWebReload()
+            }
         }
         updateStatus()
         refreshBackForward()
+    }
+
+    /** A settings toggle in the offline workspace must never silently fetch a webpage. */
+    private fun flushDeferredWebReload() {
+        if (!::webView.isInitialized || destroyed) return
+        if (!deferredWebReload.consumeIfVisible(activityResumed, nativeHub != null)) return
+        if (NativeWorkspaceNavigation.needsInitialLoad(webView.url)) {
+            webView.loadUrl(NativeWorkspaceNavigation.safeDestination(lastUrl))
+        } else {
+            webView.reload()
+        }
+    }
+
+    /** Save a manually entered link without loading Character.AI or exposing credentials. */
+    private fun createOfflineBookmark(onSaved: () -> Unit) {
+        val fields = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), dp(4))
+            setBackgroundColor(Color.rgb(21, 22, 30))
+        }
+        val titleInput = EditText(this).apply {
+            hint = getString(R.string.hub_bookmark_name_hint)
+            setTextColor(TEXT); setHintTextColor(MUTED)
+            isSingleLine = true
+            filters = arrayOf(InputFilter.LengthFilter(90))
+        }
+        val urlInput = EditText(this).apply {
+            hint = getString(R.string.hub_bookmark_url_hint)
+            setTextColor(TEXT); setHintTextColor(MUTED)
+            isSingleLine = true
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+            filters = arrayOf(InputFilter.LengthFilter(4096))
+        }
+        fields.addView(titleInput)
+        fields.addView(urlInput)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.hub_bookmark_manual_add)
+            .setView(fields)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.bookmark_add) { _, _ ->
+                val normalized = OfflineBookmarkEditor.normalize(
+                    titleInput.text.toString(), urlInput.text.toString())
+                if (normalized == null) {
+                    showToast(getString(R.string.hub_bookmark_invalid))
+                } else if (store.addBookmark(normalized.first, normalized.second)) {
+                    onSaved()
+                    showToast(getString(R.string.bookmark_saved))
+                } else showToast(getString(R.string.hub_bookmark_invalid))
+            }.show()
     }
 
     /** Independent native offline home. Does not request Character.AI APIs or load the site. */
@@ -700,16 +753,10 @@ class MainActivity : Activity() {
         addButton(layout, getString(R.string.hub_open_browser)) {
             openBrowserTab(BrowserSessionPolicy.HOME)
         }
-        addButton(layout, getString(R.string.hub_add_bookmark)) {
-            // The native workspace can be visible before the first WebView load.
-            val url = UrlPolicy.sanitizeBookmark(webView.url ?: lastUrl)
-            if (url == null) showToast(getString(R.string.link_unavailable))
-            else {
-                store.addBookmark(webView.title ?: "Character.AI", url)
-                showToast(getString(R.string.bookmark_saved))
-                closeNativeHub()
-                showNativeHub()
-            }
+        // The manual editor works even before WebView's first navigation.
+        var refreshNativeBookmarks: () -> Unit = {}
+        addButton(layout, getString(R.string.hub_bookmark_manual_add)) {
+            createOfflineBookmark { refreshNativeBookmarks() }
         }
         addButton(layout, getString(R.string.hub_privacy)) { showPrivacyStats() }
         layout.addView(sectionLabel(getString(R.string.hub_library)))
@@ -760,9 +807,11 @@ class MainActivity : Activity() {
             }
             override fun afterTextChanged(s: Editable?) {}
         })
+        refreshNativeBookmarks = { refresh(search.text.toString()) }
         refresh("")
         addButton(layout, getString(R.string.close)) { closeNativeHub() }
         nativeHub = panel
+        updateFooterVisibility()
         // A hidden web page cannot keep a pending microphone/camera prompt alive.
         denyPendingMedia()
         // Pause timers/media while the independent offline screen covers the site.
@@ -776,6 +825,7 @@ class MainActivity : Activity() {
     private fun openFirstPartyPage(rawUrl: String) {
         val safeUrl = NativeWorkspaceNavigation.safeDestination(rawUrl)
         lastUrl = safeUrl
+        deferredWebReload.consumedByNavigation()
         closeNativeHub(loadIfBlank = false)
         webView.loadUrl(safeUrl)
     }
@@ -787,12 +837,15 @@ class MainActivity : Activity() {
             container.removeView(it)
         }
         nativeHub = null
+        updateFooterVisibility()
         if (!destroyed && ::webView.isInitialized) {
             // Closing the native launch screen must never reveal an uninitialized blank WebView.
             if (loadIfBlank && NativeWorkspaceNavigation.needsInitialLoad(webView.url)) {
+                deferredWebReload.consumedByNavigation()
                 webView.loadUrl(NativeWorkspaceNavigation.safeDestination(lastUrl))
             }
             syncRendererLifecycle()
+            flushDeferredWebReload()
         }
     }
 
@@ -805,19 +858,38 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun showNativeBookmarkActions(title: String, url: String, onRemoved: () -> Unit) {
+    private fun showNativeBookmarkActions(title: String, url: String, onChanged: () -> Unit) {
         val options = arrayOf(getString(R.string.hub_bookmark_open),
-            getString(R.string.hub_bookmark_browser), getString(R.string.hub_bookmark_delete))
+            getString(R.string.hub_bookmark_browser), getString(R.string.hub_bookmark_rename),
+            getString(R.string.hub_bookmark_delete))
         AlertDialog.Builder(this).setTitle(title).setItems(options) { _, selected ->
             when (selected) {
                 0 -> openFirstPartyPage(url)
                 1 -> openBrowserTab(url)
-                2 -> AlertDialog.Builder(this).setTitle(R.string.hub_bookmark_delete)
+                2 -> {
+                    val input = EditText(this).apply {
+                        setText(title)
+                        setTextColor(TEXT); setHintTextColor(MUTED)
+                        isSingleLine = true
+                        filters = arrayOf(InputFilter.LengthFilter(90))
+                    }
+                    AlertDialog.Builder(this).setTitle(R.string.hub_bookmark_rename)
+                        .setView(input)
+                        .setNegativeButton(R.string.cancel, null)
+                        .setPositiveButton(R.string.apply) { _, _ ->
+                            val normalized = OfflineBookmarkEditor.normalize(input.text.toString(), url)
+                            if (normalized != null && store.addBookmark(normalized.first, normalized.second)) {
+                                onChanged()
+                                showToast(getString(R.string.bookmark_saved))
+                            }
+                        }.show()
+                }
+                3 -> AlertDialog.Builder(this).setTitle(R.string.hub_bookmark_delete)
                     .setMessage(R.string.hub_bookmark_confirm_delete)
                     .setNegativeButton(R.string.cancel, null)
                     .setPositiveButton(R.string.delete) { _, _ ->
                         store.removeBookmark(url)
-                        onRemoved()
+                        onChanged()
                         showToast(getString(R.string.bookmark_removed))
                     }.show()
             }
@@ -1195,6 +1267,7 @@ class MainActivity : Activity() {
         super.onResume()
         activityResumed = true
         syncRendererLifecycle()
+        flushDeferredWebReload()
     }
     override fun onStop() {
         // Do not revoke while an Android permission dialog merely pauses the Activity.
