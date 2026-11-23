@@ -43,6 +43,9 @@ class WindowsSourceAudit(unittest.TestCase):
         self.assertIn('location.href !== expectedPage',bridge)
         self.assertIn('untrusted-origin',bridge)
         self.assertIn('click-invoked-unconfirmed',bridge)
+        self.assertIn('page-or-composer-changed',bridge)
+        self.assertIn('parent.contains(buttons[0])',bridge)
+        self.assertIn('el.isConnected',bridge)
 
     def test_no_cloud_audio(self):
         speech = (self.src('Speech/WhisperCliTranscriber.cs')+
@@ -63,6 +66,8 @@ class WindowsSourceAudit(unittest.TestCase):
         self.assertIn('Pcm16Resampler.Convert(source, output', recorder)
         self.assertIn('EraseTemporaryRecording(_nativePath)', recorder)
         self.assertIn('n -= n % blockAlign', recorder)
+        self.assertIn('new WaveIn {', recorder)
+        self.assertNotIn('WaveInEvent?', recorder)
         self.assertIn('var overlap = Math.Min(end, nextTarget) - current', converter)
         self.assertIn('BinaryWriter(output', converter)
         self.assertNotIn('HttpClient', recorder + converter)

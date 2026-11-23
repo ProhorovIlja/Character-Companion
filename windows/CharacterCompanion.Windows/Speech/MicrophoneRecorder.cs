@@ -13,7 +13,7 @@ public sealed class MicrophoneRecorder : IDisposable
     {
         (48_000, 1), (44_100, 1), (16_000, 1), (48_000, 2), (44_100, 2)
     };
-    private WaveInEvent? _mic;
+    private WaveIn? _mic;
     private WaveFileWriter? _writer;
     private TaskCompletionSource<string>? _stopped;
     private string _nativePath = "";
@@ -41,7 +41,7 @@ public sealed class MicrophoneRecorder : IDisposable
             try
             {
                 _writer = new WaveFileWriter(_nativePath, format);
-                _mic = new WaveInEvent { WaveFormat = format, BufferMilliseconds = 100 };
+                _mic = new WaveIn { WaveFormat = format, BufferMilliseconds = 100 };
                 _mic.DataAvailable += OnDataAvailable;
                 _mic.RecordingStopped += OnRecordingStopped;
                 _maxPcmBytes = checked(format.AverageBytesPerSecond * 180);

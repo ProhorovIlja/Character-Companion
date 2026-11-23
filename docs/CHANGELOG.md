@@ -1,3 +1,9 @@
+## 0.31.0-source (2026-11-23)
+
+- Windows 0.7.0-prealpha: prevent `ComposerBridge` clicking Send if website event callbacks synchronously navigate or detach/recreate the composer; five new Node runtime cases.
+- Use the recommended NAudio 3 `WaveIn` class instead of the obsolete `WaveInEvent` alias.
+- Android GeckoView and legacy code unchanged (0.25.0-rc1), no compiled/signed release. See `docs/RELEASE_NOTES_v0.31.0-source.md`.
+
 ## v0.30.0-source — 2026-11-23
 - Windows 0.6.0 pre-alpha: auto-send now binds the dictation to the original Character.AI conversation using browser navigation revision and an independent exact-page check inside the ComposerBridge JavaScript. Draft edits/undo always disable automatic send. Manual review remains available.
 - Cancel Recording stops and deletes temp audio without resampling; microphone capture fallback no longer shares completion state across failed formats.

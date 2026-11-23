@@ -38,7 +38,11 @@ public static class ComposerBridge
           const unique = [...new Set(editors)];
           if (unique.length !== 1) return {ok:false, reason:'composer-not-unique'};
           const el = unique[0];
+          // The site's focus listener may synchronously navigate or replace its editor.
+          const stillSafe = () => location.href === expectedPage && el.isConnected;
+          if (!stillSafe()) return {ok:false,reason:'composer-detached'};
           el.focus();
+          if (!stillSafe()) return {ok:false,reason:'page-or-composer-changed'};
           if ('value' in el) {
             const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value')?.set;
             if (!setter) return {ok:false,reason:'no-setter'};
@@ -48,6 +52,9 @@ public static class ComposerBridge
           }
           el.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:text}));
           el.dispatchEvent(new Event('change',{bubbles:true}));
+          // An input/change listener can synchronously rerender the whole composer,
+          // or navigate to a different chat even though JS runs on one thread.
+          if (!stillSafe()) return {ok:false,reason:'page-or-composer-changed'};
           if (!send) return {ok:true, sent:false};
           // Only use an explicitly labeled send control near the single known composer.
           const parent = el.closest('form') || el.parentElement?.parentElement;
@@ -58,6 +65,12 @@ public static class ComposerBridge
             return /(^|[\s_-])(send|отправить)([\s_-]|$)/.test(label);
           });
           if (buttons.length !== 1) return {ok:true,sent:false,reason:'send-button-not-unique'};
+          // DOM queries and visibility getters can invoke website code. Check the
+          // actual page and attached elements immediately before invoking Send.
+          if (!stillSafe() || !parent.contains(el) || !buttons[0].isConnected ||
+              !parent.contains(buttons[0])) {
+            return {ok:false,sent:false,reason:'page-or-composer-changed'};
+          }
           buttons[0].click();
           // Click was invoked; website acceptance cannot be verified from here.
           return {ok:true,sent:true,reason:'click-invoked-unconfirmed'};

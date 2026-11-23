@@ -1,3 +1,5 @@
+**Windows 0.7.0 source:** ComposerBridge now rechecks exact page and DOM attachment after synchronous website focus/input callbacks and immediately before Send. NAudio 3 recorder now uses `WaveIn` rather than obsolete `WaveInEvent`. [Release notes](RELEASE_NOTES_v0.7.0-prealpha.md). **Not built/tested on Windows.**
+
 **v0.6.0 source:** Auto-send is tied to the first-party conversation page observed when the microphone starts. Page navigation, draft editing (including undo) or a changed DOM page cancels auto-send; recognized text stays editable. The `ComposerBridge` verifies the exact URL inside its JavaScript task. Cancel Recording skips resampling and transcription. [Detailed release notes](RELEASE_NOTES_v0.6.0-prealpha.md). **No compiled Windows executable yet.**
 
 # Character Companion · Windows 0.5.0 pre-alpha — bundled CEF, NOT WebView2
