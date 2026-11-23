@@ -162,4 +162,7 @@
     <string name="gecko_error">Не удалось запустить GeckoView. Можно открыть прежние инструменты браузера.</string>
     <string name="gecko_download_confirm">Сохранить %1$s через системный выбор документов? Не более 256 МиБ. Файл останется на устройстве.</string>
     <string name="gecko_download_saved">Файл сохранён</string>
+    <string name="gecko_recovery_title">Сбой браузера Gecko</string>
+    <string name="gecko_recovery_message">Процесс браузера завершился. Восстановить вручную? Неотправленный текст формы и состояние страницы могут быть потеряны.</string>
+    <string name="gecko_recovery_limit">Браузер неоднократно завершился. Повторные попытки ограничены. Откройте прежние инструменты или выйдите из приложения.</string>
 </resources>

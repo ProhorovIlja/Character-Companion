@@ -5,6 +5,9 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Context
+import android.os.SystemClock
+import android.text.Editable
+import android.text.TextWatcher
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -18,9 +21,13 @@ import android.view.WindowInsets
 import android.view.WindowManager
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
+import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ListView
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import org.mozilla.geckoview.AllowOrDeny
@@ -51,6 +58,10 @@ class GeckoActivity : Activity() {
     private lateinit var backButton: Button
     private lateinit var forwardButton: Button
     private lateinit var privacyButton: Button
+    private lateinit var actionsRow: LinearLayout
+    private val recoveryBudget = RendererRecoveryBudget(2, 120_000L)
+    private var needsRecovery = false
+    private var recoveryDialog: AlertDialog? = null
     private var activeUrl: String = HOME
     private var canGoBack = false
     private var canGoForward = false
@@ -95,9 +106,15 @@ class GeckoActivity : Activity() {
             setPadding(dp(14), dp(10), dp(6), dp(8))
         }
         top.addView(locationLabel, LinearLayout.LayoutParams(0, dp(54), 1f))
-        top.addView(button(getString(R.string.gecko_legacy)) {
-            startActivity(Intent(this, MainActivity::class.java))
-        })
+        top.addView(button("☆") { saveCurrentBookmark() }.apply {
+            contentDescription = getString(R.string.bookmark_add)
+        }, LinearLayout.LayoutParams(dp(48), dp(54)))
+        top.addView(button("☰") { showBookmarks() }.apply {
+            contentDescription = getString(R.string.bookmarks)
+        }, LinearLayout.LayoutParams(dp(48), dp(54)))
+        top.addView(button("⚙") { showGeckoSettings() }.apply {
+            contentDescription = getString(R.string.settings)
+        }, LinearLayout.LayoutParams(dp(48), dp(54)))
         root.addView(top)
         val bottom = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         backButton = button(getString(R.string.back)) { navigateBack() }
@@ -107,7 +124,8 @@ class GeckoActivity : Activity() {
         bottom.addView(button(getString(R.string.reload)) { session.reload() }, LinearLayout.LayoutParams(0, dp(48), 1f))
         bottom.addView(button(getString(R.string.home)) { session.loadUri(HOME) }, LinearLayout.LayoutParams(0, dp(48), 1f))
         root.addView(bottom)
-        val actions = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        actionsRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        val actions = actionsRow
         privacyButton = button(getString(R.string.filter)) {
             settings.blocking = !settings.blocking
             session.settings.setUseTrackingProtection(settings.blocking)
@@ -120,6 +138,7 @@ class GeckoActivity : Activity() {
             confirmBrowser(activeUrl)
         }, LinearLayout.LayoutParams(0, dp(48), 1f))
         root.addView(actions)
+        updateCompactChrome()
         surface = GeckoView(this)
         root.addView(surface, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
@@ -164,6 +183,197 @@ class GeckoActivity : Activity() {
         setTextColor(fg)
         setBackgroundResource(R.drawable.settings_action)
         setOnClickListener { action() }
+    }
+
+    /** Gecko bookmark editor never accesses page DOM, cookies or chat text. */
+    private fun saveCurrentBookmark() {
+        val url = UrlPolicy.sanitizeBookmark(activeUrl)
+        if (url == null) {
+            Toast.makeText(this, R.string.hub_bookmark_invalid, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val title = EditText(this).apply {
+            setSingleLine(true)
+            setText("Character.AI")
+            selectAll()
+        }
+        AlertDialog.Builder(this).setTitle(R.string.bookmark_add).setView(title)
+            .setPositiveButton(R.string.confirm) { _, _ ->
+                val saved = settings.addBookmark(title.text.toString(), url)
+                Toast.makeText(this,
+                    if (saved) R.string.bookmark_saved else R.string.hub_bookmark_invalid,
+                    Toast.LENGTH_SHORT).show()
+            }.setNegativeButton(R.string.cancel, null).show()
+    }
+
+    /** Native library: search/selection/deletion work without network requests. */
+    private fun showBookmarks() {
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(8), dp(14), dp(6))
+        }
+        val search = EditText(this).apply {
+            setSingleLine(true)
+            hint = getString(R.string.hub_search_hint)
+        }
+        val empty = TextView(this).apply {
+            setText(R.string.hub_empty)
+            setTextColor(fg)
+            setPadding(0, dp(12), 0, dp(10))
+        }
+        val entries = mutableListOf<String>()
+        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, entries)
+        val list = ListView(this).apply { this.adapter = adapter }
+        layout.addView(search)
+        layout.addView(empty)
+        layout.addView(list, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(300)))
+        var visible = emptyList<Pair<String, String>>()
+        val refresh: () -> Unit = {
+            visible = NativeLibrarySearch.filter(settings.listBookmarks(), search.text.toString())
+            adapter.clear()
+            adapter.addAll(visible.map { (title, _) -> title.take(90) })
+            adapter.notifyDataSetChanged()
+            empty.visibility = if (visible.isEmpty()) View.VISIBLE else View.GONE
+        }
+        val dialog = AlertDialog.Builder(this).setTitle(R.string.bookmarks)
+            .setView(layout).setPositiveButton(R.string.close, null).create()
+        list.setOnItemClickListener { _, _, position, _ ->
+            val url = visible.getOrNull(position)?.second?.let(UrlPolicy::sanitizeBookmark)
+            if (url != null && ::session.isInitialized && session.isOpen && !needsRecovery) {
+                session.loadUri(url)
+                dialog.dismiss()
+            } else {
+                dialog.dismiss()
+                if (needsRecovery) showRecoveryPrompt()
+            }
+        }
+        list.setOnItemLongClickListener { _, _, position, _ ->
+            val bookmark = visible.getOrNull(position)
+            if (bookmark != null) {
+                AlertDialog.Builder(this).setTitle(R.string.hub_bookmark_delete)
+                    .setMessage(R.string.hub_bookmark_confirm_delete)
+                    .setPositiveButton(R.string.delete) { _, _ ->
+                        settings.removeBookmark(bookmark.second)
+                        refresh()
+                        Toast.makeText(this, R.string.bookmark_removed, Toast.LENGTH_SHORT).show()
+                    }.setNegativeButton(R.string.cancel, null).show()
+            }
+            true
+        }
+        search.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+            override fun afterTextChanged(s: Editable?) = refresh()
+        })
+        refresh()
+        dialog.show()
+    }
+
+    private fun settingCheckbox(label: Int, selected: Boolean, change: (Boolean) -> Unit): CheckBox =
+        CheckBox(this).apply {
+            text = getString(label)
+            isChecked = selected
+            setTextColor(fg)
+            textSize = 14f
+            setPadding(dp(8), dp(6), dp(8), dp(6))
+            setOnCheckedChangeListener { _, value -> change(value) }
+        }
+
+    /** Only options actually supported by Gecko are shown; WebView-only settings are omitted. */
+    private fun showGeckoSettings() {
+        val options = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+        }
+        options.addView(settingCheckbox(R.string.toggle_filter, settings.blocking) {
+            settings.blocking = it
+            if (::session.isInitialized && session.isOpen)
+                session.settings.setUseTrackingProtection(it)
+            updatePrivacy()
+        })
+        options.addView(settingCheckbox(R.string.toggle_media, settings.mediaAllowed) {
+            settings.mediaAllowed = it
+            if (!it) {
+                pendingMediaCallback?.reject(); pendingMediaCallback = null
+                permissionCallback?.reject(); permissionCallback = null
+            }
+        })
+        options.addView(settingCheckbox(R.string.toggle_protect_screen, settings.protectScreen) {
+            settings.protectScreen = it
+            if (it) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        })
+        options.addView(settingCheckbox(R.string.toggle_resume, settings.resumePage) {
+            settings.resumePage = it
+            if (!it) settings.lastVisited = ""
+            else UrlPolicy.sanitizeBookmark(activeUrl)?.let { safe -> settings.lastVisited = safe }
+        })
+        options.addView(settingCheckbox(R.string.toggle_compact, settings.compactChrome) {
+            settings.compactChrome = it
+            updateCompactChrome()
+        })
+        val scroll = ScrollView(this).apply { addView(options) }
+        AlertDialog.Builder(this).setTitle(R.string.settings).setView(scroll)
+            .setNeutralButton(R.string.gecko_legacy) { _, _ ->
+                startActivity(Intent(this, MainActivity::class.java))
+            }.setPositiveButton(R.string.close, null).show()
+    }
+
+    private fun updateCompactChrome() {
+        if (::actionsRow.isInitialized)
+            actionsRow.visibility = if (settings.compactChrome) View.GONE else View.VISIBLE
+    }
+
+    /** User-initiated recovery, never a timer or background monitor. Form contents may be lost. */
+    private fun geckoExited() {
+        needsRecovery = true
+        // A destroyed renderer cannot satisfy old site permissions, pending file
+        // prompts or downloads. Keep no callback into the failed session.
+        runCatching { pendingMediaCallback?.reject() }
+        pendingMediaCallback = null
+        runCatching { permissionCallback?.reject() }
+        permissionCallback = null
+        runCatching { finishFilePrompt(emptyList()) }
+        abandonDownload()
+        if (!isFinishing && !isDestroyed && started) showRecoveryPrompt()
+    }
+
+    private fun showRecoveryPrompt() {
+        if (!needsRecovery || isFinishing || isDestroyed || recoveryDialog?.isShowing == true) return
+        val canRetry = recoveryBudget.recentRestartCount(SystemClock.elapsedRealtime()) < 2
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.gecko_recovery_title)
+            .setMessage(if (canRetry) R.string.gecko_recovery_message else R.string.gecko_recovery_limit)
+            .setNegativeButton(R.string.cancel, null)
+            .setNeutralButton(R.string.gecko_legacy) { _, _ ->
+                startActivity(Intent(this, MainActivity::class.java)); finish()
+            }
+        if (canRetry) dialog.setPositiveButton(R.string.retry) { _, _ -> recoverGecko() }
+        recoveryDialog = dialog.create().also { it.show() }
+    }
+
+    private fun recoverGecko() {
+        if (!needsRecovery || !::session.isInitialized ||
+            !recoveryBudget.allowAutomaticRestart(SystemClock.elapsedRealtime())) {
+            showRecoveryPrompt()
+            return
+        }
+        val safeUrl = UrlPolicy.sanitizeBookmark(activeUrl) ?: HOME
+        try {
+            surface.releaseSession()
+            if (session.isOpen) session.close()
+            session.open(engine(applicationContext))
+            surface.setSession(session)
+            needsRecovery = false
+            canGoBack = false
+            canGoForward = false
+            updateNavigation()
+            session.loadUri(safeUrl)
+        } catch (_: RuntimeException) {
+            needsRecovery = true
+            showRecoveryPrompt()
+        }
     }
 
     private fun sharedLink(value: Intent?): String? {
@@ -327,6 +537,8 @@ class GeckoActivity : Activity() {
     }
 
     private val contentDelegate = object : GeckoSession.ContentDelegate {
+        override fun onCrash(session: GeckoSession) { geckoExited() }
+        override fun onKill(session: GeckoSession) { geckoExited() }
         override fun onExternalResponse(session: GeckoSession, response: WebResponse) {
             val stream = response.body
             if (stream == null || !started || pendingDownload != null ||
@@ -539,7 +751,8 @@ class GeckoActivity : Activity() {
         if (requestCode != MEDIA_REQUEST_CODE) return
         val callback = permissionCallback ?: return
         permissionCallback = null
-        if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED })
+        if (started && settings.mediaAllowed && UrlPolicy.isTrustedMediaOrigin(activeUrl) &&
+            grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED })
             callback.grant()
         else callback.reject()
     }
@@ -590,6 +803,7 @@ class GeckoActivity : Activity() {
     }
 
     private fun navigateBack() {
+        if (needsRecovery) { showRecoveryPrompt(); return }
         if (::session.isInitialized && session.isOpen && canGoBack) session.goBack()
         else finish()
     }
@@ -600,6 +814,7 @@ class GeckoActivity : Activity() {
     override fun onStart() {
         super.onStart()
         started = true
+        if (needsRecovery) showRecoveryPrompt()
     }
 
     override fun onStop() {
@@ -613,6 +828,8 @@ class GeckoActivity : Activity() {
         if (!downloadPickerOpen) abandonDownload()
         genericPromptDialog?.dismiss()
         genericPromptDialog = null
+        recoveryDialog?.dismiss()
+        recoveryDialog = null
         super.onStop()
     }
 
@@ -623,6 +840,8 @@ class GeckoActivity : Activity() {
         abandonDownload()
         genericPromptDialog?.dismiss()
         genericPromptDialog = null
+        recoveryDialog?.dismiss()
+        recoveryDialog = null
         if (Build.VERSION.SDK_INT >= 33) backCallback?.let {
             onBackInvokedDispatcher.unregisterOnBackInvokedCallback(it)
         }

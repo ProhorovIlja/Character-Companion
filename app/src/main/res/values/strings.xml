@@ -162,4 +162,7 @@
     <string name="gecko_error">GeckoView could not start. You can open the legacy browser tools instead.</string>
     <string name="gecko_download_confirm">Save %1$s using Android’s document picker? Maximum 256 MiB. The file stays on this device.</string>
     <string name="gecko_download_saved">File saved successfully</string>
+    <string name="gecko_recovery_title">Gecko browser interrupted</string>
+    <string name="gecko_recovery_message">The browsing process stopped. Retry manually? Unsaved form text and page state may be lost.</string>
+    <string name="gecko_recovery_limit">The browser stopped repeatedly. Further attempts are paused. Open the legacy tools or leave the application.</string>
 </resources>

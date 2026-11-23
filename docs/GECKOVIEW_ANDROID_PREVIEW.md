@@ -1,3 +1,7 @@
+## v0.25.0-source — native library, settings and crash recovery
+
+The Gecko ARM64 flavor now exposes a local searchable/bookmarkable library and a native settings sheet with only implemented options (tracking protection, media consent, FLAG_SECURE, last-page resume, compact toolbar). The renderer crash/kill handlers prompt **manual** recovery with at most two attempts in two minutes; pending permissions and transfers are dropped on failure. The Activity retains the current session across orientation/screen-size changes, but other configuration changes and OS process death can still discard in-progress form content. A real Pixel 8a Android 17 device test remains mandatory. See [v0.25.0 notes](RELEASE_NOTES_v0.25.0-source.md).
+
 # GeckoView Android preview — Pixel 8a / LineageOS 24 / Android 17
 
 **2026-11-23 · source-only milestone. No APK build or physical-device validation.**

@@ -61,6 +61,17 @@ fun main() {
     check(NativeLibrarySearch.filter(emptyList(), "").isEmpty())
     check(NativeLibrarySearch.filter(listOf("Bad" to "https://accounts.google.com/callback"), "").isEmpty())
     check(NativeLibrarySearch.filter(listOf("Good" to "https://character.ai/"), "Good").single().first == "Good")
+    val saved = listOf(
+        "Hunter's Dream" to "https://character.ai/chat/a",
+        "Yharnam" to "https://character.ai/chat/b",
+        "Untrusted" to "https://example.org/secret",
+        "Duplicate" to "https://character.ai/chat/a"
+    )
+    check(NativeLibrarySearch.filter(saved, "Yharnam").map { it.first } == listOf("Yharnam"))
+    check(NativeLibrarySearch.filter(saved, "").size == 2)
+    check(NativeLibrarySearch.filter(saved, "", 1).size == 1)
+    check(NativeLibrarySearch.filter(saved, "chat/a").size == 1)
+    check(NativeLibrarySearch.filter(saved, "untrusted").isEmpty())
 
     val crashBudget = RendererRecoveryBudget(3, 120_000L)
     check(crashBudget.allowAutomaticRestart(10_000))
