@@ -7,7 +7,8 @@ using System.Windows.Input;
 using CharacterCompanion.Windows.Security;
 using CharacterCompanion.Windows.Speech;
 using Microsoft.Win32;
-using Microsoft.Web.WebView2.Core;
+using CefSharp;
+using CharacterCompanion.Windows.Browser;
 
 namespace CharacterCompanion.Windows;
 
@@ -18,63 +19,49 @@ public partial class MainWindow : Window
     private bool _busy;
     private bool _webReady;
     private bool _bridgeBusy;
+    private volatile bool _filterTrackers;
 
     public MainWindow()
     {
         _settings = AppSettings.Load();
         InitializeComponent();
+        _filterTrackers = _settings.FilterTrackers;
         FilterCheckbox.IsChecked = _settings.FilterTrackers;
         LanguageCombo.SelectedIndex = _settings.Language switch { "ru" => 1, "en" => 2, _ => 0 };
-        Loaded += async (_, _) => await InitializeBrowserAsync();
-        Closed += (_, _) => _recorder?.Dispose();
+        Loaded += (_, _) => InitializeBrowser();
+        Closed += (_, _) => { _recorder?.Dispose(); Browser.Dispose(); };
     }
 
-    private async Task InitializeBrowserAsync()
+    private void InitializeBrowser()
     {
         try
         {
-            var profile = Path.Combine(AppSettings.UserFolder, "WebView2");
-            Directory.CreateDirectory(profile);
-            var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: profile);
-            await Browser.EnsureCoreWebView2Async(environment);
-            var core = Browser.CoreWebView2;
-            core.Settings.AreDevToolsEnabled = false;
-            core.Settings.IsStatusBarEnabled = false;
-            core.Settings.AreDefaultContextMenusEnabled = true;
-            core.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
-            core.WebResourceRequested += (_, e) =>
+            // CEF is initialized in App.OnStartup. Attach handlers BEFORE first navigation.
+            Browser.RequestHandler = new CompanionRequestHandler(() => _filterTrackers,
+                uri => Dispatcher.BeginInvoke(() => OfferExternal(uri)));
+            Browser.LifeSpanHandler = new CompanionPopupHandler(uri => Dispatcher.BeginInvoke(() =>
             {
-                if (TrackerPolicy.Block(e.Request.Uri, _settings.FilterTrackers))
-                    e.Response = core.Environment.CreateWebResourceResponse(null, 403, "Filtered", "");
-            };
-            core.NavigationStarting += (_, e) =>
+                if (SitePolicy.IsFirstParty(uri)) Browser.Load(uri);
+                else if (SitePolicy.IsExternalHttps(uri)) OfferExternal(uri);
+                else SetStatus("Заблокировано небезопасное всплывающее окно.");
+            }));
+            Browser.AddressChanged += (_, e) => Dispatcher.BeginInvoke(() =>
             {
-                if (SitePolicy.IsFirstParty(e.Uri)) return;
-                e.Cancel = true;
-                if (SitePolicy.IsExternalHttps(e.Uri))
-                {
-                    OfferExternal(e.Uri);
-                }
-                else SetStatus("Заблокирована навигация на недоверенную схему или адрес.");
-            };
-            core.NewWindowRequested += (_, e) =>
+                LocationLabel.Text = SitePolicy.IsFirstParty(e.NewValue as string)
+                    ? "character.ai · локальный профиль CEF" : "Ожидание Character.AI";
+            });
+            Browser.LoadError += (_, e) =>
             {
-                e.Handled = true;
-                if (SitePolicy.IsFirstParty(e.Uri)) core.Navigate(e.Uri);
-                else if (SitePolicy.IsExternalHttps(e.Uri)) OfferExternal(e.Uri);
+                if (!e.Frame.IsMain || e.ErrorCode == CefErrorCode.Aborted) return;
+                Dispatcher.BeginInvoke(() => SetStatus("Ошибка загрузки: " + e.ErrorCode));
             };
-            core.NavigationCompleted += (_, e) =>
-            {
-                LocationLabel.Text = SitePolicy.IsFirstParty(core.Source) ? "character.ai · защищённая сессия" : "Ожидание Character.AI";
-                if (!e.IsSuccess) SetStatus("Страница не загрузилась. Проверь интернет, вход или перезагрузи.");
-            };
-            core.ProcessFailed += (_, _) => Dispatcher.Invoke(() => SetStatus("WebView2 остановлен. Нажми «Обновить»."));
             _webReady = true;
-            core.Navigate(SitePolicy.Home);
+            Browser.Load(SitePolicy.Home);
         }
         catch (Exception ex)
         {
-            SetStatus("WebView2 недоступен: " + ex.Message);
+            _webReady = false;
+            SetStatus("CEF не запущен: " + ex.Message);
         }
     }
 
@@ -82,7 +69,7 @@ public partial class MainWindow : Window
     {
         var authentication = SitePolicy.IsIdentityOrTokenUrl(address);
         var message = authentication
-            ? "Для входа откроется главная страница Character.AI в системном браузере. Сессия WebView2 не перенесётся автоматически. Продолжить?"
+            ? "Для входа откроется главная страница Character.AI в системном браузере. Сессия CEF не перенесётся автоматически. Продолжить?"
             : "Открыть сторонний HTTPS-сайт в системном браузере?\n" + new Uri(address).Host;
         if (MessageBox.Show(this, message, "Внешний браузер", MessageBoxButton.YesNo,
                 MessageBoxImage.Question) != MessageBoxResult.Yes) return;
@@ -98,15 +85,16 @@ public partial class MainWindow : Window
         catch (Exception) { /* The system may have no default HTTPS handler. */ }
     }
 
-    private void Back_Click(object sender, RoutedEventArgs e) { if (_webReady && Browser.CanGoBack) Browser.GoBack(); }
-    private void Forward_Click(object sender, RoutedEventArgs e) { if (_webReady && Browser.CanGoForward) Browser.GoForward(); }
+    private void Back_Click(object sender, RoutedEventArgs e) { if (_webReady && Browser.CanGoBack) Browser.Back(); }
+    private void Forward_Click(object sender, RoutedEventArgs e) { if (_webReady && Browser.CanGoForward) Browser.Forward(); }
     private void Reload_Click(object sender, RoutedEventArgs e) { if (_webReady) Browser.Reload(); }
-    private void Home_Click(object sender, RoutedEventArgs e) { if (_webReady) Browser.CoreWebView2.Navigate(SitePolicy.Home); }
+    private void Home_Click(object sender, RoutedEventArgs e) { if (_webReady) Browser.Load(SitePolicy.Home); }
     private void ExternalBrowser_Click(object sender, RoutedEventArgs e) => OpenExternal(SitePolicy.Home);
     private void Filter_Checked(object sender, RoutedEventArgs e)
     {
         if (!IsLoaded) return;
         _settings.FilterTrackers = FilterCheckbox.IsChecked == true;
+        _filterTrackers = _settings.FilterTrackers;
         SaveSettings();
     }
 
@@ -266,14 +254,20 @@ public partial class MainWindow : Window
         }
         var text = DraftText.Text;
         if (string.IsNullOrWhiteSpace(text)) { SetStatus("Черновик пуст."); return; }
-        if (!_webReady || !SitePolicy.IsFirstParty(Browser.CoreWebView2.Source))
+        if (!_webReady || !Browser.IsBrowserInitialized || !SitePolicy.IsFirstParty(Browser.Address))
         {
             SetStatus("Вставка разрешена только на странице character.ai в приложении."); return;
         }
         _bridgeBusy = true;
         try
         {
-            var json = await Browser.ExecuteScriptAsync(ComposerBridge.BuildScript(text, send));
+            // CEF returns JS objects through dynamic value conversion. JSON.stringify gives
+            // the same strict JSON envelope used by our existing tested ComposerBridge.
+            var expression = ComposerBridge.BuildScript(text, send).Trim().TrimEnd(';');
+            var script = "JSON.stringify(" + expression + ")";
+            var response = await Browser.EvaluateScriptAsync(script, TimeSpan.FromSeconds(10));
+            if (!response.Success || response.Result is not string json)
+                throw new InvalidOperationException("CEF не выполнил DOM-вставку: " + response.Message);
             var result = ComposerBridge.ParseResult(json);
             if (!result.Inserted) SetStatus("Не удалось найти единственное поле ввода. Скопируй текст вручную. " + result.Reason);
             else if (!send) SetStatus("Черновик вставлен в поле Character.AI, отправка не выполнялась.");

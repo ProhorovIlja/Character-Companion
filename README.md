@@ -1,3 +1,5 @@
+**v0.22.0 source / Windows v0.3.0 pre-alpha (2026-11-23):** Migrated Windows from WebView2 to bundled CEF (CefSharp.Wpf.NETCore 156.0.300). The design needs no separately installed WebView2 Runtime but carries a larger browser bundle and CefSharp has no Chromium sandbox. The native Whisper dictation and editable draft remain. Android is unchanged; GeckoView is a researched migration candidate, **not implemented**. **Neither EXE nor APK has been built or device-tested.** [Renderer decision](docs/RENDERER_DECISION_2026-11-23.md) · [Windows](windows/README.md).
+
 **Windows v0.2.0 source revision:** speech-to-send now avoids sending existing or edited draft; concurrent send requests are blocked. Ctrl+Enter and Clear Draft added. The 8-scenario JS DOM harness can be run with Node. [Details](windows/README.md). **No tested installers yet.**
 
 **Windows client added (source prototype):** See [windows/README.md](windows/README.md) for native WPF/WebView2 and offline Whisper dictation. The original Android client remains separate and unchanged in v0.19.0-rc1. No Windows executable has been built or tested yet.

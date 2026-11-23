@@ -1,55 +1,51 @@
-# Character Companion · Windows prototype (v0.21.0-source)
+# Character Companion · Windows 0.3.0 pre-alpha — bundled CEF, NOT WebView2
 
-Native Windows 10/11 WPF client with WebView2, privacy-focused request filtering, and **offline voice dictation**. This is an **uncompiled source prototype**, not a tested executable.
+Source-only WPF/.NET 10 desktop prototype. **The former WebView2 dependency has been removed.** The web renderer is app-distributed `CefSharp.Wpf.NETCore` 156.0.300 (Chromium Embedded Framework), not Edge WebView2. No standalone Edge/WebView2 Runtime installer is required. This does **not** make Character.AI's website fully native or remove the cost of bundling a Chromium engine.
 
-## Scope
+## Features preserved
 
-- Loads the first-party `https://character.ai/` website in WebView2 with a separate on-disk browser profile.
-- Conservative user-toggleable tracker-domain filter enabled by default (not full EasyList; no subscription bypass).
-- System-browser handoff for other HTTPS sites and OAuth; **external cookies do not return into WebView2**.
-- Records mic via NAudio at 16-kHz mono PCM, at most three minutes; runs a user-provided `whisper-cli.exe` and GGML `.bin` model locally. No cloud transcription service or background capture.
-- Whisper output appears in editable native draft. Buttons: insert without sending; click a uniquely identified site-send control; record→transcribe→attempt send; copy; save TXT; clear. Ctrl+Enter explicitly sends the draft. If existing draft text was present or changed during transcription, transcript is appended but **automatic sending is suppressed**.
-- Insertion requests are serialized so repeated clicks cannot enqueue simultaneous WebView2 sends.
-- Site injection restricted to `*.character.ai`, only one visible composer, and *only* one accessible send control near it. If either is not found, leave the editable draft and require manual paste/send. Clicking send is **not proof of server receipt**.
-- WAV and temporary transcript are removed after use. The app does not export cookies or account data; it saves only chosen binary/model paths, language, and filter preference.
+- A first-party `https://character.ai/` browsing surface in a native WPF window and a private, dedicated CEF profile at `%LOCALAPPDATA%\CharacterCompanion\CefProfile`.
+- Top-level URL restrictions, popup blocking or user-confirmed external HTTPS browser handoff, conservative toggleable tracker-domain filter.
+- A user-triggered NAudio microphone recording (max three minutes), local `whisper-cli.exe` with selected multilingual GGML model, editable draft and explicit copy/save/clear/insert/send operations. No automatic background listening and no cloud speech requests.
+- **Record → transcribe → attempt send** only when explicitly requested and no earlier/changed draft exists. Ctrl+Enter sends only when explicitly pressed. The app does not claim message receipt when it merely clicked a web button.
+- The CEF bridge uses the exact checked-in `ComposerBridge` script, a JSON-encoded transcript, original-page origin check and a unique composer/send control requirement.
 
-## Requirements and manual build
+## Requirements & manual Windows x64 build
 
-Install official Microsoft .NET 10 SDK, WebView2 Runtime, and a trusted `whisper.cpp` Windows build with `whisper-cli.exe`. Download a multilingual GGML model for Russian/English. Neither executable nor model is bundled.
+- Windows 10/11 x64 and official **.NET 10 SDK**. Source selects x64 because supported CEF binaries need a matching runtime architecture.
+- NuGet package restore for `CefSharp.Wpf.NETCore` **156.0.300** and `NAudio` **3.3.0**. CEF native runtime binaries must be included in output; do **not** publish a single-file build that drops them.
+- Trusted `whisper.cpp` Windows `whisper-cli.exe` and a separate multilingual GGML `.bin` model selected manually. They are not bundled or downloaded in the background.
 
 ```powershell
 cd windows/CharacterCompanion.Windows
 dotnet restore
-dotnet build -c Release
-dotnet run -c Release
+dotnet build -c Release -r win-x64
+dotnet run -c Release -r win-x64
 ```
 
-For an unpackaged Windows x64 release candidate (after testing on Windows):
+To create an **unsigned, unverified** portable source build, after testing prerequisites:
 
 ```powershell
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o ..\publish\win-x64
 ```
 
-The output is **unsigned** unless signed separately by a trusted certificate. Never publish it as tested before on-device verification.
+Keep the **entire** publish folder: `libcef.dll`, resources/locales, CefSharp assemblies, browser subprocess and supporting native DLLs are required. Windows Visual C++ runtime requirements must be tested on a clean machine. The executable has **not** been built, signed or tested here.
 
-## Tests
+## Privacy and security limitations
+
+- CefSharp documentation states that it **does not implement Chromium's sandbox**. Do not infer security superiority relative to WebView2. Patch CEF frequently and conduct a dedicated review before release.
+- Google OAuth can reject embedded browsers. An explicitly requested system-browser handoff starts at the fixed Character.AI homepage for identity flows. Separate browser cookies cannot automatically authenticate this CEF profile; no silent session transfer, token harvesting or spoofing is implemented.
+- The desktop app is an unofficial client; no public Character.AI API is assumed. Full native parity for calls/media/login has not been demonstrated.
+- Tracker rules may break legitimate pages; filtering is toggleable and narrow. It is not a bypass for subscription requirements, and the app does not access account credentials.
+- WAV and transcript temporary files are removed on normal completion; abrupt process crashes can leave leftovers that users may delete manually.
+
+## Testing status
 
 ```bash
 python -m unittest discover -s windows/tests -p 'test_*.py'
 node windows/tests/bridge_runtime.js
+node windows/tests/test_cef_script_runtime.js
 bash scripts/test-offline.sh
 ```
 
-`bridge_runtime.js` evaluates the **actual JavaScript payload** in an isolated Node VM with 8 deterministic simulated DOM scenarios (legitimate and lookalike origins, ambiguous input/button, explicit send). Passing these tests **does not** establish live Character.AI compatibility or a compiled Windows binary.
-
-## Known limitations
-
-- No build was performed in the present Linux container; this source has not been compiled with a Windows SDK or executed on Windows hardware.
-- Google OAuth in embedded WebViews can be blocked by Google. System browser mode is a **separate** session; a seamless OAuth return requires registration and support from the actual Character.AI service, not cookie scraping.
-- Character.AI controls page markup, editor and send controls. DOM insertion can fail after site updates; transcribed text always remains in the native editor.
-- The host app has no Character.AI private API, cannot guarantee access to Character Calls, and does not bypass paid features.
-- Some microphones may not accept the requested 16-kHz WaveIn format; device selection and resampling are future enhancements.
-- The Whisper CLI and models are outside the app and must be supplied separately; do not download unknown executables automatically.
-- Transcriptions are deleted on normal completion; an abrupt process crash can leave a temporary WAV in the user's temp folder. Manual deletion is possible.
-
-Primary references: [Microsoft WPF WebView2](https://learn.microsoft.com/en-us/microsoft-edge/webview2/get-started/wpf), [whisper.cpp CLI](https://github.com/ggml-org/whisper.cpp/tree/master/examples/cli), [Google OAuth in embedded browsers](https://developers.google.com/identity/siwg/best-practices).
+These scripts test source invariants and JavaScript payloads using a synthetic DOM. They **do not** compile WPF/C#, execute Chromium on Windows or prove login/message delivery. See [windows/QA.md](QA.md) for manual Windows acceptance checks and [renderer decision](../docs/RENDERER_DECISION_2026-11-23.md) for Windows CEF vs Android GeckoView tradeoffs.

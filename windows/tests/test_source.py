@@ -26,7 +26,8 @@ class WindowsSourceAudit(unittest.TestCase):
         self.assertEqual(project.findtext('.//TargetFramework'), 'net10.0-windows')
         self.assertEqual(project.findtext('.//UseWPF'), 'true')
         packages = {x.attrib['Include']:x.attrib['Version'] for x in project.findall('.//PackageReference')}
-        self.assertIn('Microsoft.Web.WebView2', packages)
+        self.assertIn('CefSharp.Wpf.NETCore', packages)
+        self.assertNotIn('Microsoft.Web.WebView2', packages)
         self.assertIn('NAudio', packages)
         self.assertNotIn('Electron', packages)
 

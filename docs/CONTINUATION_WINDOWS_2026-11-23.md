@@ -33,3 +33,9 @@ No scheduled work, automations, GitHub Actions, CI triggers or background checks
 - Eight executable JS bridge scenarios tested in Node sandbox plus Python structure checks; these are not live DOM integration tests.
 - Both environments still lack .NET SDK/Windows compilation and Android Gradle SDK; no binary signoff.
 - Keep Android 17/Pixel 8a/MindTheGapps/Morphe microG requirements in scope. Do not create background/scheduled tasks.
+
+## Follow-up v0.22.0 source: user rejects Windows WebView2
+
+User preference: no required separate installation of Edge or WebView2 Runtime, while retaining the Character.AI embedded site and native voice dictation. WPF/.NET 10 Windows project switched to bundled CEF through CefSharp.Wpf.NETCore 156.0.300, preserving NAudio and offline whisper.cpp. Direct CEF handlers enforce first-party top-level navigation, external-HTTPS popup confirmation and optional tracker domains; JavaScript bridge now uses CEF EvaluateScriptAsync with JSON envelope.
+
+Remember: this is SOURCE ONLY and CefSharp explicitly lacks Chromium sandbox; on Windows there is no .NET SDK to compile or verify CEF packaging, login, app size or memory. For Android the user wants independent engine research as well; GeckoView is an attractive Android-only engine, but migration requires deliberate implementation of media, downloads, permissions, cookie/profile, WebRTC and renderer recovery; original Android WebView remains a fallback until real Pixel 8a / LineageOS 24 tests. See docs/RENDERER_DECISION_2026-11-23.md.

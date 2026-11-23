@@ -1,3 +1,11 @@
+## v0.22.0-source / Windows v0.3.0-prealpha — 2026-11-23 (source-only)
+
+- Windows: removed WebView2 from WPF project and replaced it with in-app CefSharp/CEF 154.0.340 on x64; added CEF-specific request/popup handlers, app profile, JS JSON envelope and browser initialization/shutdown.
+- Maintained local Whisper dictation, native editable drafts, explicit click-to-send and safety rules from v0.21.
+- Added offline policy tests and executable Node regression of CEF bridge expression; no .NET SDK compilation or Windows device testing.
+- Android unchanged; GeckoView is a migration candidate with concrete lifecycle/media/auth scope; does not currently replace Android WebView.
+- No automation, scheduled operation or background checks; no executable releases.
+
 ## Windows v0.2.0-prealpha / project v0.21.0-source — 2026-11-23 (source only)
 
 - Fix accidental auto-send of prior or edited draft when requesting record/transcribe/send; keep recognized text for review when draft changed.
