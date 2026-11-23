@@ -67,21 +67,29 @@ public partial class MainWindow : Window
 
     private void OfferExternal(string address)
     {
-        var authentication = SitePolicy.IsIdentityOrTokenUrl(address);
-        var message = authentication
-            ? "Для входа откроется главная страница Character.AI в системном браузере. Сессия CEF не перенесётся автоматически. Продолжить?"
-            : "Открыть сторонний HTTPS-сайт в системном браузере?\n" + new Uri(address).Host;
+        var target = SitePolicy.SafeBrowserHandoff(address);
+        if (target is null)
+        {
+            SetStatus("Небезопасная внешняя ссылка отклонена.");
+            return;
+        }
+        var redacted = !string.Equals(target, address, StringComparison.Ordinal);
+        var message = redacted
+            ? "Ссылка содержит данные авторизации или подозрительные параметры. В системном браузере откроется только главная Character.AI. Сессия CEF не перенесётся. Продолжить?"
+            : "Открыть HTTPS-сайт в системном браузере?\n" + new Uri(target).Host;
         if (MessageBox.Show(this, message, "Внешний браузер", MessageBoxButton.YesNo,
                 MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-        OpenExternal(authentication ? SitePolicy.Home : address);
-        SetStatus(authentication ? "Для входа открыт сайт в системном браузере. Сессии независимы."
+        OpenExternal(target);
+        SetStatus(redacted ? "Секреты ссылки не переданы. Сессии браузеров независимы."
             : "Открыт внешний сайт после подтверждения.");
     }
 
     private static void OpenExternal(string address)
     {
-        if (!SitePolicy.IsFirstParty(address) && !SitePolicy.IsExternalHttps(address)) return;
-        try { Process.Start(new ProcessStartInfo(address) { UseShellExecute = true }); }
+        // Final validation also covers direct UI actions, not only OfferExternal.
+        var safe = SitePolicy.SafeBrowserHandoff(address);
+        if (safe is null) return;
+        try { Process.Start(new ProcessStartInfo(safe) { UseShellExecute = true }); }
         catch (Exception) { /* The system may have no default HTTPS handler. */ }
     }
 

@@ -35,7 +35,7 @@ class WindowsSourceAudit(unittest.TestCase):
         url = self.src('Security/SitePolicy.cs')
         bridge = self.src('Security/ComposerBridge.cs')
         self.assertIn('Uri.UriSchemeHttps',url)
-        self.assertIn('hostname.EndsWith(".character.ai"',url)
+        self.assertIn('EndsWith(".character.ai"', url)
         self.assertIn('unique.length !== 1',bridge)
         self.assertIn('buttons.length !== 1',bridge)
         self.assertIn('JsonSerializer.Serialize(text)',bridge)
@@ -64,9 +64,9 @@ class WindowsSourceAudit(unittest.TestCase):
 
     def test_browser_handoff_is_not_cookie_import(self):
         code = self.src('MainWindow.xaml.cs')
-        self.assertIn('SitePolicy.IsIdentityOrTokenUrl',code)
+        self.assertIn('SitePolicy.SafeBrowserHandoff(address)',code)
         self.assertIn('MessageBoxButton.YesNo',code)
-        self.assertIn('SitePolicy.Home : address',code)
+        self.assertIn('var safe = SitePolicy.SafeBrowserHandoff(address)',code)
         self.assertNotIn('CookieManager.GetCookiesAsync',code)
         self.assertNotIn('AddOrUpdateCookie',code)
 
@@ -90,7 +90,7 @@ class WindowsSourceAudit(unittest.TestCase):
 
     def test_origin_rejects_credential_userinfo(self):
         code=self.src('Security/SitePolicy.cs')
-        self.assertIn('!string.IsNullOrEmpty(uri.UserInfo)',code)
+        self.assertIn('!string.IsNullOrEmpty(parsed.UserInfo)',code)
 
     def test_no_background_schedulers(self):
         code='\n'.join(p.read_text(encoding='utf8') for p in (ROOT/'windows').rglob('*.cs'))

@@ -1,4 +1,8 @@
-# Character Companion · Windows 0.3.0 pre-alpha — bundled CEF, NOT WebView2
+# Character Companion · Windows 0.4.0 pre-alpha — bundled CEF, NOT WebView2
+
+**v0.4.0 source:** hardened handoff to the system browser. Native `SitePolicy` now validates HTTPS origin, rejects userinfo and alternate ports, and redirects identity links, callback paths, encoded OAuth keys, nested redirect credentials, and hash-token fragments to a fixed Character.AI homepage only after user confirmation. Credentials or cookies are never transferred between CEF and the system browser.
+
+**Manual unit compilation without WPF/CEF:** `dotnet run --project windows/PolicySmoke/CharacterCompanion.PolicySmoke.csproj` from the repository root. It compiles the **actual production `SitePolicy.cs`** with .NET 10 and checks 24 cases, without additional NuGet packages or a browser. It has NOT been run in this environment because the .NET SDK is absent. [See test README](PolicySmoke/README.md).
 
 Source-only WPF/.NET 10 desktop prototype. **The former WebView2 dependency has been removed.** The web renderer is app-distributed `CefSharp.Wpf.NETCore` 156.0.300 (Chromium Embedded Framework), not Edge WebView2. No standalone Edge/WebView2 Runtime installer is required. This does **not** make Character.AI's website fully native or remove the cost of bundling a Chromium engine.
 

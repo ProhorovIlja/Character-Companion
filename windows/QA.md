@@ -1,3 +1,7 @@
+### v0.4.0 manual security test gate
+
+Before trying a Windows installer, manually run `dotnet run --project windows/PolicySmoke/CharacterCompanion.PolicySmoke.csproj` with .NET 10 installed; require `PASS 24 external-handoff policy cases`. On Windows test browser handoffs with ordinary HTTPS links, Google/Apple/Auth0 sign-in, nested `%2563ode` keys, `#access_token`, encoded `/auth/callback` paths, and invalid schemes. Confirm that the browser never receives a source CEF OAuth callback or cookies. No real browser/API acceptance has been performed in this source-only environment.
+
 # Windows pre-alpha acceptance tests (manual; run only on user request)
 
 Before publishing any EXE/MSIX, complete every item on an actual Windows 10/11 desktop:
