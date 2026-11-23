@@ -153,7 +153,7 @@ class Structure(unittest.TestCase):
         self.assertIn('BoundedText.read(reader, RuleListParser.MAX_CHARACTERS)', activity)
         self.assertIn('IMPORT_FILTER_LIST ->', activity)
         self.assertIn('if (configuration == appliedConfiguration) return', engine)
-        self.assertIn('RuleListParser,IncomingLinkParser,BrowserSessionPolicy}.kt', script)
+        self.assertIn('RuleListParser,IncomingLinkParser,BrowserSessionPolicy,RendererRecoveryBudget}.kt', script)
         self.assertNotIn('https://easylist.to/easylist/easylist.txt', activity)
         self.assertNotIn('PeriodicWorkRequest', activity)
 
@@ -233,7 +233,7 @@ class Structure(unittest.TestCase):
     def test_browser_dependencies_are_pinned_without_new_permissions(self):
         build=(ROOT/'app/build.gradle.kts').read_text()
         manifest=(ROOT/'app/src/main/AndroidManifest.xml').read_text()
-        self.assertIn('versionName = "0.9.0"', build)
+        self.assertIn('versionName = "0.10.0-rc1"', build)
         self.assertIn('androidx.browser:browser:1.10.0', build)
         self.assertIn('androidx.webkit:webkit:1.18.0', build)
         self.assertNotIn('android.permission.QUERY_ALL_PACKAGES', manifest)
@@ -250,6 +250,32 @@ class Structure(unittest.TestCase):
         self.assertIn('[[ ! -s "$apk" ]]', script)
         self.assertNotIn('upload-file', script)
         self.assertNotIn('schedule', script.lower().split('set -euo pipefail',1)[1])
+
+    def test_renderer_crash_loop_is_bounded_and_no_activity_retain(self):
+        main=(ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
+        budget=(ROOT/'app/src/main/java/dev/caicompanion/app/RendererRecoveryBudget.kt').read_text()
+        self.assertIn('rendererRecovery.allowAutomaticRestart(SystemClock.elapsedRealtime())', main)
+        self.assertIn('showError(getString(R.string.renderer_crash_loop))', main)
+        self.assertIn('ArrayDeque<Long>()', budget)
+        self.assertIn('if (restarts.size >= maximum) return false', budget)
+        self.assertIn('denyPendingMedia()\n        super.onStop()', main)
+
+    def test_imported_rule_export_uses_saf_and_excludes_private_data(self):
+        main=(ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
+        self.assertIn('Intent.ACTION_CREATE_DOCUMENT', main)
+        self.assertIn('EXPORT_FILTER_LIST ->', main)
+        self.assertIn('snapshot.canonicalText()', main)
+        self.assertIn('if (importedRules.size > 0)', main)
+        self.assertIn('openOutputStream(uri, "w")', main)
+        self.assertIn('manual-filter-export', main)
+        self.assertNotIn('CookieManager.getInstance().getCookie(', main)
+
+    def test_release_kit_cannot_publish_unsigned_apk(self):
+        script=(ROOT/'scripts/prepare-release.sh').read_text()
+        self.assertIn('$APKSIGNER verify', script)
+        self.assertIn('assembleRelease', (ROOT/'docs/RELEASE_PROCESS.md').read_text())
+        self.assertIn('No APK has been produced', (ROOT/'docs/RELEASE_NOTES_v0.10.0-rc1.md').read_text())
+        self.assertFalse((ROOT/'.github/workflows').exists())
 
     def test_all_localized_keys_unique(self):
         for locale in ('values','values-ru'):

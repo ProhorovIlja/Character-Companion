@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.10.0-rc1 — 2026-11-23 (source candidate; no APK release)
+- Bounded renderer restart policy with explicit retry after repeated WebView crashes.
+- Manual local export of imported blocking rules to TXT, without cookies or private chat data.
+- Third-party downloads use user-confirmed browser handoff rather than DownloadManager.
+- Capture permission requests are denied when the Activity stops, not merely pauses for Android permission UI.
+- Manual APK/signature/package/QA release packaging with source ZIP, tar.gz and SHA-256 (will refuse missing APK/device signoff). No automation, uploads or scheduled processes.
+- 30 structural tests and 185 Kotlin assertions passed offline; no real APK or device tests yet.
+
 ## v0.9.0 — 2026-11-23 (source only)
 - Added separate first-party AndroidX Browser 1.10.0 Custom Tab browser session; login compatibility fallback shares the **browser's** cookies, not WebView's. No ad filtering or credentials are shared between them.
 - Identity-provider handoff starts at the Character.AI homepage instead of forwarding an in-progress OAuth URL. Only sanitized first-party URLs can open this browser-session path.

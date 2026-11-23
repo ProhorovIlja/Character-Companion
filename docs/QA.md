@@ -1,8 +1,8 @@
-# Quality assurance · 2026-11-23 · v0.9.0
+# Quality assurance · 2026-11-23 · v0.10.0-rc1
 
 ## Completed in offline environment
 
-- `bash scripts/test-offline.sh` passed: **27 Python structural tests** and **174 Kotlin assertions**.
+- `bash scripts/test-offline.sh` passed: **30 Python structural tests** and **185 Kotlin assertions**.
 - Kotlin checks cover HTTPS and hostname boundaries, rejecting domain spoofing, protected service hosts, strict filter rules/overrides, URL query sanitization, identity URL discrimination, request counts and bounded Reader behavior.
 - Static checks cover XML parsing, RU/EN parity, privacy manifest defaults, no scheduled jobs, HTTPS-only surface, atomic settings import, conservative domain rules and no Javascript bridge.
 - New offline cases cover URL sharing sanitization (including encoded auth paths), four browser profiles, UI code contracts for external-link and download confirmation, fullscreen, permission cleanup, and legacy storage sanitization.
@@ -73,3 +73,11 @@
 - Verify browser mode does **not** block ads or show WebView-only settings, and switching back to the filtered mode does not claim browser cookies transferred.
 - Launch through the Share Sheet twice on the same Activity; ensure original untrusted extras cannot be reused.
 - Use Android Profiler / tracing to measure whether removing per-navigation cookie flushing improves smoothness without harming session persistence. No benchmark claims from offline tests.
+
+## v0.10.0-rc1 source-only verification — complete (APK pending)
+
+- 30 Python structure tests passed, including RU/EN resource parity, renderer budget hook, filter TXT export integration, release safety gate and no workflow files.
+- 185 pure Kotlin assertions passed, including crash-budget window expiry, restrictions of third-party downloads, hostname boundaries, allow/block matching and import limits.
+- `scripts/prepare-release.sh` was exercised with no APK and correctly refused to produce release artifacts. This is NOT a substitute for verifying a signed APK.
+- Installed tools: JDK and CLI Kotlin. Missing: Android SDK Platform 36, Android build-tools, Gradle distribution, ADB. APK build and on-device compatibility remain unverified.
+- Manual device signoff and a user-owned release-signing key are mandatory before creating a published GitHub Release.

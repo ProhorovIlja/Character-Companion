@@ -123,4 +123,9 @@
     <string name="section_browser_session">СЕССИЯ БРАУЗЕРА</string>
     <string name="browser_session_open">Открыть Character.AI во вкладке браузера</string>
     <string name="browser_session_desc">Для входа через Google и лучшей совместимости. Используется сессия системного браузера, а не cookies WebView приложения. Фильтрация Character Companion, статистика и настройки оформления WebView на эту вкладку не распространяются.</string>
+
+    <string name="renderer_crash_loop">Движок WebView неоднократно завершался. Автоперезапуск остановлен. Попробуйте ещё раз или откройте сайт в браузере.</string>
+    <string name="export_filter_list">Экспортировать список доменов (TXT)</string>
+    <string name="filter_export_success">Список доменов экспортирован</string>
+    <string name="filter_export_failure">Не удалось экспортировать список доменов</string>
 </resources>

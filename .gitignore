@@ -14,3 +14,9 @@ local.properties
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# Manual release outputs, package/signing secrets and QA signoff
+out/
+release-artifacts/
+*signoff*.txt
+*.properties.local

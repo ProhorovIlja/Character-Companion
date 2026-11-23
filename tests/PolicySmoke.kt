@@ -9,9 +9,23 @@ import dev.caicompanion.app.RuleListParser
 import dev.caicompanion.app.IncomingLinkParser
 import dev.caicompanion.app.BrowserProfile
 import dev.caicompanion.app.BrowserSessionPolicy
+import dev.caicompanion.app.RendererRecoveryBudget
 import java.io.StringReader
 
 fun main() {
+    val crashBudget = RendererRecoveryBudget(3, 120_000L)
+    check(crashBudget.allowAutomaticRestart(10_000))
+    check(crashBudget.allowAutomaticRestart(10_100))
+    check(crashBudget.allowAutomaticRestart(10_200))
+    check(!crashBudget.allowAutomaticRestart(10_300))
+    check(crashBudget.allowAutomaticRestart(130_000))
+    check(!crashBudget.allowAutomaticRestart(130_001))
+    check(crashBudget.allowAutomaticRestart(130_100))
+    check(!RendererRecoveryBudget(1, 300).let { it.allowAutomaticRestart(1) && it.allowAutomaticRestart(2) })
+    check(RendererRecoveryBudget(1, 300).allowAutomaticRestart(300))
+    check(DownloadPolicy.classify("https://cdn.evil.example/file.apk") == DownloadPolicy.Kind.BROWSER_ONLY)
+    check(DownloadPolicy.classify("https://a.character.ai/file.txt") == DownloadPolicy.Kind.SAFE_SYSTEM)
+
     val filters = HostBlocker(
         listOf("# ignore", "doubleclick.net", "example.com", "evilnotallowed.net", "http://bad.invalid"),
         listOf("tracker.test", "..invalid", "foo*.com"),
@@ -119,7 +133,7 @@ fun main() {
     check(UrlPolicy.sanitizeBookmark("https://character.ai/chat/%0afoo") == null)
     check(UrlPolicy.sanitizeBookmark("https://character.ai/chat/normal") == "https://character.ai/chat/normal")
     check(DownloadPolicy.classify("https://cdn.character.ai/image.png") == DownloadPolicy.Kind.SAFE_SYSTEM)
-    check(DownloadPolicy.classify("https://cdn.example.org/file.zip") == DownloadPolicy.Kind.SAFE_SYSTEM)
+    check(DownloadPolicy.classify("https://cdn.example.org/file.zip") == DownloadPolicy.Kind.BROWSER_ONLY)
     check(DownloadPolicy.classify("https://cdn.example.org/file.zip?signature=abc") == DownloadPolicy.Kind.BROWSER_ONLY)
     check(DownloadPolicy.classify("https://cdn.example.org/file.zip#fragment") == DownloadPolicy.Kind.BROWSER_ONLY)
     check(DownloadPolicy.classify("https://accounts.google.com/hello") == DownloadPolicy.Kind.BROWSER_ONLY)

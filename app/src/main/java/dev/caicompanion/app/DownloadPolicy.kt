@@ -30,6 +30,9 @@ object DownloadPolicy {
             decodedPath.any { it.isISOControl() || it == '\\' } ||
             decodedPath.split('/').any { it.lowercase(Locale.ROOT) in sensitiveSegments }
         ) return Kind.BROWSER_ONLY
-        return Kind.SAFE_SYSTEM
+        // Untrusted remote hosts are routed to the browser, where the user retains
+        // their browser protections and can review any redirects or prompts.
+        // Only clean first-party URLs are eligible for the system downloader.
+        return if (HostBlocker.isServiceHost(uri.host)) Kind.SAFE_SYSTEM else Kind.BROWSER_ONLY
     }
 }

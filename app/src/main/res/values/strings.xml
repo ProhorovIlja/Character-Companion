@@ -123,4 +123,9 @@
     <string name="section_browser_session">BROWSER SESSION</string>
     <string name="browser_session_open">Open Character.AI in a browser tab</string>
     <string name="browser_session_desc">For Google sign-in and maximum website compatibility. Uses the default browser\'s session, not this app\'s WebView cookies. Character Companion filtering, privacy statistics and WebView appearance settings do not apply inside the browser tab.</string>
+
+    <string name="renderer_crash_loop">The WebView renderer stopped repeatedly. Automatic restarts are paused. Try again, or use the browser button for a separate session.</string>
+    <string name="export_filter_list">Export imported domain rules (TXT)</string>
+    <string name="filter_export_success">Imported domain list exported</string>
+    <string name="filter_export_failure">Could not export imported domain rules</string>
 </resources>

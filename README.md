@@ -1,8 +1,17 @@
 # Character Companion — Android
 
-**v0.9.0 source preview · 23 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
+**v0.10.0-rc1 source candidate · 23 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
 
-**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (27 structural Python tests + 174 Kotlin assertions). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
+**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (30 structural Python tests + 185 Kotlin assertions). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
+
+## v0.10.0-rc1 update (23 November 2026) — NOT an APK release
+
+- **Renderer reliability:** bounded auto-recovery after three WebView renderer crashes in two minutes. Repeated crashes pause auto-restarts and present a retry screen rather than cycling indefinitely.
+- **Portable filter lists:** user-initiated, background-thread TXT export of imported domain block/allow rules via Android Storage Access Framework, without cookies, chats or authentication data. Original user settings JSON remains separate.
+- **Safer downloads:** only clean HTTPS Character.AI-owned URLs may enter Android DownloadManager; other domains are browser-only after confirmation. This reduces exposure to unattended cross-origin downloads.
+- **Media permission lifecycle:** deny pending capture requests on `onStop` after the app becomes hidden; do **not** revoke on `onPause`, which can occur during a legitimate Android runtime permission dialog.
+- **Manual release gate:** `scripts/prepare-release.sh` refuses unsigned/debug, wrong-package, unverified APKs or missing device signoff, and can package source ZIP/tar.gz with checksums **after** a signed and tested APK exists. It never publishes releases or schedules CI. See `docs/RELEASE_PROCESS.md` and pending `docs/RELEASE_NOTES_v0.10.0-rc1.md`.
+- **Evidence:** 30 Python structure tests and 185 standalone Kotlin `check(...)` assertions pass. No Android APK compiled; no device validation or signed release available in this environment.
 
 ## v0.9.0 update (23 November 2026)
 

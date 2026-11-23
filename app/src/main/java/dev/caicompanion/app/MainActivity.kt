@@ -20,6 +20,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.os.Bundle
 import android.os.Environment
+import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
@@ -64,6 +65,7 @@ class MainActivity : Activity() {
         private const val EXPORT_SETTINGS = 703
         private const val IMPORT_SETTINGS = 704
         private const val IMPORT_FILTER_LIST = 705
+        private const val EXPORT_FILTER_LIST = 706
         private val TEXT = Color.rgb(235, 225, 211)
         private val MUTED = Color.rgb(177, 175, 189)
         private val ACCENT = Color.rgb(201, 169, 113)
@@ -90,6 +92,7 @@ class MainActivity : Activity() {
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
     private var destroyed = false
     private var modernBackCallback: OnBackInvokedCallback? = null
+    private val rendererRecovery = RendererRecoveryBudget()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -265,8 +268,13 @@ class MainActivity : Activity() {
                 container.addView(webView, index.coerceAtLeast(0), FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
                 configureWebView(webView)
-                showToast(getString(R.string.browser_restarted))
-                webView.loadUrl(lastUrl.takeIf(UrlPolicy::isInternal) ?: HOME)
+                if (rendererRecovery.allowAutomaticRestart(SystemClock.elapsedRealtime())) {
+                    showToast(getString(R.string.browser_restarted))
+                    webView.loadUrl(lastUrl.takeIf(UrlPolicy::isInternal) ?: HOME)
+                } else {
+                    // A healthy WebView is installed, but must not auto-load in a crash loop.
+                    showError(getString(R.string.renderer_crash_loop))
+                }
                 return true
             }
         }
@@ -284,7 +292,7 @@ class MainActivity : Activity() {
                 titleLabel.text = title?.take(65)?.ifBlank { "character.ai" } ?: "character.ai"
             }
             override fun onPermissionRequest(request: PermissionRequest) = runOnUiThread {
-                requestMediaPermission(request)
+                if (destroyed) request.deny() else requestMediaPermission(request)
             }
             override fun onPermissionRequestCanceled(request: PermissionRequest) = runOnUiThread {
                 if (pendingMedia === request) {
@@ -705,6 +713,9 @@ class MainActivity : Activity() {
         }
         addButton(layout, getString(R.string.filter_edit)) { showFilterRules() }
         addButton(layout, getString(R.string.import_filter_list)) { chooseFilterList() }
+        if (importedRules.size > 0) {
+            addButton(layout, getString(R.string.export_filter_list)) { exportFilterList() }
+        }
         layout.addView(infoLabel(getString(R.string.filter_import_info, importedRules.size)))
         if (importedRules.size > 0) {
             addButton(layout, getString(R.string.clear_imported_filter)) { confirmClearImportedList() }
@@ -887,6 +898,31 @@ class MainActivity : Activity() {
             putExtra(Intent.EXTRA_TITLE, "character-companion-settings.json")
         }, EXPORT_SETTINGS)
     }
+    private fun exportFilterList() {
+        if (importedRules.size == 0) return
+        startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TITLE, "character-companion-filter-domains.txt")
+        }, EXPORT_FILTER_LIST)
+    }
+
+    /** Only normalized, user-imported domain rules leave private storage by explicit action. */
+    private fun writeFilterList(uri: Uri) {
+        val snapshot = importedRules
+        Thread({
+            val saved = runCatching {
+                val output = contentResolver.openOutputStream(uri, "w")
+                    ?: throw java.io.IOException("Document provider returned no output stream")
+                output.bufferedWriter(Charsets.UTF_8).use { it.write(snapshot.canonicalText()) }
+            }.isSuccess
+            runOnUiThread {
+                if (!destroyed) showToast(getString(
+                    if (saved) R.string.filter_export_success else R.string.filter_export_failure))
+            }
+        }, "manual-filter-export").start()
+    }
+
     private fun importSettings() {
         startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -917,6 +953,12 @@ class MainActivity : Activity() {
         CookieManager.getInstance().flush()
     }
     override fun onResume() { super.onResume(); webView.onResume() }
+    override fun onStop() {
+        // Do not revoke while an Android permission dialog merely pauses the Activity.
+        // Revoke a pending WebRTC request when the application actually becomes hidden.
+        denyPendingMedia()
+        super.onStop()
+    }
     override fun onDestroy() {
         destroyed = true
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -949,6 +991,9 @@ class MainActivity : Activity() {
             }
             IMPORT_FILTER_LIST -> if (resultCode == RESULT_OK) data?.data?.let { uri ->
                 importFilterList(uri)
+            }
+            EXPORT_FILTER_LIST -> if (resultCode == RESULT_OK) data?.data?.let { uri ->
+                writeFilterList(uri)
             }
             IMPORT_SETTINGS -> if (resultCode == RESULT_OK) data?.data?.let { uri ->
                 try {
