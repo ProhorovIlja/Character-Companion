@@ -11,10 +11,23 @@ import dev.caicompanion.app.BrowserProfile
 import dev.caicompanion.app.BrowserSessionPolicy
 import dev.caicompanion.app.RendererRecoveryBudget
 import dev.caicompanion.app.NativeLibrarySearch
+import dev.caicompanion.app.NativeWorkspaceNavigation
 import dev.caicompanion.app.SupportReport
 import java.io.StringReader
 
 fun main() {
+    check(NativeWorkspaceNavigation.safeDestination("https://character.ai/chat/abc?access_token=secret") ==
+        "https://character.ai/chat/abc")
+    check(NativeWorkspaceNavigation.safeDestination("https://evil.example/path") == "https://character.ai/")
+    check(NativeWorkspaceNavigation.safeDestination(null) == "https://character.ai/")
+    check(NativeWorkspaceNavigation.needsInitialLoad(null))
+    check(NativeWorkspaceNavigation.needsInitialLoad(""))
+    check(NativeWorkspaceNavigation.needsInitialLoad("about:blank"))
+    check(!NativeWorkspaceNavigation.needsInitialLoad("https://character.ai/"))
+    check(!NativeWorkspaceNavigation.shouldResumeRenderer(false, false))
+    check(!NativeWorkspaceNavigation.shouldResumeRenderer(false, true))
+    check(!NativeWorkspaceNavigation.shouldResumeRenderer(true, true))
+    check(NativeWorkspaceNavigation.shouldResumeRenderer(true, false))
     val library = listOf(
         "Tessa | Gothic" to "https://character.ai/chat/a",
         " Hunter Stories " to "https://character.ai/chat/b?access_token=redacted",
@@ -23,6 +36,11 @@ fun main() {
     )
     check(NativeLibrarySearch.filter(library, "").size == 2)
     check(NativeLibrarySearch.filter(library, "GOTHIC").single().first == "Tessa | Gothic")
+    check(NativeLibrarySearch.filter(listOf(
+        "First title" to "https://character.ai/chat/same",
+        "Hunter alias" to "https://character.ai/chat/same"
+    ), "hunter").single().first == "Hunter alias")
+
     check(NativeLibrarySearch.filter(library, "hunter chat").single().second == "https://character.ai/chat/b")
     check(NativeLibrarySearch.filter(library, "not-safe").isEmpty())
     check(NativeLibrarySearch.filter(library, "", 1).size == 1)

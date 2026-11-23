@@ -95,6 +95,7 @@ class MainActivity : Activity() {
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
     private var destroyed = false
     private var keyboardVisible = false
+    private var activityResumed = false
     private var nativeHub: View? = null
     private var modernBackCallback: OnBackInvokedCallback? = null
     private val rendererRecovery = RendererRecoveryBudget()
@@ -179,7 +180,7 @@ class MainActivity : Activity() {
             // This Activity is singleTop: clear the new, untrusted share Intent too.
             setIntent(Intent(Intent.ACTION_MAIN))
             if (safe == null) showToast(getString(R.string.shared_link_rejected))
-            else { lastUrl = safe; webView.loadUrl(safe) }
+            else openFirstPartyPage(safe)
         }
     }
 
@@ -284,9 +285,10 @@ class MainActivity : Activity() {
                 container.addView(webView, index.coerceAtLeast(0), FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
                 configureWebView(webView)
+                syncRendererLifecycle()
                 if (rendererRecovery.allowAutomaticRestart(SystemClock.elapsedRealtime())) {
                     showToast(getString(R.string.browser_restarted))
-                    webView.loadUrl(lastUrl.takeIf(UrlPolicy::isInternal) ?: HOME)
+                    if (nativeHub == null) webView.loadUrl(NativeWorkspaceNavigation.safeDestination(lastUrl))
                 } else {
                     // A healthy WebView is installed, but must not auto-load in a crash loop.
                     showError(getString(R.string.renderer_crash_loop))
@@ -437,7 +439,9 @@ class MainActivity : Activity() {
         val validResources = resources.isNotEmpty() && resources.all {
             it == PermissionRequest.RESOURCE_AUDIO_CAPTURE || it == PermissionRequest.RESOURCE_VIDEO_CAPTURE
         }
-        if (!store.mediaAllowed || !validResources || !UrlPolicy.isTrustedMediaOrigin(request.origin.toString())) {
+        // A hidden Activity or offline workspace must never surface a media permission prompt.
+        if (!activityResumed || nativeHub != null || !store.mediaAllowed || !validResources ||
+            !UrlPolicy.isTrustedMediaOrigin(request.origin.toString())) {
             request.deny(); return
         }
         pendingMedia?.deny()
@@ -480,7 +484,7 @@ class MainActivity : Activity() {
         val camera = pendingMediaResources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE)
         val permissionOk = (!microphone || checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) &&
             (!camera || checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
-        if (permissionOk && store.mediaAllowed &&
+        if (permissionOk && activityResumed && nativeHub == null && store.mediaAllowed &&
             UrlPolicy.isTrustedMediaOrigin(request.origin.toString()) &&
             UrlPolicy.isTrustedMediaOrigin(webView.url))
             request.grant(pendingMediaResources) else request.deny()
@@ -492,7 +496,7 @@ class MainActivity : Activity() {
         findViewById<View>(R.id.back).setOnClickListener { if (webView.canGoBack()) webView.goBack() }
         findViewById<View>(R.id.forward).setOnClickListener { if (webView.canGoForward()) webView.goForward() }
         findViewById<View>(R.id.reload).setOnClickListener { webView.reload() }
-        findViewById<View>(R.id.home).setOnClickListener { closeNativeHub(); webView.loadUrl(HOME) }
+        findViewById<View>(R.id.home).setOnClickListener { openFirstPartyPage(HOME) }
         findViewById<View>(R.id.home).setOnLongClickListener { showNativeHub(); true }
         findViewById<View>(R.id.open_browser).setOnClickListener {
             openBrowserTab(BrowserSessionPolicy.safeTabUrl(webView.url))
@@ -692,16 +696,13 @@ class MainActivity : Activity() {
         }
         layout.addView(heading)
         layout.addView(infoLabel(getString(R.string.hub_description)))
-        addButton(layout, getString(R.string.hub_continue)) {
-            val destination = UrlPolicy.sanitizeBookmark(lastUrl) ?: HOME
-            closeNativeHub()
-            webView.loadUrl(destination)
-        }
+        addButton(layout, getString(R.string.hub_continue)) { openFirstPartyPage(lastUrl) }
         addButton(layout, getString(R.string.hub_open_browser)) {
             openBrowserTab(BrowserSessionPolicy.HOME)
         }
         addButton(layout, getString(R.string.hub_add_bookmark)) {
-            val url = UrlPolicy.sanitizeBookmark(webView.url)
+            // The native workspace can be visible before the first WebView load.
+            val url = UrlPolicy.sanitizeBookmark(webView.url ?: lastUrl)
             if (url == null) showToast(getString(R.string.link_unavailable))
             else {
                 store.addBookmark(webView.title ?: "Character.AI", url)
@@ -733,15 +734,23 @@ class MainActivity : Activity() {
                 val item = Button(this).apply {
                     text = title
                     isAllCaps = false
+                    textSize = 14f
+                    setTextColor(TEXT)
+                    setBackgroundResource(R.drawable.settings_action)
+                    gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
+                    setPadding(dp(14), dp(10), dp(14), dp(10))
                     minHeight = dp(52)
-                    contentDescription = title
-                    setOnClickListener {
-                        closeNativeHub()
-                        webView.loadUrl(url)
+                    setOnClickListener { openFirstPartyPage(url) }
+                    contentDescription = getString(R.string.hub_bookmark_options_hint, title)
+                    setOnLongClickListener {
+                        showNativeBookmarkActions(title, url) { refresh(search.text.toString()) }
+                        true
                     }
                 }
                 list.addView(item, LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                        bottomMargin = dp(6)
+                    })
             }
         }
         search.addTextChangedListener(object : TextWatcher {
@@ -754,6 +763,8 @@ class MainActivity : Activity() {
         refresh("")
         addButton(layout, getString(R.string.close)) { closeNativeHub() }
         nativeHub = panel
+        // A hidden web page cannot keep a pending microphone/camera prompt alive.
+        denyPendingMedia()
         // Pause timers/media while the independent offline screen covers the site.
         webView.onPause()
         container.addView(panel, FrameLayout.LayoutParams(
@@ -761,14 +772,56 @@ class MainActivity : Activity() {
         panel.bringToFront()
     }
 
-    private fun closeNativeHub() {
+    /** First-party navigation always leaves the native workspace before loading WebView. */
+    private fun openFirstPartyPage(rawUrl: String) {
+        val safeUrl = NativeWorkspaceNavigation.safeDestination(rawUrl)
+        lastUrl = safeUrl
+        closeNativeHub(loadIfBlank = false)
+        webView.loadUrl(safeUrl)
+    }
+
+    private fun closeNativeHub(loadIfBlank: Boolean = true) {
         nativeHub?.let {
             (getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager)
                 ?.hideSoftInputFromWindow(it.windowToken, 0)
             container.removeView(it)
         }
         nativeHub = null
-        if (!destroyed && ::webView.isInitialized) webView.onResume()
+        if (!destroyed && ::webView.isInitialized) {
+            // Closing the native launch screen must never reveal an uninitialized blank WebView.
+            if (loadIfBlank && NativeWorkspaceNavigation.needsInitialLoad(webView.url)) {
+                webView.loadUrl(NativeWorkspaceNavigation.safeDestination(lastUrl))
+            }
+            syncRendererLifecycle()
+        }
+    }
+
+    private fun syncRendererLifecycle() {
+        if (!::webView.isInitialized || destroyed) return
+        if (NativeWorkspaceNavigation.shouldResumeRenderer(activityResumed, nativeHub != null)) {
+            webView.onResume()
+        } else {
+            webView.onPause()
+        }
+    }
+
+    private fun showNativeBookmarkActions(title: String, url: String, onRemoved: () -> Unit) {
+        val options = arrayOf(getString(R.string.hub_bookmark_open),
+            getString(R.string.hub_bookmark_browser), getString(R.string.hub_bookmark_delete))
+        AlertDialog.Builder(this).setTitle(title).setItems(options) { _, selected ->
+            when (selected) {
+                0 -> openFirstPartyPage(url)
+                1 -> openBrowserTab(url)
+                2 -> AlertDialog.Builder(this).setTitle(R.string.hub_bookmark_delete)
+                    .setMessage(R.string.hub_bookmark_confirm_delete)
+                    .setNegativeButton(R.string.cancel, null)
+                    .setPositiveButton(R.string.delete) { _, _ ->
+                        store.removeBookmark(url)
+                        onRemoved()
+                        showToast(getString(R.string.bookmark_removed))
+                    }.show()
+            }
+        }.setNegativeButton(R.string.cancel, null).show()
     }
 
     private fun showBookmarks() {
@@ -781,7 +834,7 @@ class MainActivity : Activity() {
                 when (selected) {
                     0 -> { if (store.addBookmark(webView.title ?: "Character.AI", url)) showToast(getString(R.string.bookmark_saved)) }
                     1 -> { store.removeBookmark(url); showToast(getString(R.string.bookmark_removed)) }
-                    else -> saved.getOrNull(selected - 2)?.second?.let { webView.loadUrl(it) }
+                    else -> saved.getOrNull(selected - 2)?.second?.let(::openFirstPartyPage)
                 }
             }.setNegativeButton(R.string.cancel, null).show()
     }
@@ -1077,6 +1130,43 @@ class MainActivity : Activity() {
         }, IMPORT_SETTINGS)
     }
 
+    /** User-initiated SAF backup I/O must not block the UI thread on slow providers. */
+    private fun writeSettingsBackup(uri: Uri) {
+        // Serialize a bounded snapshot before background I/O so further UI changes stay independent.
+        val snapshot = runCatching { store.exportJson() }.getOrNull()
+        if (snapshot == null) { showToast(getString(R.string.export_failure)); return }
+        Thread({
+            val success = runCatching {
+                val output = contentResolver.openOutputStream(uri, "w")
+                    ?: throw java.io.IOException("Document provider returned no output stream")
+                output.bufferedWriter(Charsets.UTF_8).use { it.write(snapshot) }
+            }.isSuccess
+            runOnUiThread {
+                if (!destroyed) showToast(getString(if (success) R.string.export_success else R.string.export_failure))
+            }
+        }, "manual-backup-export").start()
+    }
+
+    private fun readSettingsBackup(uri: Uri) {
+        Thread({
+            val result = runCatching {
+                val contents = contentResolver.openInputStream(uri)?.bufferedReader()?.use {
+                    BoundedText.read(it, 200_000)
+                }
+                contents != null && store.importJson(contents)
+            }
+            runOnUiThread {
+                if (destroyed) return@runOnUiThread
+                if (result.getOrDefault(false)) {
+                    applySettings(reload = true)
+                    showToast(getString(R.string.import_success))
+                } else {
+                    showToast(getString(if (result.isFailure) R.string.import_failure else R.string.import_unsupported))
+                }
+            }
+        }, "manual-backup-import").start()
+    }
+
     private fun navigateBack() {
         when {
             nativeHub != null -> closeNativeHub()
@@ -1096,11 +1186,16 @@ class MainActivity : Activity() {
         super.onSaveInstanceState(outState)
     }
     override fun onPause() {
+        activityResumed = false
         super.onPause()
-        webView.onPause()
+        syncRendererLifecycle()
         CookieManager.getInstance().flush()
     }
-    override fun onResume() { super.onResume(); webView.onResume() }
+    override fun onResume() {
+        super.onResume()
+        activityResumed = true
+        syncRendererLifecycle()
+    }
     override fun onStop() {
         // Do not revoke while an Android permission dialog merely pauses the Activity.
         // Revoke a pending WebRTC request when the application actually becomes hidden.
@@ -1130,30 +1225,14 @@ class MainActivity : Activity() {
                 chooser?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data))
                 chooser = null
             }
-            EXPORT_SETTINGS -> if (resultCode == RESULT_OK) data?.data?.let { uri ->
-                try {
-                    val output = contentResolver.openOutputStream(uri, "w")
-                        ?: throw java.io.IOException("Document provider returned no output stream")
-                    output.bufferedWriter(Charsets.UTF_8).use { it.write(store.exportJson()) }
-                    showToast(getString(R.string.export_success))
-                } catch (_: Exception) { showToast(getString(R.string.export_failure)) }
-            }
+            EXPORT_SETTINGS -> if (resultCode == RESULT_OK) data?.data?.let(::writeSettingsBackup)
             IMPORT_FILTER_LIST -> if (resultCode == RESULT_OK) data?.data?.let { uri ->
                 importFilterList(uri)
             }
             EXPORT_FILTER_LIST -> if (resultCode == RESULT_OK) data?.data?.let { uri ->
                 writeFilterList(uri)
             }
-            IMPORT_SETTINGS -> if (resultCode == RESULT_OK) data?.data?.let { uri ->
-                try {
-                    val contents = contentResolver.openInputStream(uri)?.bufferedReader()?.use {
-                        BoundedText.read(it, 200_000)
-                    }
-                    if (contents != null && store.importJson(contents)) {
-                        applySettings(reload = true); showToast(getString(R.string.import_success))
-                    } else showToast(getString(R.string.import_unsupported))
-                } catch (_: Exception) { showToast(getString(R.string.import_failure)) }
-            }
+            IMPORT_SETTINGS -> if (resultCode == RESULT_OK) data?.data?.let(::readSettingsBackup)
         }
     }
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {

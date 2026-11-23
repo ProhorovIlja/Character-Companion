@@ -1,4 +1,4 @@
-# Character Companion v0.12.0-rc1 — Android release notes
+# Character Companion v0.14.0-rc1 — Android release notes
 
 **Unofficial Character.AI browser companion. Not affiliated with Character.AI.**
 

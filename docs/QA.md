@@ -1,4 +1,4 @@
-# Quality assurance · 2026-11-23 · v0.13.0-rc1
+# Quality assurance · 2026-11-23 · v0.14.0-rc1
 
 ## Completed in offline environment
 
@@ -114,3 +114,13 @@
 - Export/import manual JSON; ensure hub preference survives and **camera/microphone request permission remains off after import** even if backup contained `mediaAllowed: true`.
 - Measure Android app startup time, frame jank, memory PSS and battery against the v0.12 shell and official client; no performance claim until hardware measurement.
 - Install debug APK from a full verified Git checkout only after real Gradle/Android SDK build; do not publish a GitHub Release until an independently signed APK passes device QA.
+
+## v0.14 workspace / lifecycle / bookmark regressions — PENDING ON DEVICE
+
+- Launch offline with native workspace enabled. Press Close or Android Back: the WebView must start a safe Character.AI page instead of showing a blank canvas.
+- While the workspace is visible, background/foreground the application repeatedly; embedded media/timers must remain paused until the workspace is dismissed.
+- Share a valid Character.AI character link from another app while Character Companion already displays its native workspace; the workspace should close and the shared page should load in WebView.
+- Long-press a saved library item: open internally, open in browser, or remove after confirmation. Deleting the local link must not affect the remote Character.AI conversation.
+- Import a JSON settings backup from a slow document provider; the application must remain responsive. Export must report errors when no writable SAF stream is supplied.
+- From a hidden app or native workspace, ensure WebRTC microphone/camera requests cannot show a permission prompt or be granted.
+- Repeat on Android 10, 13, 16 and Pixel 8a LineageOS Android 17. Confirm keyboard insets, predictive Back, rotation and accessibility.

@@ -6,6 +6,13 @@
 - Custom native workspace starts without a network request; WebView is only navigated when the user elects to use Character.AI, or when native workspace is disabled.
 - Settings persisted locally. No scripts injected into first-party pages, no JavaScript credential bridges, no undocumented account tokens, no scheduled tasks/CI/background telemetry.
 
+## Native workspace state machine (v0.14)
+
+- The workspace, browser navigation, lifecycle and permission prompts have explicit boundaries. `NativeWorkspaceNavigation.kt` contains testable, Android-free policy decisions.
+- Dismissing an initial offline workspace triggers a safe first-party navigation instead of exposing a blank WebView. New shared links dismiss the workspace before navigating.
+- Renderer `onResume()` is gated on Activity visibility and the absence of the native overlay; background media grants are denied. These prevent unnecessary work and unwanted prompts, but device verification is still pending.
+- Long-press saved links exposes native actions, with a separate user confirmation for local deletion. The network page is not scraped or modified.
+
 ## Integration boundary (Character.AI)
 
 - Official Android version 1.17.4 observed in a legally user-provided XAPK is React Native + Hermes + Skia + WebRTC; this is a reference for architecture, **not** permission or ability to transplant proprietary code. See `OFFICIAL_APK_AUDIT_1.17.4.md`.

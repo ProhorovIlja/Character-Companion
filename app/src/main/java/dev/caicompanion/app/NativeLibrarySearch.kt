@@ -18,10 +18,11 @@ object NativeLibrarySearch {
         val seen = HashSet<String>()
         for ((rawTitle, rawUrl) in bookmarks) {
             val url = UrlPolicy.sanitizeBookmark(rawUrl) ?: continue
-            if (!seen.add(url)) continue
             val title = rawTitle.take(90).ifBlank { "Character.AI" }
             val searchable = (title + " " + url).lowercase(Locale.ROOT)
-            if (terms.all { searchable.contains(it) }) {
+            // Deduplicate after matching: a differently titled duplicate may be the
+            // only entry that matches the user's current search.
+            if (terms.all { searchable.contains(it) } && seen.add(url)) {
                 matched.add(title to url)
                 if (matched.size >= limit.coerceIn(0, 100)) break
             }

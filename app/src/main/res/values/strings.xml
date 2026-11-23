@@ -143,4 +143,9 @@
     <string name="hub_library">YOUR OFFLINE LIBRARY</string>
     <string name="hub_search_hint">Search saved characters and pages</string>
     <string name="hub_empty">No matching bookmarks. Save a page to build your library.</string>
+    <string name="hub_bookmark_options_hint">%1$s. Long-press for bookmark options</string>
+    <string name="hub_bookmark_open">Open in Character Companion</string>
+    <string name="hub_bookmark_browser">Open in system browser</string>
+    <string name="hub_bookmark_delete">Remove this bookmark</string>
+    <string name="hub_bookmark_confirm_delete">Remove this saved link from the offline library? This does not delete any Character.AI conversation.</string>
 </resources>

@@ -143,4 +143,9 @@
     <string name="hub_library">ВАША ОФЛАЙН-БИБЛИОТЕКА</string>
     <string name="hub_search_hint">Поиск по сохранённым персонажам и страницам</string>
     <string name="hub_empty">Совпадений нет. Сохраните страницу, чтобы пополнить библиотеку.</string>
+    <string name="hub_bookmark_options_hint">%1$s. Удерживайте для управления закладкой</string>
+    <string name="hub_bookmark_open">Открыть в Character Companion</string>
+    <string name="hub_bookmark_browser">Открыть в системном браузере</string>
+    <string name="hub_bookmark_delete">Удалить эту закладку</string>
+    <string name="hub_bookmark_confirm_delete">Удалить сохранённую ссылку из офлайн-библиотеки? Переписка в Character.AI не удаляется.</string>
 </resources>

@@ -1,6 +1,6 @@
 # Character Companion — Android
 
-**v0.13.0-rc1 source candidate (23 November 2026).** Adds a native offline workspace with searchable saved links. No Android APK was built or device-tested in this environment. See [Native architecture](docs/NATIVE_ARCHITECTURE.md) and [release notes](docs/RELEASE_NOTES_v0.13.0-rc1.md).
+**v0.14.0-rc1 source candidate (23 November 2026).** Fixes native workspace lifecycle, shared-link routing, local bookmark actions, and asynchronous manual settings backups; microphone/camera prompts are blocked while the app or workspace is hidden. Offline tests pass. No verified APK or Android 17 device test. See [native architecture](docs/NATIVE_ARCHITECTURE.md) and [release notes](docs/RELEASE_NOTES_v0.14.0-rc1.md).
 
 
 **Previous v0.12.0-rc1 source candidate · 23 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.

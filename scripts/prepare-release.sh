@@ -3,7 +3,7 @@
 # Never creates a GitHub Release, starts CI, schedules tasks or stores signing keys.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-VERSION='0.13.0-rc1'
+VERSION='0.14.0-rc1'
 PKG='dev.caicompanion.app'
 APK="${1:-}"
 SIGNOFF="${2:-}"
@@ -40,7 +40,7 @@ fi
 BADGING="$($AAPT dump badging "$APK" 2>&1)" || {
   echo 'APK manifest inspection failed.' >&2; exit 2;
 }
-if ! grep -Eq "^package: name='$PKG' versionCode='13' versionName='$VERSION'" <<< "$BADGING"; then
+if ! grep -Eq "^package: name='$PKG' versionCode='14' versionName='$VERSION'" <<< "$BADGING"; then
   echo 'Package ID/version mismatch. Refusing to label APK as this version.' >&2; exit 2
 fi
 if ! command -v unzip >/dev/null || ! unzip -tq "$APK" >/dev/null; then

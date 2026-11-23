@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.14.0-rc1 — 2026-11-23 (source candidate; no APK)
+
+- Fixed blank WebView when dismissing a native first-run workspace before browser navigation.
+- Fixed hidden WebView being resumed by Android lifecycle while native workspace remains visible.
+- Incoming Android Share links now close the workspace before navigating to a sanitized first-party URL.
+- Long-press offline bookmark to open internally, open in system browser, or remove with confirmation; RU/EN accessibility strings included.
+- Fixed duplicate URL search where the matching later title could be skipped during deduplication.
+- User-initiated SAF settings import/export now performs potentially slow I/O off the main UI thread.
+- Deny camera/microphone prompts while the Activity is hidden or the native workspace is displayed, including grants that finish after app backgrounding.
+- 48 offline Python tests and 224 Kotlin policy assertions passed. No SDK build, APK signing, Google/Apple login verification or Android 17 device testing.
+
+
 ## v0.13.0-rc1 — 2026-11-23 (source candidate; no APK)
 
 - New fully native offline startup workspace and searchable local bookmark library, bilingual UI, privacy shortcuts and explicit browser handoff.
