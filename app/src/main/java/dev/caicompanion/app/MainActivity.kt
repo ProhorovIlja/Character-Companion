@@ -91,6 +91,7 @@ class MainActivity : Activity() {
     private var fullscreenView: View? = null
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
     private var destroyed = false
+    private var keyboardVisible = false
     private var modernBackCallback: OnBackInvokedCallback? = null
     private val rendererRecovery = RendererRecoveryBudget()
 
@@ -123,9 +124,12 @@ class MainActivity : Activity() {
         // Android 15/16 enforce edge-to-edge. Keep native controls outside system bars.
         val root = findViewById<View>(R.id.root)
         root.setOnApplyWindowInsetsListener { target, insets ->
-            if (Build.VERSION.SDK_INT >= 30) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                // Actual IME visibility, not a height heuristic that fails in multi-window.
                 val bars = insets.getInsets(WindowInsets.Type.systemBars())
+                keyboardVisible = insets.isVisible(WindowInsets.Type.ime())
                 target.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+                updateFooterVisibility()
             } else {
                 @Suppress("DEPRECATION")
                 target.setPadding(insets.systemWindowInsetLeft, insets.systemWindowInsetTop,
@@ -134,11 +138,13 @@ class MainActivity : Activity() {
             insets
         }
         root.requestApplyInsets()
-        // Respect the IME by hiding footer while typing in the website.
-        root.viewTreeObserver.addOnGlobalLayoutListener {
-            val visible = android.graphics.Rect().also { root.getWindowVisibleDisplayFrame(it) }
-            val keyboardVisible = root.rootView.height - visible.bottom > 180 * resources.displayMetrics.density
-            footer.visibility = if (keyboardVisible || fullscreenView != null) View.GONE else View.VISIBLE
+        // Android 10: fall back to layout bounds because WindowInsets.Type.ime() is API 30+.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            root.viewTreeObserver.addOnGlobalLayoutListener {
+                val visible = android.graphics.Rect().also { root.getWindowVisibleDisplayFrame(it) }
+                keyboardVisible = root.rootView.height - visible.bottom > 180 * resources.displayMetrics.density
+                updateFooterVisibility()
+            }
         }
         // Do not persist browser history / OAuth state in framework instance-state Bundles.
         // Orientation is handled through configChanges; after process death restore only
@@ -246,6 +252,12 @@ class MainActivity : Activity() {
             override fun onReceivedError(view: WebView?, request: WebResourceRequest, error: WebResourceError) {
                 if (request.isForMainFrame && !destroyed) {
                     showError(error.description?.toString() ?: getString(R.string.error_loading))
+                }
+            }
+            override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest,
+                response: android.webkit.WebResourceResponse) {
+                if (!destroyed && request.isForMainFrame && response.statusCode in 500..599) {
+                    showError(getString(R.string.error_server, response.statusCode))
                 }
             }
             override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler, error: android.net.http.SslError?) {
@@ -361,6 +373,13 @@ class MainActivity : Activity() {
             } catch (_: Exception) { showToast(getString(R.string.error_download)) }
     }
 
+    /** Shared by IME insets, fullscreen video and settings; never obscure active text fields. */
+    private fun updateFooterVisibility() {
+        if (::footer.isInitialized) {
+            footer.visibility = if (keyboardVisible || fullscreenView != null) View.GONE else View.VISIBLE
+        }
+    }
+
     private fun enterFullscreen(customView: View, callback: WebChromeClient.CustomViewCallback) {
         if (fullscreenView != null || destroyed) {
             callback.onCustomViewHidden()
@@ -388,7 +407,7 @@ class MainActivity : Activity() {
         window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
         webView.visibility = View.VISIBLE
         header.visibility = if (store.compactChrome || fullscreenView != null) View.GONE else View.VISIBLE
-        footer.visibility = View.VISIBLE
+        updateFooterVisibility()
     }
 
     private fun desktopAgent(): String = defaultAgent.replace(Regex("\\([^)]*\\)"), "(X11; Linux x86_64)")
@@ -491,6 +510,9 @@ class MainActivity : Activity() {
         findViewById<View>(R.id.filter).setOnLongClickListener { showFilterRules(); true }
         findViewById<View>(R.id.settings).setOnClickListener { showSettings() }
         findViewById<View>(R.id.error_retry).setOnClickListener { errorOverlay.visibility = View.GONE; webView.loadUrl(lastUrl) }
+        findViewById<View>(R.id.error_open_browser).setOnClickListener {
+            openBrowserTab(BrowserSessionPolicy.safeTabUrl(lastUrl))
+        }
     }
 
     private fun confirmIdentityNavigation(url: String) {
@@ -560,8 +582,26 @@ class MainActivity : Activity() {
             packageInfo?.versionName ?: "unknown", appMegabytes,
             filter.ruleCount(), filter.blockedRequestCount.get(),
             if (store.blocking) getString(R.string.enabled) else getString(R.string.disabled))
+        val snapshot = SupportReport.Snapshot(
+            appVersion = BuildConfig.VERSION_NAME,
+            androidApi = Build.VERSION.SDK_INT,
+            webViewPackage = packageInfo?.packageName,
+            webViewVersion = packageInfo?.versionName,
+            javaHeapMb = appMegabytes.toLong(),
+            filterRuleCount = filter.ruleCount(),
+            importedRuleCount = importedRules.size,
+            blockedRequests = filter.blockedRequestCount.get(),
+            rendererRestarts = rendererRecovery.recentRestartCount(SystemClock.elapsedRealtime()),
+            protectionEnabled = store.blocking,
+            strictBlocking = store.strictBlocking
+        )
         AlertDialog.Builder(this).setTitle(R.string.diagnostics).setMessage(text)
-            .setNeutralButton(R.string.privacy_stats) { _, _ -> showPrivacyStats() }
+            .setNeutralButton(R.string.diagnostics_copy) { _, _ ->
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("Character Companion diagnostics",
+                    SupportReport.format(snapshot)))
+                showToast(getString(R.string.diagnostics_copied))
+            }
             .setPositiveButton(R.string.confirm, null).show()
     }
     private fun showPrivacyStats() {
@@ -613,6 +653,7 @@ class MainActivity : Activity() {
         filter.strict = store.strictBlocking
         filter.replace(store.customRules, store.excludeRules, importedRules)
         header.visibility = if (store.compactChrome || fullscreenView != null) View.GONE else View.VISIBLE
+        updateFooterVisibility()
         if (::webView.isInitialized) {
             webView.setBackgroundColor(if (store.darkCanvas) Color.rgb(17, 18, 25) else Color.WHITE)
             webView.settings.textZoom = store.textZoom

@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.12.0-rc1 — 2026-11-23 (source candidate; no APK)
+
+- Android 11–17 IME tracking uses system WindowInsets, with Android 10 layout fallback.
+- Footer state preserved across video fullscreen and keyboard transitions.
+- Main-frame HTTP 5xx error handling with a separate browser fallback.
+- Manual, bounded privacy-safe support report copy, no chat URLs or credentials.
+- 47 Python tests and 200 pure Kotlin assertions passed. Android SDK build remains unavailable.
+
+
 ## v0.11.0-rc1 — 2026-11-23 (source candidate; no APK release)
 
 - Added isolated, read-only XAPK inspection with basic binary Android Manifest analysis and ZIP traversal safeguards; SHA-256 verified reconstruction from original raw chunks; synthetic fixtures and tests.

@@ -33,3 +33,7 @@ The command only reads OS API, whether a LineageOS version property exists, and 
 ## Google Play Protect
 
 There is **no legitimate technical switch that guarantees suppressing installation warnings** for a sideloaded APK. Google may prompt for a scan even if the APK is properly signed and harmless. Stable developer signing identity, clean permissions, reproducible artifacts and optional distribution through Google Play improve trust, but cannot promise zero prompts. Avoid disabling Play Protect or impersonating the official Character.AI app. [Google guidance](https://developers.google.com/android/play-protect/warning-dev-guidance).
+
+## v0.12.0 source update
+
+For Android 11–17, the shell now checks `WindowInsets.Type.ime()` instead of using window-height heuristics. The footer remains hidden until both fullscreen media and IME are dismissed. This is source-level behavior and remains unverified on the owner's Pixel 8a. The error screen can open an isolated browser session; the diagnostic report is copied only by explicit user action and excludes account/URL content.

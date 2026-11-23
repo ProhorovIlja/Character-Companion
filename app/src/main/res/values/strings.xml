@@ -128,4 +128,7 @@
     <string name="export_filter_list">Export imported domain rules (TXT)</string>
     <string name="filter_export_success">Imported domain list exported</string>
     <string name="filter_export_failure">Could not export imported domain rules</string>
+    <string name="diagnostics_copy">Copy diagnostics</string>
+    <string name="diagnostics_copied">Diagnostics copied to clipboard</string>
+    <string name="error_server">Server error (HTTP %1$d). Retry or open in browser.</string>
 </resources>

@@ -14,13 +14,23 @@ class RendererRecoveryBudget(
 
     private val restarts = ArrayDeque<Long>()
 
-    /** Returns false when a crash loop requires explicit user intervention. */
-    @Synchronized fun allowAutomaticRestart(elapsedRealtime: Long): Boolean {
+    private fun prune(elapsedRealtime: Long) {
         require(elapsedRealtime >= 0)
         if (restarts.isNotEmpty() && elapsedRealtime < restarts.peekLast()) restarts.clear()
         while (restarts.isNotEmpty() && elapsedRealtime - restarts.peekFirst() >= windowMillis) {
             restarts.removeFirst()
         }
+    }
+
+    /** No URLs or crash-stack traces are stored, only timestamps for the current process. */
+    @Synchronized fun recentRestartCount(elapsedRealtime: Long): Int {
+        prune(elapsedRealtime)
+        return restarts.size
+    }
+
+    /** Returns false when a crash loop requires explicit user intervention. */
+    @Synchronized fun allowAutomaticRestart(elapsedRealtime: Long): Boolean {
+        prune(elapsedRealtime)
         if (restarts.size >= maximum) return false
         restarts.addLast(elapsedRealtime)
         return true

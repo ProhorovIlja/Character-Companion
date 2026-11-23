@@ -98,3 +98,9 @@
 - Received and inspected the second, 180,553,623-byte XAPK. Confirmed `ai.character.app`, 1.17.4 (162), min API 24, target API 36, 88 split APKs, 14 base DEX and 47 ARM64 libraries. See `docs/OFFICIAL_APK_AUDIT_1.17.4.md`.
 - Extracted cert fingerprints from v2/v3 APK Signing Blocks of three modules and compared them to historical APKMirror listing. This is **not** cryptographic signature verification.
 - The originally supplied 278,738,234-byte XAPK was never downloaded. Do not assert same content. No Android app was run, no private API was used, no Character Companion APK compiled.
+
+## v0.12.0-rc1 source verification
+
+- 47 Python structural/unit tests and 200 pure Kotlin assertions pass locally.
+- New cases cover Android 17 IME WindowInsets usage, native error fallback, explicit diagnostic copy, sanitization of untrusted version/provider text, renderer crash counters and localized Android resources.
+- No Android SDK build, lint, emulator, Google OAuth return, calls or device performance benchmark performed.

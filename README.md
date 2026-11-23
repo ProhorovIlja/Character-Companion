@@ -1,8 +1,8 @@
 # Character Companion — Android
 
-**v0.11.0-rc1 source candidate · 23 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
+**v0.12.0-rc1 source candidate · 23 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
 
-**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (45 Python unit/structural tests + the existing Kotlin policy suite). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
+**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (47 Python unit/structural tests + 200 Kotlin `check` assertions). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
 
 ## v0.11.0-rc1 — Android 17 & XAPK research readiness (NOT an APK release)
 
@@ -123,3 +123,10 @@ These checks validate policy logic and source structure, **not** Android compila
 - Use an updated Android System WebView and test after any Character.AI frontend change.
 
 The source tree and technical limitations are documented in [docs/SECURITY.md](docs/SECURITY.md), [docs/RESEARCH.md](docs/RESEARCH.md), [docs/QA.md](docs/QA.md), and [docs/CHANGELOG.md](docs/CHANGELOG.md). Third-party repositories were evaluated as references only: **no code was copied** without verification of licensing and fit.
+
+## v0.12.0-rc1 (source-only) — Android 17 usability and explicit diagnostics
+
+- Android 11–17 use WindowInsets IME visibility rather than a fixed keyboard-height guess; Android 10 retains a fallback. Fullscreen media and keyboard visibility now share footer state.
+- Main-frame HTTP 5xx errors provide a retry and a browser-session fallback. OAuth and errors on subresources are not treated as a page failure.
+- Diagnostics may be copied **only on explicit user action**. The bounded report contains app/WebView version, Android API, rule counts, session-only block and renderer counters. It omits URLs, account identifiers, cookies, message content and device IDs.
+- Source-only RC; no built/tested APK or GitHub Release. Android SDK/Gradle/ADB and real Android 17 hardware tests are still required.

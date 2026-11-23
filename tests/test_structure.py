@@ -177,7 +177,7 @@ class Structure(unittest.TestCase):
         self.assertIn('BoundedText.read(reader, RuleListParser.MAX_CHARACTERS)', activity)
         self.assertIn('IMPORT_FILTER_LIST ->', activity)
         self.assertIn('if (configuration == appliedConfiguration) return', engine)
-        self.assertIn('RuleListParser,IncomingLinkParser,BrowserSessionPolicy,RendererRecoveryBudget}.kt', script)
+        self.assertIn('RuleListParser,IncomingLinkParser,BrowserSessionPolicy,RendererRecoveryBudget,SupportReport}.kt', script)
         self.assertNotIn('https://easylist.to/easylist/easylist.txt', activity)
         self.assertNotIn('PeriodicWorkRequest', activity)
 
@@ -257,7 +257,9 @@ class Structure(unittest.TestCase):
     def test_browser_dependencies_are_pinned_without_new_permissions(self):
         build=(ROOT/'app/build.gradle.kts').read_text()
         manifest=(ROOT/'app/src/main/AndroidManifest.xml').read_text()
-        self.assertIn('versionName = "0.11.0-rc1"', build)
+        self.assertIn('versionName = "0.12.0-rc1"', build)
+        self.assertIn("VERSION='0.12.0-rc1'", (ROOT/'scripts/prepare-release.sh').read_text())
+        self.assertIn("versionCode='12'", (ROOT/'scripts/prepare-release.sh').read_text())
         self.assertIn('androidx.browser:browser:1.10.0', build)
         self.assertIn('androidx.webkit:webkit:1.18.0', build)
         self.assertNotIn('android.permission.QUERY_ALL_PACKAGES', manifest)
@@ -306,5 +308,28 @@ class Structure(unittest.TestCase):
             root=ET.parse(ROOT/'app/src/main/res'/locale/'strings.xml').getroot()
             keys=[el.attrib.get('name') for el in root if el.tag == 'string']
             self.assertEqual(len(keys),len(set(keys)))
+
+
+    def test_android17_ime_and_error_recovery_ui(self):
+        activity=(ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
+        layout=(ROOT/'app/src/main/res/layout/activity_main.xml').read_text()
+        self.assertIn('insets.isVisible(WindowInsets.Type.ime())', activity)
+        self.assertIn('if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R)', activity)
+        self.assertIn('updateFooterVisibility()', activity)
+        self.assertIn('response.statusCode in 500..599', activity)
+        self.assertIn('R.id.error_open_browser', activity)
+        self.assertIn('@+id/error_open_browser', layout)
+        self.assertIn('BrowserSessionPolicy.safeTabUrl(lastUrl)', activity)
+
+    def test_opt_in_support_report_never_includes_chat_data(self):
+        report=(ROOT/'app/src/main/java/dev/caicompanion/app/SupportReport.kt').read_text()
+        activity=(ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
+        self.assertIn('data class Snapshot',report)
+        self.assertNotIn('getCookie(', report)
+        self.assertNotIn('lastVisited', report)
+        self.assertNotIn('androidId', report)
+        self.assertIn('setNeutralButton(R.string.diagnostics_copy)',activity)
+        self.assertIn('SupportReport.format(snapshot)',activity)
+        self.assertIn('rendererRecovery.recentRestartCount(',activity)
 
 if __name__=='__main__': unittest.main()

@@ -128,4 +128,7 @@
     <string name="export_filter_list">Экспортировать список доменов (TXT)</string>
     <string name="filter_export_success">Список доменов экспортирован</string>
     <string name="filter_export_failure">Не удалось экспортировать список доменов</string>
+    <string name="diagnostics_copy">Скопировать диагностику</string>
+    <string name="diagnostics_copied">Диагностика скопирована</string>
+    <string name="error_server">Ошибка сервера (HTTP %1$d). Повторите запрос или откройте сайт в браузере.</string>
 </resources>

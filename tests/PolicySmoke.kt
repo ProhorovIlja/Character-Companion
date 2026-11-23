@@ -10,6 +10,7 @@ import dev.caicompanion.app.IncomingLinkParser
 import dev.caicompanion.app.BrowserProfile
 import dev.caicompanion.app.BrowserSessionPolicy
 import dev.caicompanion.app.RendererRecoveryBudget
+import dev.caicompanion.app.SupportReport
 import java.io.StringReader
 
 fun main() {
@@ -250,5 +251,31 @@ fun main() {
     check(BrowserSessionPolicy.safeTabUrl("https://c.ai:444/chats") == "https://character.ai/")
     check(BrowserSessionPolicy.safeTabUrl("https://character.ai/?token=SECRET") == "https://character.ai/")
     check(BrowserSessionPolicy.safeTabUrl("https://character.ai/../auth") == "https://character.ai/")
+    // Minimal, user-initiated diagnostics cannot accidentally expose a URL or token.
+    val support = SupportReport.format(SupportReport.Snapshot(
+        appVersion = "0.12.0-rc1\nhttps://example.test/?token=SENSITIVE",
+        androidApi = 37,
+        webViewPackage = "com.android.webview\nAuthorization:Bearer SECRET",
+        webViewVersion = "150.0.0.0", javaHeapMb = 120,
+        filterRuleCount = 42, importedRuleCount = 7,
+        blockedRequests = 99L, rendererRestarts = 2,
+        protectionEnabled = true, strictBlocking = false
+    ))
+    check("Android 17 runtime: yes" in support)
+    check("Imported domains: 7" in support)
+    check("Automatic renderer restarts: 2" in support)
+    check(!support.contains("https://"))
+    check(!support.contains("SENSITIVE"))
+    check(!support.contains("Authorization"))
+    check(!support.contains("Bearer"))
+    check(support.length < 800)
+    val budgetForReport = RendererRecoveryBudget(maximum = 2, windowMillis = 10_000)
+    check(budgetForReport.recentRestartCount(0L) == 0)
+    check(budgetForReport.allowAutomaticRestart(1000L))
+    check(budgetForReport.recentRestartCount(1001L) == 1)
+    check(budgetForReport.allowAutomaticRestart(2000L))
+    check(!budgetForReport.allowAutomaticRestart(3000L))
+    check(budgetForReport.recentRestartCount(11_000L) == 1)
+    check(budgetForReport.recentRestartCount(12_000L) == 0)
     println("PolicySmoke: browser policy, concurrency, URL safety and local statistics assertions passed")
 }
