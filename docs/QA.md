@@ -91,3 +91,10 @@
 - Android 17 diagnostic script tests use a mocked `adb`; no real phone was connected and no auth, voice, UI or battery data was gathered.
 - AGP 8.13 API support max 36.1; keep target/compile SDK 36 and test runtime API 37 on a real LineageOS build before claiming compatibility.
 - Check that manual source packaging rejects unsigned/debug/no-signoff APKs, and that `aapt dump badging` is used for APK metadata.
+
+
+## Official Character.AI 1.17.4 static XAPK research (post-rc1 addendum)
+
+- Received and inspected the second, 180,553,623-byte XAPK. Confirmed `ai.character.app`, 1.17.4 (162), min API 24, target API 36, 88 split APKs, 14 base DEX and 47 ARM64 libraries. See `docs/OFFICIAL_APK_AUDIT_1.17.4.md`.
+- Extracted cert fingerprints from v2/v3 APK Signing Blocks of three modules and compared them to historical APKMirror listing. This is **not** cryptographic signature verification.
+- The originally supplied 278,738,234-byte XAPK was never downloaded. Do not assert same content. No Android app was run, no private API was used, no Character Companion APK compiled.

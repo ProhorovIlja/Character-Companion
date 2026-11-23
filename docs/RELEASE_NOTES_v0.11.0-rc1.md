@@ -24,3 +24,8 @@
 - Official Character.AI XAPK: **IDENTIFIED BY METADATA, CONTENT NOT FETCHED** (278,738,234 > 268,435,456 byte transfer limit)
 
 The project is unofficial and not endorsed by Character.AI. No automated jobs, workflows, scheduled tasks or background monitoring were created.
+
+
+## Post-publication research addendum (23 November 2026)
+
+A separate smaller, user-supplied 180,553,623-byte XAPK was fetched successfully after this source candidate was created. Static inspection found official Character.AI v1.17.4 (162), React Native/Hermes, native WebRTC components, and target SDK 36. The earlier 278,738,234-byte archive remains over the Drive connector limit. See `docs/OFFICIAL_APK_AUDIT_1.17.4.md`. No APK build, runtime compatibility test, official signing verification, or Character Calls implementation resulted from this research.

@@ -3,7 +3,7 @@
 ## v0.11.0-rc1 — 2026-11-23 (source candidate; no APK release)
 
 - Added isolated, read-only XAPK inspection with basic binary Android Manifest analysis and ZIP traversal safeguards; SHA-256 verified reconstruction from original raw chunks; synthetic fixtures and tests.
-- Added manual 190-MiB XAPK splitter for files larger than the 256-MiB Drive connector transfer limit. The official 278,738,234-byte Character.AI XAPK **was not downloaded**; its actual app internals remain unexamined.
+- Added manual 190-MiB XAPK splitter for files larger than the 256-MiB Drive connector transfer limit. The original 278,738,234-byte Character.AI XAPK **was not downloaded**. A second smaller 180,553,623-byte XAPK was later downloaded and audited statically; findings are in `docs/OFFICIAL_APK_AUDIT_1.17.4.md`.
 - Android 17 / LineageOS read-only preflight and Pixel 8a compatibility plan. The current AGP 8.13 toolchain supports `compileSdk 36` only; target SDK remains 36 pending verified migration.
 - Explicit resizeable Activity and corrected manual release `aapt` choice. No signed APK, tests on hardware, scheduled operations or GitHub Release.
 

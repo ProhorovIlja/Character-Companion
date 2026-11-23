@@ -1,10 +1,12 @@
 # Official Character.AI XAPK — read-only analysis plan
 
-## Source and access blocker (23 November 2026)
+## Source and transfer status (23 November 2026)
 
-User supplied `Character+AI_+Chat,+Talk,+Text_1.17.4_APKPure.xapk` in the specified private Google Drive folder (gungrain@gmail.com). Drive metadata reports **278,738,234 bytes** (`application/x-zip`). The connected Drive download explicitly rejects files above **268,435,456 bytes (256 MiB)** with HTTP 413. **The binary was NOT read or unpacked, and no app architecture, permissions, signature, or code findings can be claimed from it.** The app version string is only from the filename.
+**Research update:** A second XAPK, `character-ai-1-17-4.xapk` (180,553,623 bytes), was subsequently uploaded to the same private Drive folder and successfully downloaded. Its static metadata **has now been inspected**; see [OFFICIAL_APK_AUDIT_1.17.4.md](OFFICIAL_APK_AUDIT_1.17.4.md). The original, different 278,738,234-byte APKPure XAPK remains inaccessible because of the 256-MiB limit. Do not conflate these two archives or claim they have matching hashes.
 
-The source is a third-party APKPure package. Its authenticity, publisher signing certificate and equivalence to the Google Play build are unverified. Never execute, install or redistribute unverified app modules automatically. Do not publish copied Character.AI code, binaries, icons, assets or decompiled source to the public project repository.
+User supplied `Character+AI_+Chat,+Talk,+Text_1.17.4_APKPure.xapk` in the specified private Google Drive folder (gungrain@gmail.com). Drive metadata reports **278,738,234 bytes** (`application/x-zip`). The connected Drive download explicitly rejects files above **268,435,456 bytes (256 MiB)** with HTTP 413. **This original, larger binary was NOT read or unpacked.** The newer, smaller user-provided XAPK was read and audited separately; its version comes from binary AndroidManifest rather than the filename.
+
+The original source is a third-party APKPure package, and the two archives are not assumed equivalent. The smaller source has a certificate fingerprint consistent with historical APKMirror metadata; formal `apksigner` signature verification and exact Google Play provenance are still unverified. Never execute, install or redistribute unverified app modules automatically. Do not publish copied Character.AI code, binaries, icons, assets or decompiled source to the public project repository.
 
 ## Send unmodified archive through the connector limit
 
@@ -35,7 +37,7 @@ Alternatively inspect a complete XAPK directly with `python3 tools/inspect_xapk.
 - Calculates original XAPK and per-module SHA-256 hashes. It **does not validate APK signing certificates**, decompile app logic, decrypt traffic or bypass server-side features.
 - Keeps the analysis offline and returns only metadata. It does not upload results automatically.
 
-## Next research after binary is accessible
+## Further checks after static inspection
 
 1. Check APK signing certificates using the official Android `apksigner` tool and cross-check signing identity against an authenticated trusted build.
 2. Compare package splits, native ABIs, Java/Kotlin/React Native/Flutter or WebView indicators, network and login libraries and permissions.
