@@ -15,6 +15,10 @@ namespace CharacterCompanion.Windows;
 public partial class MainWindow : Window
 {
     private readonly AppSettings _settings;
+    // A foreground-only lifetime token. Closing must stop a pending whisper-cli.exe
+    // instead of leaving the model consuming CPU after the window disappears.
+    private readonly CancellationTokenSource _windowLifetime = new();
+    private volatile bool _closing;
     private MicrophoneRecorder? _recorder;
     private bool _busy;
     private bool _webReady;
@@ -36,7 +40,17 @@ public partial class MainWindow : Window
         FilterCheckbox.IsChecked = _settings.FilterTrackers;
         LanguageCombo.SelectedIndex = _settings.Language switch { "ru" => 1, "en" => 2, _ => 0 };
         Loaded += (_, _) => InitializeBrowser();
-        Closed += (_, _) => { _recorder?.Dispose(); Browser.Dispose(); };
+        Closing += (_, _) =>
+        {
+            _closing = true;
+            _windowLifetime.Cancel();
+        };
+        Closed += (_, _) =>
+        {
+            _recorder?.Dispose();
+            Browser.Dispose();
+            _windowLifetime.Dispose();
+        };
     }
 
     private void InitializeBrowser()
@@ -45,8 +59,8 @@ public partial class MainWindow : Window
         {
             // CEF is initialized in App.OnStartup. Attach handlers BEFORE first navigation.
             Browser.RequestHandler = new CompanionRequestHandler(() => _filterTrackers,
-                uri => Dispatcher.BeginInvoke(() => OfferExternal(uri)));
-            Browser.LifeSpanHandler = new CompanionPopupHandler(uri => Dispatcher.BeginInvoke(() =>
+                uri => QueueBrowserAction(() => OfferExternal(uri)));
+            Browser.LifeSpanHandler = new CompanionPopupHandler(uri => QueueBrowserAction(() =>
             {
                 if (SitePolicy.IsFirstParty(uri)) Browser.Load(uri);
                 else if (SitePolicy.IsExternalHttps(uri)) OfferExternal(uri);
@@ -55,7 +69,7 @@ public partial class MainWindow : Window
             Browser.AddressChanged += (_, e) =>
             {
                 System.Threading.Interlocked.Increment(ref _navigationEpoch);
-                Dispatcher.BeginInvoke(() =>
+                QueueBrowserAction(() =>
                 {
                     LocationLabel.Text = SitePolicy.IsFirstParty(e.NewValue as string)
                         ? "character.ai · локальный профиль CEF" : "Ожидание Character.AI";
@@ -64,7 +78,7 @@ public partial class MainWindow : Window
             Browser.LoadError += (_, e) =>
             {
                 if (!e.Frame.IsMain || e.ErrorCode == CefErrorCode.Aborted) return;
-                Dispatcher.BeginInvoke(() => SetStatus("Ошибка загрузки: " + e.ErrorCode));
+                QueueBrowserAction(() => SetStatus("Ошибка загрузки: " + e.ErrorCode));
             };
             _webReady = true;
             Browser.Load(SitePolicy.Home);
@@ -74,6 +88,21 @@ public partial class MainWindow : Window
             _webReady = false;
             SetStatus("CEF не запущен: " + ex.Message);
         }
+    }
+
+    // CefSharp events arrive off-thread. Discard late events instead of showing a
+    // new WPF dialog after the user has already closed the app.
+    private void QueueBrowserAction(Action action)
+    {
+        if (_closing || Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished) return;
+        try
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (!_closing && !Dispatcher.HasShutdownStarted) action();
+            });
+        }
+        catch (InvalidOperationException) { /* Dispatcher already shutting down. */ }
     }
 
     private void OfferExternal(string address)
@@ -153,7 +182,7 @@ public partial class MainWindow : Window
 
     private void StartRecord_Click(object sender, RoutedEventArgs e)
     {
-        if (_busy || _recorder is not null) return;
+        if (_closing || _busy || _recorder is not null) return;
         if (!File.Exists(_settings.WhisperExecutable) || !File.Exists(_settings.WhisperModel))
         {
             SetStatus("Сначала выбери whisper-cli.exe и GGML-модель (.bin). Запись не начата.");
@@ -192,7 +221,7 @@ public partial class MainWindow : Window
     private async void RecordAndSend_Click(object sender, RoutedEventArgs e) => await StopAndTranscribeAsync(true);
     private async void CancelRecord_Click(object sender, RoutedEventArgs e)
     {
-        if (_recorder is null || _busy) return;
+        if (_closing || _recorder is null || _busy) return;
         var recorder = _recorder;
         _busy = true;
         SetRecordingButtons(false);
@@ -202,14 +231,17 @@ public partial class MainWindow : Window
         {
             MicrophoneRecorder.EraseTemporaryRecording(recorder.FilePath);
             recorder.Dispose(); _recorder = null; _recordingPage = null; _busy = false;
-            SetRecordingButtons(false); RecordingStatus.Text = "Микрофон выключен";
-            SetStatus("Запись отменена, временный WAV удалён.");
+            if (!_closing)
+            {
+                SetRecordingButtons(false); RecordingStatus.Text = "Микрофон выключен";
+                SetStatus("Запись отменена, временный WAV удалён.");
+            }
         }
     }
 
     private async Task StopAndTranscribeAsync(bool sendAfter)
     {
-        if (_recorder is null || _busy) return;
+        if (_closing || _recorder is null || _busy) return;
         var recorder = _recorder;
         // Never auto-send an earlier edited draft or text changed while Whisper is working.
         var draftBeforeTranscription = DraftText.Text;
@@ -223,9 +255,15 @@ public partial class MainWindow : Window
         try
         {
             wav = await recorder.StopAsync();
+            _windowLifetime.Token.ThrowIfCancellationRequested();
             RecordingStatus.Text = "Локальная расшифровка…";
             var transcript = await WhisperCliTranscriber.TranscribeAsync(
-                _settings.WhisperExecutable, _settings.WhisperModel, wav, _settings.Language);
+                _settings.WhisperExecutable, _settings.WhisperModel, wav, _settings.Language,
+                _windowLifetime.Token);
+            // The user can close the window while the subprocess is returning.
+            // Never touch the composer or dispatch Send after shutdown begins.
+            _windowLifetime.Token.ThrowIfCancellationRequested();
+            if (_closing) return;
             var draftEditedWhileWorking = !string.Equals(
                 DraftText.Text, draftBeforeTranscription, StringComparison.Ordinal)
                 || _draftRevision != draftEpochAtStop || draftEpochAtStop != draftEpochAtStart;
@@ -249,16 +287,23 @@ public partial class MainWindow : Window
             }
             else SetStatus("Речь расшифрована локально. Текст можно отредактировать.");
         }
+        catch (OperationCanceledException) when (_windowLifetime.IsCancellationRequested)
+        {
+            // Window shutdown: do not report an error to the disposed WPF interface.
+        }
         catch (Exception ex)
         {
-            RecordingStatus.Text = "Микрофон выключен";
-            SetStatus("Расшифровка не выполнена: " + ex.Message);
+            if (!_closing)
+            {
+                RecordingStatus.Text = "Микрофон выключен";
+                SetStatus("Расшифровка не выполнена: " + ex.Message);
+            }
         }
         finally
         {
             MicrophoneRecorder.EraseTemporaryRecording(wav ?? recorder.FilePath);
             recorder.Dispose(); _recorder = null; _recordingPage = null; _busy = false;
-            SetRecordingButtons(false);
+            if (!_closing) SetRecordingButtons(false);
         }
     }
 
@@ -281,6 +326,7 @@ public partial class MainWindow : Window
 
     private async Task InsertDraftAsync(bool send, bool fromTranscription = false, string? expectedPage = null)
     {
+        if (_closing || _windowLifetime.IsCancellationRequested) return;
         if (_bridgeBusy || (_busy && !fromTranscription))
         {
             SetStatus("Вставка/отправка уже выполняется или идёт распознавание речи.");
@@ -306,7 +352,11 @@ public partial class MainWindow : Window
             // the same strict JSON envelope used by our existing tested ComposerBridge.
             var expression = ComposerBridge.BuildScript(text, send, expectedPage ?? browserPage).Trim().TrimEnd(';');
             var script = "JSON.stringify(" + expression + ")";
+            // Closing the WPF window cancels future bridge dispatches; already
+            // dispatched site events cannot be undone, so do not claim delivery.
+            if (_closing || _windowLifetime.IsCancellationRequested) return;
             var response = await Browser.EvaluateScriptAsync(script, TimeSpan.FromSeconds(10));
+            if (_closing || _windowLifetime.IsCancellationRequested) return;
             if (!response.Success || response.Result is not string json)
                 throw new InvalidOperationException("CEF не выполнил DOM-вставку: " + response.Message);
             var result = ComposerBridge.ParseResult(json);
@@ -315,7 +365,7 @@ public partial class MainWindow : Window
             else if (result.ClickAttempted) SetStatus("Кнопка отправки нажата. Подтверди доставку сообщения в интерфейсе Character.AI.");
             else SetStatus("Текст вставлен, но кнопку отправки нельзя определить однозначно. Отправь вручную.");
         }
-        catch (Exception ex) { SetStatus("Вставка в страницу не выполнена: " + ex.Message); }
+        catch (Exception ex) { if (!_closing) SetStatus("Вставка в страницу не выполнена: " + ex.Message); }
         finally { _bridgeBusy = false; }
     }
 

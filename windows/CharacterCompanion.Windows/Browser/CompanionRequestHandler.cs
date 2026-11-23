@@ -26,7 +26,9 @@ internal sealed class CompanionRequestHandler : RequestHandler
     {
         if (frame?.IsMain != true) return false;
         if (SitePolicy.IsFirstParty(request.Url)) return false;
-        if (SitePolicy.IsExternalHttps(request.Url)) _externalNavigation(request.Url);
+        // A passive script or redirect must not cause an unsolicited external
+        // browser prompt. Only a direct user navigation may request one.
+        if (userGesture && SitePolicy.IsExternalHttps(request.Url)) _externalNavigation(request.Url);
         // No file:, http:, javascript: or unapproved external top-level navigation.
         return true;
     }

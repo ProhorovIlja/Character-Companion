@@ -1,3 +1,7 @@
+### v0.9.0 manual shutdown and external navigation checks
+
+On real Windows, during a long Whisper inference close the window: check Task Manager for absence of the orphaned `whisper-cli.exe`, absence of unintended message insertion/send, and cleanup of the temporary audio/text files. Repeat by closing immediately after pressing Transcribe & Send and after recognition finishes but before CEF dispatch. Verify normal user-clicked external links prompt for confirmation, while automatic popups/redirects do not. Test sign-in because OAuth redirects may not retain a CEF user gesture. Source tests cannot certify these scenarios.
+
 ### v0.8.0 — manual build and CLI pipe-drain verification
 
 From the full checkout on a Windows 10/11 x64 desktop with official .NET 10 SDK and network/package cache ready:

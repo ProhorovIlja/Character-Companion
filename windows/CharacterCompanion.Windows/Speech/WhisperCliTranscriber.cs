@@ -33,6 +33,9 @@ public static class WhisperCliTranscriber
         foreach (var argument in arguments) process.StartInfo.ArgumentList.Add(argument);
         try
         {
+            // Important if the window was closed after WAV conversion but before
+            // starting the model; do not spawn an already-cancelled transcription.
+            cancellationToken.ThrowIfCancellationRequested();
             if (!process.Start()) throw new InvalidOperationException("Cannot start whisper.cpp.");
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromMinutes(4));

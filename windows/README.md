@@ -1,3 +1,7 @@
+### v0.9.0 source-only shutdown and external-popup security
+
+Closing Windows now cancels active whisper.cpp processing and prevents later automatic-send dispatch. Non-user-initiated third-party CEF popup/navigation attempts no longer create an external-browser dialog. Windows authentication and process cancellation remain unverified on-device; [release notes](RELEASE_NOTES_v0.9.0-prealpha.md) and [QA](QA.md) describe required manual checks.
+
 **Windows 0.8.0 source:** `whisper-cli.exe` stdout/stderr are drained with constant memory. Added a foreground-only manual Windows PowerShell build/publish gate (`.\windows\build-windows.ps1` from repository root) that first compiles/runs linked-production .NET PolicySmoke, then publishes a full CEF/WPF portable folder. **The helper is untested in PowerShell; no EXE or signed installer exists.** [Release notes](RELEASE_NOTES_v0.8.0-prealpha.md).
 
 **Windows 0.7.0 source:** ComposerBridge now rechecks exact page and DOM attachment after synchronous website focus/input callbacks and immediately before Send. NAudio 3 recorder now uses `WaveIn` rather than obsolete `WaveInEvent`. [Release notes](RELEASE_NOTES_v0.7.0-prealpha.md). **Not built/tested on Windows.**

@@ -16,7 +16,9 @@ internal sealed class CompanionPopupHandler : LifeSpanHandler
         out IWebBrowser newBrowser)
     {
         newBrowser = null!;
-        _onPopup(targetUrl);
+        // CEF can deliver window.open from timers and third-party scripts.
+        // Suppress those rather than repeatedly prompting the user.
+        if (userGesture && !string.IsNullOrWhiteSpace(targetUrl)) _onPopup(targetUrl);
         return true;
     }
 }
