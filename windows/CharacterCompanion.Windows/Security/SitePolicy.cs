@@ -83,9 +83,16 @@ public static class SitePolicy
         }
         // Nested redirect URLs can hide code/state parameters in an ordinary key's value.
         var expandedQuery = DecodeLimited(query);
-        if (expandedQuery == null || Regex.IsMatch(expandedQuery,
-            @"(?:^|[?&#])(?:code|state|access_token|id_token|refresh_token|client_secret|session_id|oauth_token|token|signature)=",
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) return true;
+        if (expandedQuery == null) return true;
+        // Match nested parameter names against the COMPLETE sensitive-key set.
+        // The previous regex checked only a subset, so a value such as
+        // ?payload=%3Fredirect_uri%3D... could cross the browser boundary.
+        foreach (Match match in Regex.Matches(expandedQuery,
+            @"(?:^|[?&#])([A-Za-z_][A-Za-z0-9_-]{0,63})=",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+        {
+            if (SensitiveKeys.Contains(match.Groups[1].Value)) return true;
+        }
 
         var fragment = DecodeLimited(uri.GetComponents(UriComponents.Fragment, UriFormat.UriEscaped));
         // Only unstructured page anchors are safe. OAuth implicit grants use fragments.

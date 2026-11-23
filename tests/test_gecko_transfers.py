@@ -43,6 +43,15 @@ class GeckoTransferTests(unittest.TestCase):
         self.assertIn('input: InputStream', POLICY)
         self.assertNotIn('DownloadManager', GECKO)
 
+    def test_defective_input_stream_cannot_spin_unbounded(self):
+        self.assertIn('var emptyReads = 0', POLICY)
+        self.assertIn('if (++emptyReads >= 8) throw IOException("download_stream_stalled")', POLICY)
+        self.assertIn('emptyReads = 0', POLICY)
+        self.assertIn('if (n.toLong() > maxBytes - total)', POLICY)
+        smoke = (ROOT / 'tests/PolicySmoke.kt').read_text(encoding='utf-8')
+        self.assertIn('check(stalled.reads == 8)', smoke)
+        self.assertIn('resumedOutput.toByteArray().contentEquals(byteArrayOf(42))', smoke)
+
     def test_cancel_and_activity_teardown_close_pending_streams(self):
         self.assertIn('try { pending?.body?.close() }', GECKO)
         self.assertIn('try { response.body?.close() }', GECKO)
@@ -81,8 +90,8 @@ class GeckoTransferTests(unittest.TestCase):
             self.assertIn('gecko_download_saved',keys)
 
     def test_application_version_moves_forward_without_platform_mixup(self):
-        self.assertIn('versionCode = 25', BUILD)
-        self.assertIn('versionName = "0.25.0-rc1"', BUILD)
+        self.assertIn('versionCode = 26', BUILD)
+        self.assertIn('versionName = "0.26.0-rc1"', BUILD)
         self.assertIn('create("gecko")',BUILD)
         self.assertIn('create("legacy")',BUILD)
         self.assertFalse((ROOT/'.github/workflows').exists())

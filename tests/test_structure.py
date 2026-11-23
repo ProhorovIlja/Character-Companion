@@ -377,8 +377,8 @@ class Structure(unittest.TestCase):
     def test_browser_dependencies_are_pinned_without_new_permissions(self):
         build=(ROOT/'app/build.gradle.kts').read_text()
         manifest=(ROOT/'app/src/main/AndroidManifest.xml').read_text()
-        self.assertIn('versionName = "0.25.0-rc1"', build)
-        self.assertIn('versionCode = 25', build)
+        self.assertIn('versionName = "0.26.0-rc1"', build)
+        self.assertIn('versionCode = 26', build)
         release = (ROOT/'scripts/prepare-release.sh').read_text()
         self.assertIn('VERSION="$(sed -nE', release)
         self.assertIn('VERSION_CODE="$(sed -nE', release)

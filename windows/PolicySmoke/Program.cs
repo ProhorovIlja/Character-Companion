@@ -39,6 +39,18 @@ Check(SitePolicy.SafeBrowserHandoff("https://example.org/page?%2563ode=secret") 
       SitePolicy.Home, "twice-encoded OAuth key");
 Check(SitePolicy.SafeBrowserHandoff("https://example.org/page?x=a%26code%3Dsecret") ==
       SitePolicy.Home, "nested OAuth credential");
+Check(SitePolicy.SafeBrowserHandoff("https://example.org/page?payload=%3Fredirect_uri%3Dhttps%3A%2F%2Fother.test%2Fcallback") ==
+      SitePolicy.Home, "nested redirect_uri");
+Check(SitePolicy.SafeBrowserHandoff("https://example.org/page?payload=%253Fcode_verifier%253Dsecret") ==
+      SitePolicy.Home, "double-encoded code_verifier");
+Check(SitePolicy.SafeBrowserHandoff("https://example.org/page?payload=%23callback%3Dhttps%3A%2F%2Fother.test") ==
+      SitePolicy.Home, "nested callback");
+Check(SitePolicy.SafeBrowserHandoff("https://example.org/page?payload=%3Freturn_url%3Dsecret") ==
+      SitePolicy.Home, "nested return_url");
+Check(SitePolicy.SafeBrowserHandoff("https://example.org/page?payload=%26authorization%3Dsecret") ==
+      SitePolicy.Home, "nested authorization");
+Check(SitePolicy.SafeBrowserHandoff("https://example.org/page?payload=hello%26statefulness%3Dyes") ==
+      "https://example.org/page?payload=hello%26statefulness%3Dyes", "nested innocuous key allowed");
 Check(SitePolicy.SafeBrowserHandoff("https://example.org/page?state=secret") ==
       SitePolicy.Home, "OAuth state");
 Check(SitePolicy.SafeBrowserHandoff("https://example.org/page#access_token=secret") ==

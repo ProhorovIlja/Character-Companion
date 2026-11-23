@@ -1,3 +1,7 @@
+## v0.34.0: stalled-download protection
+
+The opt-in GeckoView flavor still saves only after a manual Android document-picker action. If a broken source stream repeatedly returns zero bytes despite a nonempty read buffer, the bounded copier now aborts after eight consecutive zero-length reads rather than looping forever. A subsequent successful read resets the counter. The 256-MiB cap, original-page guard and partial-file cleanup remain. These are pure Kotlin/JVM-tested invariants, not device-tested Gecko/SAF behavior.
+
 **v0.28.0-source security update:** Gecko media permission requests require the same approved first-party HTTPS origin before and after each prompt; system runtime permission and site media callbacks have independent pending-origin snapshots. Switching media off, leaving the app or changing origins revokes pending consent. Nested encoded OAuth callback values in non-sensitive query parameters are redacted on external-browser handoff. For manual Windows-hosted Android builds see [Windows instructions](ANDROID17_MANUAL_BUILD_WINDOWS.md). Neither feature has yet been device-tested.
 
 ## v0.26.0-source: safe external-browser handoff

@@ -458,6 +458,31 @@ fun main() {
     check(!GeckoTransferPolicy.isSelectedDocumentUri("content://user:pass@provider/path"))
     val copied = java.io.ByteArrayOutputStream()
     check(GeckoTransferPolicy.copy(java.io.ByteArrayInputStream(byteArrayOf(1,2,3,4)), copied, 4) == 4L)
+    // A defective input provider returning zero repeatedly must fail boundedly,
+    // not spin indefinitely and pin a CPU core. No Android classes required.
+    val stalled = object : java.io.InputStream() {
+        var reads = 0
+        override fun read(): Int { reads++; return 0 }
+        override fun read(b: ByteArray, off: Int, len: Int): Int { reads++; return 0 }
+    }
+    val stalledResult = runCatching {
+        GeckoTransferPolicy.copy(stalled, java.io.ByteArrayOutputStream(), 64)
+    }
+    check(stalledResult.exceptionOrNull() is java.io.IOException)
+    check(stalled.reads == 8)
+    // A single spurious zero read followed by real data must not break a download.
+    val recovers = object : java.io.InputStream() {
+        var state = 0
+        override fun read(): Int = -1
+        override fun read(b: ByteArray, off: Int, len: Int): Int = when (state++) {
+            0 -> 0
+            1 -> { b[off] = 42; 1 }
+            else -> -1
+        }
+    }
+    val resumedOutput = java.io.ByteArrayOutputStream()
+    check(GeckoTransferPolicy.copy(recovers, resumedOutput, 64) == 1L)
+    check(resumedOutput.toByteArray().contentEquals(byteArrayOf(42)))
     check(copied.toByteArray().contentEquals(byteArrayOf(1,2,3,4)))
     check(runCatching { GeckoTransferPolicy.copy(
         java.io.ByteArrayInputStream(byteArrayOf(1,2,3,4)), java.io.ByteArrayOutputStream(), 3)

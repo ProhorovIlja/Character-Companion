@@ -26,6 +26,16 @@ class HandoffSmokeStructure(unittest.TestCase):
                        'UriFormat.UriEscaped', 'RegexOptions.CultureInvariant'):
             self.assertIn(marker, policy)
 
+    def test_nested_redirect_uses_complete_sensitive_key_set(self):
+        policy=(WINDOWS/'CharacterCompanion.Windows/Security/SitePolicy.cs').read_text(encoding='utf-8')
+        suite=(WINDOWS/'PolicySmoke/Program.cs').read_text(encoding='utf-8')
+        self.assertIn('foreach (Match match in Regex.Matches(expandedQuery,', policy)
+        self.assertIn('SensitiveKeys.Contains(match.Groups[1].Value)', policy)
+        self.assertNotIn('(?:code|state|access_token|id_token|refresh_token|client_secret|session_id|oauth_token|token|signature)=', policy)
+        for marker in ['nested redirect_uri', 'double-encoded code_verifier', 'nested callback',
+                       'nested return_url', 'nested authorization', 'nested innocuous key allowed']:
+            self.assertIn(marker, suite)
+
     def test_final_process_start_revalidates_url(self):
         source=(WINDOWS/'CharacterCompanion.Windows/MainWindow.xaml.cs').read_text(encoding='utf-8')
         self.assertIn('var safe = SitePolicy.SafeBrowserHandoff(address)', source)

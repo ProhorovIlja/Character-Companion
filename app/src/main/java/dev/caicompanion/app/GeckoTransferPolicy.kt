@@ -54,10 +54,17 @@ object GeckoTransferPolicy {
         require(maxBytes in 1..MAX_DOWNLOAD_BYTES)
         val buffer = ByteArray(16 * 1024)
         var total = 0L
+        var emptyReads = 0
         while (true) {
             val n = input.read(buffer)
             if (n < 0) break
-            if (n == 0) continue
+            if (n == 0) {
+                // Malformed provider streams must not spin forever at 100% CPU.
+                // A blocking InputStream should return data or EOF for a nonempty buffer.
+                if (++emptyReads >= 8) throw IOException("download_stream_stalled")
+                continue
+            }
+            emptyReads = 0
             if (n.toLong() > maxBytes - total) throw IOException("download_exceeds_limit")
             output.write(buffer, 0, n)
             total += n

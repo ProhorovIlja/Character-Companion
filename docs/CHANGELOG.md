@@ -1,3 +1,9 @@
+## 2026-11-23 · v0.34.0-source
+
+- Android GeckoView 0.26.0-rc1: bounded failure on repeated zero-byte reads from a malformed streaming download provider; a transient empty read does not corrupt output. Added executable Kotlin/JVM cases.
+- Windows CEF/Whisper 0.10.0-prealpha: catch encoded nested `redirect_uri`, `callback`, `code_verifier`, `return_url` and all other sensitive-key variants on system-browser handoff; expand production-source-linked manual C# tests.
+- Source/test update only, no device-compiled APK/EXE, no CI or scheduled automation. See [release notes](RELEASE_NOTES_v0.34.0-source.md).
+
 ## 2026-11-23 · v0.33.0-source
 
 - Windows v0.9.0 pre-alpha: WPF closing cancels local whisper.cpp process via the window lifetime token, preventing new inference and bridge dispatch after closure. Existing process cleanup remains. External popup/top-level browser offers require a CEF user gesture. Added source-only tests. No native build or installer.
