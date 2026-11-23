@@ -1,4 +1,4 @@
-# Character Companion · Windows prototype (v0.20.0-source)
+# Character Companion · Windows prototype (v0.21.0-source)
 
 Native Windows 10/11 WPF client with WebView2, privacy-focused request filtering, and **offline voice dictation**. This is an **uncompiled source prototype**, not a tested executable.
 
@@ -8,7 +8,8 @@ Native Windows 10/11 WPF client with WebView2, privacy-focused request filtering
 - Conservative user-toggleable tracker-domain filter enabled by default (not full EasyList; no subscription bypass).
 - System-browser handoff for other HTTPS sites and OAuth; **external cookies do not return into WebView2**.
 - Records mic via NAudio at 16-kHz mono PCM, at most three minutes; runs a user-provided `whisper-cli.exe` and GGML `.bin` model locally. No cloud transcription service or background capture.
-- Whisper output appears in editable native draft. Buttons: insert without sending; click verified site-send control; record→transcribe→attempt send; copy; save TXT.
+- Whisper output appears in editable native draft. Buttons: insert without sending; click a uniquely identified site-send control; record→transcribe→attempt send; copy; save TXT; clear. Ctrl+Enter explicitly sends the draft. If existing draft text was present or changed during transcription, transcript is appended but **automatic sending is suppressed**.
+- Insertion requests are serialized so repeated clicks cannot enqueue simultaneous WebView2 sends.
 - Site injection restricted to `*.character.ai`, only one visible composer, and *only* one accessible send control near it. If either is not found, leave the editable draft and require manual paste/send. Clicking send is **not proof of server receipt**.
 - WAV and temporary transcript are removed after use. The app does not export cookies or account data; it saves only chosen binary/model paths, language, and filter preference.
 
@@ -30,6 +31,16 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 ```
 
 The output is **unsigned** unless signed separately by a trusted certificate. Never publish it as tested before on-device verification.
+
+## Tests
+
+```bash
+python -m unittest discover -s windows/tests -p 'test_*.py'
+node windows/tests/bridge_runtime.js
+bash scripts/test-offline.sh
+```
+
+`bridge_runtime.js` evaluates the **actual JavaScript payload** in an isolated Node VM with 8 deterministic simulated DOM scenarios (legitimate and lookalike origins, ambiguous input/button, explicit send). Passing these tests **does not** establish live Character.AI compatibility or a compiled Windows binary.
 
 ## Known limitations
 

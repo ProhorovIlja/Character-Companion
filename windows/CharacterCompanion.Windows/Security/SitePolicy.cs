@@ -7,7 +7,8 @@ public static class SitePolicy
     public static bool IsFirstParty(string? address)
     {
         if (!Uri.TryCreate(address, UriKind.Absolute, out var uri)) return false;
-        if (uri.Scheme != Uri.UriSchemeHttps || !uri.IsDefaultPort) return false;
+        if (uri.Scheme != Uri.UriSchemeHttps || !uri.IsDefaultPort ||
+            !string.IsNullOrEmpty(uri.UserInfo)) return false;
         var hostname = uri.IdnHost.TrimEnd('.');
         return hostname.Equals("character.ai", StringComparison.OrdinalIgnoreCase)
                || hostname.EndsWith(".character.ai", StringComparison.OrdinalIgnoreCase);

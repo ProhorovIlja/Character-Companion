@@ -1,3 +1,5 @@
+**Windows v0.2.0 source revision:** speech-to-send now avoids sending existing or edited draft; concurrent send requests are blocked. Ctrl+Enter and Clear Draft added. The 8-scenario JS DOM harness can be run with Node. [Details](windows/README.md). **No tested installers yet.**
+
 **Windows client added (source prototype):** See [windows/README.md](windows/README.md) for native WPF/WebView2 and offline Whisper dictation. The original Android client remains separate and unchanged in v0.19.0-rc1. No Windows executable has been built or tested yet.
 
 > **v0.19.0-rc1 source candidate:** updated Morphe MicroG-RE package detection for the current `app.revanced.android.gms` and legacy IDs; fixed manual APK release-version drift. No tested APK or guaranteed Google login yet.

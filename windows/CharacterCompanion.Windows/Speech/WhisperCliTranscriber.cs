@@ -50,9 +50,19 @@ public static class WhisperCliTranscriber
         }
         catch
         {
-            try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                    // Do not race temporary-text cleanup against a still-running child.
+                    await process.WaitForExitAsync(CancellationToken.None)
+                        .WaitAsync(TimeSpan.FromSeconds(5));
+                }
+            }
             catch (InvalidOperationException) { }
             catch (System.ComponentModel.Win32Exception) { }
+            catch (TimeoutException) { /* A locked file may remain; report via the original error. */ }
             throw;
         }
         finally

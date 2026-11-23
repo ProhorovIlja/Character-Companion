@@ -16,3 +16,13 @@ Before publishing any EXE/MSIX, complete every item on an actual Windows 10/11 d
 12. Only when all tests pass, sign release binaries and publish Windows source ZIP, optional installer, hashes and release notes. Publish Android binaries under separate platform assets after Android device signoff.
 
 The preceding source-only tests do **not** qualify as completion of this list.
+
+### v0.21 targeted checks
+
+- With **nonempty old draft**, dictate and press "Расшифровать и отправить": app must append recognized text and **must not** click Send.
+- During local recognition, manually edit the draft: auto-send must be cancelled and edited text retained.
+- Double-press Send or Ctrl+Enter while insertion is underway: exactly one bridge operation may run at a time.
+- With **empty unchanged draft**, an explicit "Расшифровать и отправить" action may click one clearly labelled site Send; check actual delivery separately.
+- Force whisper-cli to hang past timeout: confirm child process termination and temporary transcript cleanup.
+- Check that a URL with user-info and a lookalike host cannot be treated as first-party.
+- Perform microphone format/samplerate tests on actual Windows hardware, especially 44.1/48-kHz-only devices (not covered by source tests).

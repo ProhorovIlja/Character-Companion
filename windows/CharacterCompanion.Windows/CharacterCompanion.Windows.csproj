@@ -8,7 +8,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>CharacterCompanion.Windows</AssemblyName>
     <RootNamespace>CharacterCompanion.Windows</RootNamespace>
-    <Version>0.20.0</Version>
+    <Version>0.21.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>

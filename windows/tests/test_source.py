@@ -69,6 +69,28 @@ class WindowsSourceAudit(unittest.TestCase):
         self.assertNotIn('CookieManager.GetCookiesAsync',code)
         self.assertNotIn('AddOrUpdateCookie',code)
 
+    def test_dictation_never_auto_sends_existing_draft(self):
+        code=self.src('MainWindow.xaml.cs')
+        self.assertIn('draftBeforeTranscription',code)
+        self.assertIn('draftEditedWhileWorking',code)
+        self.assertIn('canAutoSend = sendAfter && string.IsNullOrWhiteSpace(draftBeforeTranscription)',code)
+        self.assertIn('if (canAutoSend)',code)
+        self.assertIn('await InsertDraftAsync(true, fromTranscription: true)',code)
+        self.assertIn('_bridgeBusy',code)
+        self.assertIn('(_busy && !fromTranscription)',code)
+        self.assertIn('DraftText_KeyDown',code)
+        self.assertIn('ClearDraft_Click',code)
+
+    def test_whisper_cleanup_waits_for_exit(self):
+        code=self.src('Speech/WhisperCliTranscriber.cs')
+        self.assertIn('process.Kill(entireProcessTree: true)',code)
+        self.assertIn('await process.WaitForExitAsync(CancellationToken.None)',code)
+        self.assertIn('WaitAsync(TimeSpan.FromSeconds(5))',code)
+
+    def test_origin_rejects_credential_userinfo(self):
+        code=self.src('Security/SitePolicy.cs')
+        self.assertIn('!string.IsNullOrEmpty(uri.UserInfo)',code)
+
     def test_no_background_schedulers(self):
         code='\n'.join(p.read_text(encoding='utf8') for p in (ROOT/'windows').rglob('*.cs'))
         for forbidden in ['TaskSchedulerService','PeriodicTimer','Register-ScheduledTask','schtasks.exe','StartupTask']:

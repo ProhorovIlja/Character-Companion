@@ -1,3 +1,11 @@
+## Windows v0.2.0-prealpha / project v0.21.0-source — 2026-11-23 (source only)
+
+- Fix accidental auto-send of prior or edited draft when requesting record/transcribe/send; keep recognized text for review when draft changed.
+- Prevent duplicate concurrent WebView2 send/insert actions; add Ctrl+Enter send and Clear Draft.
+- Improve Whisper timeout cleanup by waiting after child-process kill; tighten first-party URL checks against user-info.
+- Execute real composer bridge JavaScript in eight synthetic DOM security/UX scenarios using Node VM; Android offline regression suite retained.
+- No compiled Windows binary or Android APK: build/identity/device signoffs remain required.
+
 ## Windows v0.1.0-prealpha — 2026-11-23 (source only)
 
 - Added a separate native Windows WPF/.NET 10 WebView2 client, with local whisper.cpp dictation into an editable draft and explicit manual-send / transcription-then-send buttons.

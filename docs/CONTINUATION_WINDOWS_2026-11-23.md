@@ -25,3 +25,11 @@ The specific missing Windows feature is microphone dictation of messages to Char
 The attached earlier Markdown conversation history was already saved to Google Drive as `character-companion-chat-history-2026-11-23.md` in the correct folder. This file records the new Windows scope and avoids losing it in future conversations.
 
 No scheduled work, automations, GitHub Actions, CI triggers or background checks are requested or authorized.
+
+## Follow-up v0.21.0-source (same day)
+
+- Windows `0.2.0-prealpha`: fix auto-send with pre-existing or edited draft, serialize bridge operations, add Ctrl+Enter and Clear Draft.
+- Whisper process timeout/error cleanup now waits for termination; first-party host check rejects URL userinfo.
+- Eight executable JS bridge scenarios tested in Node sandbox plus Python structure checks; these are not live DOM integration tests.
+- Both environments still lack .NET SDK/Windows compilation and Android Gradle SDK; no binary signoff.
+- Keep Android 17/Pixel 8a/MindTheGapps/Morphe microG requirements in scope. Do not create background/scheduled tasks.

@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Navigation;
+using System.Windows.Input;
 using CharacterCompanion.Windows.Security;
 using CharacterCompanion.Windows.Speech;
 using Microsoft.Win32;
@@ -16,6 +17,7 @@ public partial class MainWindow : Window
     private MicrophoneRecorder? _recorder;
     private bool _busy;
     private bool _webReady;
+    private bool _bridgeBusy;
 
     public MainWindow()
     {
@@ -196,6 +198,8 @@ public partial class MainWindow : Window
     {
         if (_recorder is null || _busy) return;
         var recorder = _recorder;
+        // Never auto-send an earlier edited draft or text changed while Whisper is working.
+        var draftBeforeTranscription = DraftText.Text;
         _busy = true;
         SetRecordingButtons(false);
         string? wav = null;
@@ -205,10 +209,23 @@ public partial class MainWindow : Window
             RecordingStatus.Text = "Локальная расшифровка…";
             var transcript = await WhisperCliTranscriber.TranscribeAsync(
                 _settings.WhisperExecutable, _settings.WhisperModel, wav, _settings.Language);
-            DraftText.Text = string.IsNullOrWhiteSpace(DraftText.Text) ? transcript : DraftText.Text.TrimEnd() + " " + transcript;
+            var draftEditedWhileWorking = !string.Equals(
+                DraftText.Text, draftBeforeTranscription, StringComparison.Ordinal);
+            var canAutoSend = sendAfter && string.IsNullOrWhiteSpace(draftBeforeTranscription)
+                && !draftEditedWhileWorking;
+            DraftText.Text = string.IsNullOrWhiteSpace(DraftText.Text)
+                ? transcript : DraftText.Text.TrimEnd() + " " + transcript;
             RecordingStatus.Text = "Микрофон выключен";
-            SetStatus("Речь расшифрована локально. Текст можно отредактировать.");
-            if (sendAfter) await InsertDraftAsync(true);
+            if (canAutoSend)
+            {
+                SetStatus("Расшифровано локально. Выполняется отправка по запросу.");
+                await InsertDraftAsync(true, fromTranscription: true);
+            }
+            else if (sendAfter)
+            {
+                SetStatus("Диктовка добавлена в существующий/изменённый черновик. Автоотправка отменена, чтобы не отправить чужой текст.");
+            }
+            else SetStatus("Речь расшифрована локально. Текст можно отредактировать.");
         }
         catch (Exception ex)
         {
@@ -225,15 +242,35 @@ public partial class MainWindow : Window
 
     private async void InsertDraft_Click(object sender, RoutedEventArgs e) => await InsertDraftAsync(false);
     private async void SendDraft_Click(object sender, RoutedEventArgs e) => await InsertDraftAsync(true);
-
-    private async Task InsertDraftAsync(bool send)
+    private async void DraftText_KeyDown(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.Enter && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+        {
+            e.Handled = true;
+            await InsertDraftAsync(true);
+        }
+    }
+    private void ClearDraft_Click(object sender, RoutedEventArgs e)
+    {
+        if (_busy || _bridgeBusy) { SetStatus("Черновик занят. Дождись завершения текущего действия."); return; }
+        DraftText.Clear();
+        SetStatus("Черновик очищен по запросу.");
+    }
+
+    private async Task InsertDraftAsync(bool send, bool fromTranscription = false)
+    {
+        if (_bridgeBusy || (_busy && !fromTranscription))
+        {
+            SetStatus("Вставка/отправка уже выполняется или идёт распознавание речи.");
+            return;
+        }
         var text = DraftText.Text;
         if (string.IsNullOrWhiteSpace(text)) { SetStatus("Черновик пуст."); return; }
         if (!_webReady || !SitePolicy.IsFirstParty(Browser.CoreWebView2.Source))
         {
             SetStatus("Вставка разрешена только на странице character.ai в приложении."); return;
         }
+        _bridgeBusy = true;
         try
         {
             var json = await Browser.ExecuteScriptAsync(ComposerBridge.BuildScript(text, send));
@@ -244,6 +281,7 @@ public partial class MainWindow : Window
             else SetStatus("Текст вставлен, но кнопку отправки нельзя определить однозначно. Отправь вручную.");
         }
         catch (Exception ex) { SetStatus("Вставка в страницу не выполнена: " + ex.Message); }
+        finally { _bridgeBusy = false; }
     }
 
     private void CopyDraft_Click(object sender, RoutedEventArgs e)
