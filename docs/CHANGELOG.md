@@ -1,3 +1,9 @@
+## Windows v0.1.0-prealpha — 2026-11-23 (source only)
+
+- Added a separate native Windows WPF/.NET 10 WebView2 client, with local whisper.cpp dictation into an editable draft and explicit manual-send / transcription-then-send buttons.
+- Security: first-party origin checks, unique editor/send-button verification, conservative tracker list, explicit external-browser authorization (no cookie copying).
+- Added Windows-only static tests and release notes. No Windows EXE built or tested; Android v0.19.0-rc1 remains untouched.
+
 ## v0.19.0-rc1 (2026-11-23) — source candidate; no APK
 
 - Correct Morphe MicroG-RE package detection following its August 2026 application ID migration to `app.revanced.android.gms`; preserve older `app.morphe.android.gms` support alongside `com.google.android.gms`.
