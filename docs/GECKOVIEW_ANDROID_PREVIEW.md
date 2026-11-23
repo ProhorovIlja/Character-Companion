@@ -1,3 +1,7 @@
+## v0.26.0-source: safe external-browser handoff
+
+External navigation is still user-confirmed. The new `ExternalBrowserPolicy` prevents transfer of OAuth `code`, `state`, tokens, signed URLs and callback fragments from Gecko into the separate system browser, showing an explicit Character.AI home-page fallback instead. This **does not establish Google OAuth SSO or transfer cookies**. Source candidate only, not device-tested. Android app version `0.23.0-rc1` (`versionCode 23`).
+
 ## v0.25.0-source — native library, settings and crash recovery
 
 The Gecko ARM64 flavor now exposes a local searchable/bookmarkable library and a native settings sheet with only implemented options (tracking protection, media consent, FLAG_SECURE, last-page resume, compact toolbar). The renderer crash/kill handlers prompt **manual** recovery with at most two attempts in two minutes; pending permissions and transfers are dropped on failure. The Activity retains the current session across orientation/screen-size changes, but other configuration changes and OS process death can still discard in-progress form content. A real Pixel 8a Android 17 device test remains mandatory. See [v0.25.0 notes](RELEASE_NOTES_v0.25.0-source.md).
@@ -15,7 +19,7 @@ Android now has two explicit Gradle flavors:
 
 Both flavors use the same application ID, so **they cannot be installed side by side** without assigning separate application IDs. Gecko's cookies, app permission grants and in-process state are **not** migrated from the existing Android WebView profile. Do not promise SSO across engines. The gecko variant carries embedded ARM64 Gecko libraries and may be substantially larger.
 
-The version in Gradle is Android `0.21.0-rc1`, `versionCode 21`; the multi-platform source bundle is `v0.23.0-source`. This is source development versioning, **not a GitHub Release**.
+The version in Gradle is Android `0.23.0-rc1`, `versionCode 23`; the latest multi-platform source bundle is `v0.26.0-source`. This is source development versioning, **not a GitHub Release**.
 
 ## Manual build (requires proper SDK)
 

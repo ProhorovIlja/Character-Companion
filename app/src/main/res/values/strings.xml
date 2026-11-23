@@ -165,4 +165,5 @@
     <string name="gecko_recovery_title">Gecko browser interrupted</string>
     <string name="gecko_recovery_message">The browsing process stopped. Retry manually? Unsaved form text and page state may be lost.</string>
     <string name="gecko_recovery_limit">The browser stopped repeatedly. Further attempts are paused. Open the legacy tools or leave the application.</string>
+    <string name="gecko_external_sensitive">External authentication or a temporary sign-in URL cannot be transferred safely. Open the Character.AI homepage in the system browser instead? Browser sessions remain separate.</string>
 </resources>

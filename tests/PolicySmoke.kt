@@ -1,3 +1,4 @@
+import dev.caicompanion.app.ExternalBrowserPolicy
 import dev.caicompanion.app.HostBlocker
 import dev.caicompanion.app.UrlPolicy
 import dev.caicompanion.app.FilterEngine
@@ -453,5 +454,31 @@ fun main() {
     check(runCatching { GeckoTransferPolicy.copy(
         java.io.ByteArrayInputStream(byteArrayOf(1,2,3,4)), java.io.ByteArrayOutputStream(), 3)
     }.exceptionOrNull() is java.io.IOException)
+    // An explicit external-browser handoff must never carry a login callback,
+    // transient OAuth code, state, signed URL, or implicit-flow fragment.
+    check(ExternalBrowserPolicy.target("https://character.ai/") == "https://character.ai/")
+    check(ExternalBrowserPolicy.target("https://example.org/guide?a=1") == "https://example.org/guide?a=1")
+    check(ExternalBrowserPolicy.target("https://example.org/#help") == "https://example.org/#help")
+    check(ExternalBrowserPolicy.target("https://accounts.google.com/o/oauth2/v2/auth?state=SECRET") == ExternalBrowserPolicy.HOME)
+    check(ExternalBrowserPolicy.target("https://foo.auth0.com/authorize?client_id=abc") == ExternalBrowserPolicy.HOME)
+    check(ExternalBrowserPolicy.target("https://appleid.apple.com/auth/authorize") == ExternalBrowserPolicy.HOME)
+    check(ExternalBrowserPolicy.target("https://character.ai/callback?code=SECRET") == ExternalBrowserPolicy.HOME)
+    check(ExternalBrowserPolicy.target("https://character.ai/login") == ExternalBrowserPolicy.HOME)
+    check(ExternalBrowserPolicy.target("https://example.org/other?code=SECRET") == ExternalBrowserPolicy.HOME)
+    check(ExternalBrowserPolicy.target("https://example.org/other?%63ode=SECRET") == ExternalBrowserPolicy.HOME)
+    check(ExternalBrowserPolicy.target("https://example.org/other?%2563ode=SECRET") == ExternalBrowserPolicy.HOME)
+    check(ExternalBrowserPolicy.target("https://example.org/%252Foauth%252Fcallback") == ExternalBrowserPolicy.HOME)
+    check(ExternalBrowserPolicy.target("https://example.org/#access_token=SECRET") == ExternalBrowserPolicy.HOME)
+    check(ExternalBrowserPolicy.target("https://example.org/#%61ccess_token=SECRET") == ExternalBrowserPolicy.HOME)
+    check(ExternalBrowserPolicy.target("https://example.org/#/callback?access_token=SECRET") == ExternalBrowserPolicy.HOME)
+    check(ExternalBrowserPolicy.target("https://example.org/path?redirect=https%3A%2F%2Fevil.test%2Fcode%3DSECRET") == ExternalBrowserPolicy.HOME)
+    check(ExternalBrowserPolicy.target("https://accounts.google.com.attacker.test/guide") ==
+        "https://accounts.google.com.attacker.test/guide")
+    check(ExternalBrowserPolicy.target("http://example.org/") == null)
+    check(ExternalBrowserPolicy.target("javascript:alert(1)") == null)
+    check(ExternalBrowserPolicy.target("https://user:pass@example.org/") == null)
+    check(ExternalBrowserPolicy.target("https://example.org:8443/path") == null)
+    check(ExternalBrowserPolicy.target("https://example.org/\u202Eunsafe") == null)
+    check(ExternalBrowserPolicy.target("https://example.org/" + "x".repeat(9000)) == null)
     println("PolicySmoke: browser policy, concurrency, URL safety and local statistics assertions passed")
 }

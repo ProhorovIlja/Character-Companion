@@ -386,7 +386,8 @@ class GeckoActivity : Activity() {
         super.onNewIntent(intent)
         val safe = sharedLink(intent)
         if (intent.action == Intent.ACTION_SEND) setIntent(Intent(Intent.ACTION_MAIN))
-        if (safe != null && ::session.isInitialized && session.isOpen) session.loadUri(safe)
+        if (safe != null && !needsRecovery && ::session.isInitialized && session.isOpen)
+            session.loadUri(safe)
     }
 
     /** SAF selection: Gecko sees only URIs explicitly selected by the user, not device storage. */
@@ -790,13 +791,20 @@ class GeckoActivity : Activity() {
     }
 
     private fun confirmBrowser(url: String) {
-        if (!UrlPolicy.isHttps(url)) return
+        // Even on explicit handoff never forward OAuth code/state/token fragments
+        // to a different browser with an unrelated cookie jar.
+        val target = ExternalBrowserPolicy.target(url) ?: return
+        val sensitive = target != url
         AlertDialog.Builder(this).setTitle(R.string.external_link_title)
-            .setMessage(getString(R.string.external_link_message, android.net.Uri.parse(url).host ?: "?"))
+            .setMessage(if (sensitive) getString(R.string.gecko_external_sensitive)
+                else getString(R.string.external_link_message, Uri.parse(target).host ?: "?"))
             .setPositiveButton(R.string.open_browser) { _, _ ->
                 try {
-                    startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE))
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target))
+                        .addCategory(Intent.CATEGORY_BROWSABLE))
                 } catch (_: ActivityNotFoundException) {
+                    Toast.makeText(this, R.string.error_browser, Toast.LENGTH_SHORT).show()
+                } catch (_: SecurityException) {
                     Toast.makeText(this, R.string.error_browser, Toast.LENGTH_SHORT).show()
                 }
             }.setNegativeButton(R.string.cancel, null).show()

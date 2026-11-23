@@ -1,3 +1,7 @@
+## v0.26.0 Gecko external-browser handoff
+
+An external browser has a different cookie jar from GeckoView. Never hand off transient OAuth authorization codes, `state`, bearer tokens, callback URLs, implicit-flow fragments or signed redirect parameters from the embedded session. `ExternalBrowserPolicy.target` enforces HTTPS, rejects malformed URLs and falls back to a fixed Character.AI home address for sensitive transfers, with an explicit confirmation. The feature does not implement or guarantee Google/Apple sign-in.
+
 # Security and privacy model · v0.7.0
 
 The Android client is a native wrapper that loads first-party Character.AI content. No native password form, Character.AI token extraction, private API calls, JS credential bridge, proxy/VPN, analytics SDK, automated tasks or content storage exist. The UI communicates via the official `WebView`; the website remains under Character.AI's control.
