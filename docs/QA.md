@@ -1,8 +1,8 @@
-# Quality assurance · 2026-11-23 · v0.11.0-rc1
+# Quality assurance · 2026-11-23 · v0.13.0-rc1
 
 ## Completed in offline environment
 
-- `bash scripts/test-offline.sh` passed: **30 Python structural tests** and **185 Kotlin assertions**.
+- `bash scripts/test-offline.sh` passed: **48 Python structural/unit tests** and **212 Kotlin assertions**.
 - Kotlin checks cover HTTPS and hostname boundaries, rejecting domain spoofing, protected service hosts, strict filter rules/overrides, URL query sanitization, identity URL discrimination, request counts and bounded Reader behavior.
 - Static checks cover XML parsing, RU/EN parity, privacy manifest defaults, no scheduled jobs, HTTPS-only surface, atomic settings import, conservative domain rules and no Javascript bridge.
 - New offline cases cover URL sharing sanitization (including encoded auth paths), four browser profiles, UI code contracts for external-link and download confirmation, fullscreen, permission cleanup, and legacy storage sanitization.
@@ -104,3 +104,13 @@
 - 47 Python structural/unit tests and 200 pure Kotlin assertions pass locally.
 - New cases cover Android 17 IME WindowInsets usage, native error fallback, explicit diagnostic copy, sanitization of untrusted version/provider text, renderer crash counters and localized Android resources.
 - No Android SDK build, lint, emulator, Google OAuth return, calls or device performance benchmark performed.
+
+## v0.13 Android native-workspace validation — PENDING
+
+- Start a fresh installation without internet; the native library must render with no outbound request until the user selects WebView or system browser. Test launch with empty bookmarks.
+- Save up to 100 character links, search with case/space variations, close with Android Back and hardware/software keyboard, rotate, then reopen by long-pressing Home.
+- Verify only sanitized first-party Character.AI bookmarks are displayed and none contain login/OAuth data or untrusted domains.
+- Confirm WebView media/timers pause while hub is visible and resume after navigating back; verify text input and overlay layering on Pixel 8a Android 17.
+- Export/import manual JSON; ensure hub preference survives and **camera/microphone request permission remains off after import** even if backup contained `mediaAllowed: true`.
+- Measure Android app startup time, frame jank, memory PSS and battery against the v0.12 shell and official client; no performance claim until hardware measurement.
+- Install debug APK from a full verified Git checkout only after real Gradle/Android SDK build; do not publish a GitHub Release until an independently signed APK passes device QA.

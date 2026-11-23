@@ -131,4 +131,16 @@
     <string name="diagnostics_copy">Copy diagnostics</string>
     <string name="diagnostics_copied">Diagnostics copied to clipboard</string>
     <string name="error_server">Server error (HTTP %1$d). Retry or open in browser.</string>
+    <string name="hub_open">Open native workspace</string>
+    <string name="hub_on_launch">Open native workspace on launch</string>
+    <string name="hub_on_launch_desc">Offline bookmark library, no Character.AI page loaded until you choose it</string>
+    <string name="hub_title">CHARACTER COMPANION</string>
+    <string name="hub_description">Your private, offline Android workspace. Search saved links locally; no account data or conversations are read.</string>
+    <string name="hub_continue">Continue in Character.AI WebView</string>
+    <string name="hub_open_browser">Character.AI in system browser</string>
+    <string name="hub_add_bookmark">Save current page</string>
+    <string name="hub_privacy">Privacy statistics</string>
+    <string name="hub_library">YOUR OFFLINE LIBRARY</string>
+    <string name="hub_search_hint">Search saved characters and pages</string>
+    <string name="hub_empty">No matching bookmarks. Save a page to build your library.</string>
 </resources>

@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.13.0-rc1 — 2026-11-23 (source candidate; no APK)
+
+- New fully native offline startup workspace and searchable local bookmark library, bilingual UI, privacy shortcuts and explicit browser handoff.
+- Native workspace pauses WebView while displayed; first launch defers remote site navigation until user action. Native layout uses Android Views, not Electron.
+- Stored configuration can opt out of native startup; long-press Home reopens the workspace.
+- Privacy-safe settings import never silently enables media capture consent.
+- 48 Python tests, 212 standalone Kotlin assertions. No verified Android binary, GitHub Release, or Android 17 on-device validation.
+
+
 ## v0.12.0-rc1 — 2026-11-23 (source candidate; no APK)
 
 - Android 11–17 IME tracking uses system WindowInsets, with Android 10 layout fallback.

@@ -177,7 +177,7 @@ class Structure(unittest.TestCase):
         self.assertIn('BoundedText.read(reader, RuleListParser.MAX_CHARACTERS)', activity)
         self.assertIn('IMPORT_FILTER_LIST ->', activity)
         self.assertIn('if (configuration == appliedConfiguration) return', engine)
-        self.assertIn('RuleListParser,IncomingLinkParser,BrowserSessionPolicy,RendererRecoveryBudget,SupportReport}.kt', script)
+        self.assertIn('RuleListParser,IncomingLinkParser,BrowserSessionPolicy,RendererRecoveryBudget,SupportReport,NativeLibrarySearch}.kt', script)
         self.assertNotIn('https://easylist.to/easylist/easylist.txt', activity)
         self.assertNotIn('PeriodicWorkRequest', activity)
 
@@ -214,6 +214,29 @@ class Structure(unittest.TestCase):
         self.assertIn('UrlPolicy.sanitizeBookmark', parsed)
         self.assertIn('onNewIntent(intent: Intent)', main)
         self.assertIn('setIntent(Intent(Intent.ACTION_MAIN))', main)
+
+    def test_native_offline_workspace_lifecycle_and_privacy(self):
+        activity=(ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
+        settings=(ROOT/'app/src/main/java/dev/caicompanion/app/SettingsStore.kt').read_text()
+        library=(ROOT/'app/src/main/java/dev/caicompanion/app/NativeLibrarySearch.kt').read_text()
+        self.assertIn('if (store.startInHub) showNativeHub() else webView.loadUrl(lastUrl)', activity)
+        self.assertIn('private fun showNativeHub()', activity)
+        self.assertIn('private fun closeNativeHub()', activity)
+        self.assertIn('NativeLibrarySearch.filter(store.listBookmarks(), query)', activity)
+        self.assertIn('InputFilter.LengthFilter(80)', activity)
+        self.assertIn('nativeHub != null -> closeNativeHub()', activity)
+        self.assertIn('webView.onPause()\n        container.addView(panel', activity)
+        self.assertIn('getBoolean("start_in_native_hub", true)', settings)
+        self.assertIn('put("startInHub", startInHub)', settings)
+        self.assertIn('.putBoolean("media_allowed", false)', settings)
+        self.assertIn('UrlPolicy.sanitizeBookmark(rawUrl)', library)
+        self.assertNotIn('android.webkit.WebView', library)
+        self.assertNotIn('httpURLConnection', library)
+        self.assertNotIn('addJavascriptInterface(', activity)
+        for filename in ('values/strings.xml', 'values-ru/strings.xml'):
+            text=(ROOT/'app/src/main/res'/filename).read_text()
+            self.assertIn('name="hub_title"',text)
+            self.assertIn('name="hub_search_hint"',text)
 
     def test_screen_privacy_opt_in_not_always_on(self):
         main=(ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
@@ -257,9 +280,9 @@ class Structure(unittest.TestCase):
     def test_browser_dependencies_are_pinned_without_new_permissions(self):
         build=(ROOT/'app/build.gradle.kts').read_text()
         manifest=(ROOT/'app/src/main/AndroidManifest.xml').read_text()
-        self.assertIn('versionName = "0.12.0-rc1"', build)
-        self.assertIn("VERSION='0.12.0-rc1'", (ROOT/'scripts/prepare-release.sh').read_text())
-        self.assertIn("versionCode='12'", (ROOT/'scripts/prepare-release.sh').read_text())
+        self.assertIn('versionName = "0.13.0-rc1"', build)
+        self.assertIn("VERSION='0.13.0-rc1'", (ROOT/'scripts/prepare-release.sh').read_text())
+        self.assertIn("versionCode='13'", (ROOT/'scripts/prepare-release.sh').read_text())
         self.assertIn('androidx.browser:browser:1.10.0', build)
         self.assertIn('androidx.webkit:webkit:1.18.0', build)
         self.assertNotIn('android.permission.QUERY_ALL_PACKAGES', manifest)

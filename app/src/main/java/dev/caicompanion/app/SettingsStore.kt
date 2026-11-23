@@ -7,6 +7,9 @@ import org.json.JSONObject
 /** Stores only browser shell configuration and user bookmarks, never messages or credentials. */
 class SettingsStore(context: Context) {
     private val prefs = context.getSharedPreferences("character_companion_v2", Context.MODE_PRIVATE)
+    var startInHub: Boolean
+        get() = prefs.getBoolean("start_in_native_hub", true)
+        set(v) = prefs.edit().putBoolean("start_in_native_hub", v).apply()
     var protectScreen: Boolean
         get() = prefs.getBoolean("protect_screen", false)
         set(v) = prefs.edit().putBoolean("protect_screen", v).apply()
@@ -106,6 +109,7 @@ class SettingsStore(context: Context) {
     fun exportJson(): String = JSONObject().apply {
         put("schema", 1)
         put("application", "Character Companion for Android")
+        put("startInHub", startInHub)
         put("blocking", blocking)
         put("protectScreen", protectScreen)
         put("strictBlocking", strictBlocking)
@@ -142,13 +146,14 @@ class SettingsStore(context: Context) {
             bookmarkArray.put(JSONObject().put("title", title).put("url", url))
         }
         prefs.edit()
+            .putBoolean("start_in_native_hub", parsed.optBoolean("startInHub", true))
             .putBoolean("blocking", parsed.optBoolean("blocking", true))
             .putBoolean("protect_screen", parsed.optBoolean("protectScreen", false))
             .putBoolean("strict_blocking", parsed.optBoolean("strictBlocking", false))
             .putBoolean("reduce_images", parsed.optBoolean("reduceImages", false))
             .putBoolean("third_party_cookies", parsed.optBoolean("thirdPartyCookies", true))
             .putBoolean("media_gesture", parsed.optBoolean("mediaRequiresGesture", true))
-            .putBoolean("media_allowed", parsed.optBoolean("mediaAllowed", false))
+            .putBoolean("media_allowed", false) // Never import a privileged consent toggle
             .putBoolean("desktop_mode", parsed.optBoolean("desktopMode", false))
             .putBoolean("resume_page", parsed.optBoolean("resumePage", false))
             .putBoolean("compact_chrome", parsed.optBoolean("compactChrome", false))

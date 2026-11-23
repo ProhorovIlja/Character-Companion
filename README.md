@@ -1,8 +1,11 @@
 # Character Companion — Android
 
-**v0.12.0-rc1 source candidate · 23 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
+**v0.13.0-rc1 source candidate (23 November 2026).** Adds a native offline workspace with searchable saved links. No Android APK was built or device-tested in this environment. See [Native architecture](docs/NATIVE_ARCHITECTURE.md) and [release notes](docs/RELEASE_NOTES_v0.13.0-rc1.md).
 
-**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (47 Python unit/structural tests + 200 Kotlin `check` assertions). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
+
+**Previous v0.12.0-rc1 source candidate · 23 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
+
+**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (48 Python unit/structural tests + 212 Kotlin `check` assertions). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
 
 ## v0.11.0-rc1 — Android 17 & XAPK research readiness (NOT an APK release)
 

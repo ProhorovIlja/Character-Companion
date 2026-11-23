@@ -131,4 +131,16 @@
     <string name="diagnostics_copy">Скопировать диагностику</string>
     <string name="diagnostics_copied">Диагностика скопирована</string>
     <string name="error_server">Ошибка сервера (HTTP %1$d). Повторите запрос или откройте сайт в браузере.</string>
+    <string name="hub_open">Открыть нативное пространство</string>
+    <string name="hub_on_launch">Открывать нативное пространство при запуске</string>
+    <string name="hub_on_launch_desc">Офлайн-библиотека закладок; сайт загрузится только после выбора</string>
+    <string name="hub_title">CHARACTER COMPANION</string>
+    <string name="hub_description">Личное офлайн-пространство Android. Поиск по сохранённым ссылкам без сети; переписки и данные аккаунта не читаются.</string>
+    <string name="hub_continue">Продолжить в Character.AI (WebView)</string>
+    <string name="hub_open_browser">Character.AI в системном браузере</string>
+    <string name="hub_add_bookmark">Сохранить текущую страницу</string>
+    <string name="hub_privacy">Статистика приватности</string>
+    <string name="hub_library">ВАША ОФЛАЙН-БИБЛИОТЕКА</string>
+    <string name="hub_search_hint">Поиск по сохранённым персонажам и страницам</string>
+    <string name="hub_empty">Совпадений нет. Сохраните страницу, чтобы пополнить библиотеку.</string>
 </resources>

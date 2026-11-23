@@ -39,6 +39,9 @@ import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
+import android.text.Editable
+import android.text.TextWatcher
+import android.text.InputFilter
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -92,6 +95,7 @@ class MainActivity : Activity() {
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
     private var destroyed = false
     private var keyboardVisible = false
+    private var nativeHub: View? = null
     private var modernBackCallback: OnBackInvokedCallback? = null
     private val rendererRecovery = RendererRecoveryBudget()
 
@@ -153,7 +157,7 @@ class MainActivity : Activity() {
         // Drop untrusted share extras from the Activity's retained Intent after validation.
         if (intent?.action == Intent.ACTION_SEND) setIntent(Intent(Intent.ACTION_MAIN))
         lastUrl = initialShare ?: (if (store.resumePage) store.lastVisited.ifBlank { HOME } else HOME)
-        webView.loadUrl(lastUrl)
+        if (store.startInHub) showNativeHub() else webView.loadUrl(lastUrl)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             modernBackCallback = OnBackInvokedCallback { navigateBack() }
             onBackInvokedDispatcher.registerOnBackInvokedCallback(
@@ -488,7 +492,8 @@ class MainActivity : Activity() {
         findViewById<View>(R.id.back).setOnClickListener { if (webView.canGoBack()) webView.goBack() }
         findViewById<View>(R.id.forward).setOnClickListener { if (webView.canGoForward()) webView.goForward() }
         findViewById<View>(R.id.reload).setOnClickListener { webView.reload() }
-        findViewById<View>(R.id.home).setOnClickListener { webView.loadUrl(HOME) }
+        findViewById<View>(R.id.home).setOnClickListener { closeNativeHub(); webView.loadUrl(HOME) }
+        findViewById<View>(R.id.home).setOnLongClickListener { showNativeHub(); true }
         findViewById<View>(R.id.open_browser).setOnClickListener {
             openBrowserTab(BrowserSessionPolicy.safeTabUrl(webView.url))
         }
@@ -669,6 +674,103 @@ class MainActivity : Activity() {
         refreshBackForward()
     }
 
+    /** Independent native offline home. Does not request Character.AI APIs or load the site. */
+    private fun showNativeHub() {
+        if (destroyed || nativeHub != null) return
+        val panel = ScrollView(this).apply {
+            setBackgroundColor(Color.rgb(17, 18, 25))
+            isFillViewport = true
+        }
+        val layout = settingsColumn()
+        panel.addView(layout)
+        val heading = TextView(this).apply {
+            text = getString(R.string.hub_title)
+            textSize = 21f
+            setTextColor(ACCENT)
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(0, dp(8), 0, dp(10))
+        }
+        layout.addView(heading)
+        layout.addView(infoLabel(getString(R.string.hub_description)))
+        addButton(layout, getString(R.string.hub_continue)) {
+            val destination = UrlPolicy.sanitizeBookmark(lastUrl) ?: HOME
+            closeNativeHub()
+            webView.loadUrl(destination)
+        }
+        addButton(layout, getString(R.string.hub_open_browser)) {
+            openBrowserTab(BrowserSessionPolicy.HOME)
+        }
+        addButton(layout, getString(R.string.hub_add_bookmark)) {
+            val url = UrlPolicy.sanitizeBookmark(webView.url)
+            if (url == null) showToast(getString(R.string.link_unavailable))
+            else {
+                store.addBookmark(webView.title ?: "Character.AI", url)
+                showToast(getString(R.string.bookmark_saved))
+                closeNativeHub()
+                showNativeHub()
+            }
+        }
+        addButton(layout, getString(R.string.hub_privacy)) { showPrivacyStats() }
+        layout.addView(sectionLabel(getString(R.string.hub_library)))
+        val search = EditText(this).apply {
+            hint = getString(R.string.hub_search_hint)
+            setTextColor(TEXT)
+            setHintTextColor(MUTED)
+            isSingleLine = true
+            filters = arrayOf(InputFilter.LengthFilter(80))
+        }
+        layout.addView(search)
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        layout.addView(list)
+        fun refresh(query: String) {
+            list.removeAllViews()
+            val saved = NativeLibrarySearch.filter(store.listBookmarks(), query)
+            if (saved.isEmpty()) {
+                list.addView(infoLabel(getString(R.string.hub_empty)))
+                return
+            }
+            for ((title, url) in saved) {
+                val item = Button(this).apply {
+                    text = title
+                    isAllCaps = false
+                    minHeight = dp(52)
+                    contentDescription = title
+                    setOnClickListener {
+                        closeNativeHub()
+                        webView.loadUrl(url)
+                    }
+                }
+                list.addView(item, LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            }
+        }
+        search.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                refresh(s?.toString().orEmpty())
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+        refresh("")
+        addButton(layout, getString(R.string.close)) { closeNativeHub() }
+        nativeHub = panel
+        // Pause timers/media while the independent offline screen covers the site.
+        webView.onPause()
+        container.addView(panel, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        panel.bringToFront()
+    }
+
+    private fun closeNativeHub() {
+        nativeHub?.let {
+            (getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager)
+                ?.hideSoftInputFromWindow(it.windowToken, 0)
+            container.removeView(it)
+        }
+        nativeHub = null
+        if (!destroyed && ::webView.isInitialized) webView.onResume()
+    }
+
     private fun showBookmarks() {
         val url = UrlPolicy.sanitizeBookmark(webView.url) ?: HOME
         val saved = store.listBookmarks()
@@ -730,6 +832,10 @@ class MainActivity : Activity() {
         layout.addView(sectionLabel(getString(R.string.section_profiles)))
         addButton(layout, getString(R.string.profile_title)) { showProfiles() }
         layout.addView(infoLabel(getString(R.string.profile_desc)))
+        addButton(layout, getString(R.string.hub_open)) { showNativeHub() }
+        addToggle(layout, getString(R.string.hub_on_launch), getString(R.string.hub_on_launch_desc), store.startInHub) {
+            store.startInHub = it
+        }
         layout.addView(sectionLabel(getString(R.string.section_browser_session)))
         addButton(layout, getString(R.string.browser_session_open)) {
             openBrowserTab(BrowserSessionPolicy.HOME)
@@ -973,6 +1079,7 @@ class MainActivity : Activity() {
 
     private fun navigateBack() {
         when {
+            nativeHub != null -> closeNativeHub()
             fullscreenView != null -> leaveFullscreen()
             webView.canGoBack() -> webView.goBack()
             else -> finish()
@@ -1007,6 +1114,7 @@ class MainActivity : Activity() {
             modernBackCallback = null
         }
         leaveFullscreen()
+        closeNativeHub()
         denyPendingMedia()
         chooser?.onReceiveValue(null); chooser = null
         container.removeView(webView)

@@ -10,10 +10,30 @@ import dev.caicompanion.app.IncomingLinkParser
 import dev.caicompanion.app.BrowserProfile
 import dev.caicompanion.app.BrowserSessionPolicy
 import dev.caicompanion.app.RendererRecoveryBudget
+import dev.caicompanion.app.NativeLibrarySearch
 import dev.caicompanion.app.SupportReport
 import java.io.StringReader
 
 fun main() {
+    val library = listOf(
+        "Tessa | Gothic" to "https://character.ai/chat/a",
+        " Hunter Stories " to "https://character.ai/chat/b?access_token=redacted",
+        "NOT SAFE" to "https://evil.example/chat/c",
+        "Duplicate" to "https://character.ai/chat/a"
+    )
+    check(NativeLibrarySearch.filter(library, "").size == 2)
+    check(NativeLibrarySearch.filter(library, "GOTHIC").single().first == "Tessa | Gothic")
+    check(NativeLibrarySearch.filter(library, "hunter chat").single().second == "https://character.ai/chat/b")
+    check(NativeLibrarySearch.filter(library, "not-safe").isEmpty())
+    check(NativeLibrarySearch.filter(library, "", 1).size == 1)
+    check(NativeLibrarySearch.filter(library, "", 0).isEmpty())
+    check(NativeLibrarySearch.filter(library, "not found").isEmpty())
+    check(NativeLibrarySearch.filter(library, "HUNTER  chat", 2).size == 1)
+    check(NativeLibrarySearch.filter(library, "GOTHIC", 0).isEmpty())
+    check(NativeLibrarySearch.filter(emptyList(), "").isEmpty())
+    check(NativeLibrarySearch.filter(listOf("Bad" to "https://accounts.google.com/callback"), "").isEmpty())
+    check(NativeLibrarySearch.filter(listOf("Good" to "https://character.ai/"), "Good").single().first == "Good")
+
     val crashBudget = RendererRecoveryBudget(3, 120_000L)
     check(crashBudget.allowAutomaticRestart(10_000))
     check(crashBudget.allowAutomaticRestart(10_100))
