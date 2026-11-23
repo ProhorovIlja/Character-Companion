@@ -12,6 +12,6 @@ class BrowserBridgeRuntimeSmoke(unittest.TestCase):
         result=subprocess.run(['node', str(HERE/'bridge_runtime.js')], cwd=HERE,
                               capture_output=True, text=True, timeout=15)
         self.assertEqual(result.returncode, 0, result.stdout+'\n'+result.stderr)
-        self.assertIn('PASS 8',result.stdout)
+        self.assertIn('PASS 11',result.stdout)
 
 if __name__=='__main__': unittest.main()

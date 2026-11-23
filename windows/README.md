@@ -1,3 +1,5 @@
+**v0.6.0 source:** Auto-send is tied to the first-party conversation page observed when the microphone starts. Page navigation, draft editing (including undo) or a changed DOM page cancels auto-send; recognized text stays editable. The `ComposerBridge` verifies the exact URL inside its JavaScript task. Cancel Recording skips resampling and transcription. [Detailed release notes](RELEASE_NOTES_v0.6.0-prealpha.md). **No compiled Windows executable yet.**
+
 # Character Companion · Windows 0.5.0 pre-alpha — bundled CEF, NOT WebView2
 
 **v0.5.0 source:** NAudio capture now tries PCM16 48/44.1/16-kHz mono and 48/44.1-kHz stereo formats, then a bounded streaming resampler produces 16-kHz mono WAV for offline whisper.cpp. This code has not been run on Windows or compiled in this environment. [Speech change notes](RELEASE_NOTES_v0.5.0-prealpha.md).

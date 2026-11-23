@@ -43,3 +43,16 @@ The preceding source-only tests do **not** qualify as completion of this list.
 ## v0.5.0 speech capture acceptance
 
 On Windows, test a 48-kHz default input, a 44.1-kHz input and a device that lacks native 16-kHz capture. Stop and cancel recordings, confirm no truncated WAV or stale native-capture temp file, and check generated 16-kHz mono RIFF metadata before using whisper.cpp. Repeat with a stereo-only capture driver if available. Run `dotnet run --project windows/PolicySmoke/CharacterCompanion.PolicySmoke.csproj` to execute the source-linked URL and PCM regression checks. Document perceived speech quality and latency; none of these real-device checks were performed in the source-only environment.
+
+
+### v0.6.0 conversation-bound dictation (manual Windows signoff)
+
+1. With Character.AI conversation **A** open, record, then navigate to **B** and select Transcribe & Send. The transcript must remain in the native draft, with **no send attempt in B**.
+2. Repeat with A→B→A. The navigation revision must still cancel the original automatic send.
+3. Repeat while recording and again while Whisper is transcribing. Also try a page reload and a tab/hash navigation; the JS bridge must reject any different current URL.
+4. Edit the draft and undo it before recognition ends. The edit revision must cancel auto-send even when the text is identical to its previous snapshot.
+5. Start recording before any first-party page is ready. Recognition may still work; automatic send is suppressed.
+6. From a stable first-party chat with an initially empty, unmodified draft, a user-initiated Transcribe & Send may attempt **one** clearly labeled send button. Verify actual receipt on the real service separately.
+7. Cancel a 1–3-minute recording: it must not transcribe or convert to a second WAV, and temporary files should be removed. Test microphone format fallback and driver failure.
+
+These are real Windows integration tests pending compilation and hardware access; Node synthetic DOM checks alone are not a signoff.

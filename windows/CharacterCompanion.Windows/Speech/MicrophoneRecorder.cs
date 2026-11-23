@@ -31,10 +31,12 @@ public sealed class MicrophoneRecorder : IDisposable
         FilePath = Path.Combine(folder, $"cc-{id}-16k.wav");
         _nativePath = Path.Combine(folder, $"cc-{id}-capture.wav");
         _bytes = 0;
-        _stopped = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         Exception? lastError = null;
         foreach (var (rate, channels) in CaptureFormats)
         {
+            // Each failed capture attempt must have an independent completion source.
+            // Some drivers invoke RecordingStopped even when StartRecording fails.
+            _stopped = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
             var format = new WaveFormat(rate, 16, channels);
             try
             {
@@ -43,13 +45,14 @@ public sealed class MicrophoneRecorder : IDisposable
                 _mic.DataAvailable += OnDataAvailable;
                 _mic.RecordingStopped += OnRecordingStopped;
                 _maxPcmBytes = checked(format.AverageBytesPerSecond * 180);
-                _mic.StartRecording();
                 IsRecording = true;
+                _mic.StartRecording();
                 return;
             }
             catch (Exception ex)
             {
                 lastError = ex;
+                IsRecording = false;
                 _mic?.Dispose(); _mic = null;
                 _writer?.Dispose(); _writer = null;
                 EraseTemporaryRecording(_nativePath);
@@ -115,6 +118,28 @@ public sealed class MicrophoneRecorder : IDisposable
         finally
         {
             EraseTemporaryRecording(_nativePath);
+        }
+    }
+
+    /// <summary>
+    /// Abandons a recording without PCM conversion or any speech recognition.
+    /// Unlike StopAsync this never creates a normalized output WAV.
+    /// </summary>
+    public async Task CancelAsync()
+    {
+        try
+        {
+            if (IsRecording) _mic?.StopRecording();
+            if (_stopped is not null)
+            {
+                try { await _stopped.Task.WaitAsync(TimeSpan.FromSeconds(5)); }
+                catch (Exception) { /* Cancellation must still clean up on driver failure. */ }
+            }
+        }
+        finally
+        {
+            Dispose();
+            EraseTemporaryRecording(FilePath);
         }
     }
 

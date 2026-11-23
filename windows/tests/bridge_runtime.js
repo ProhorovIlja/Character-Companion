@@ -11,7 +11,9 @@ assert(match, 'Could not extract bridge JS template from actual C# source');
 const template = match[1];
 assert(template.includes('{{payload}}') && template.includes('{{sendArg}}'));
 
-function run({text, send=false, origin='https://character.ai', editorCount=1, buttonCount=1, frame=false}) {
+function run({text, send=false, origin='https://character.ai', editorCount=1, buttonCount=1, frame=false, href, expectedPage}) {
+  href = href ?? origin + '/chat/abc';
+  expectedPage = expectedPage ?? href;
   let clicked = 0;
   let dispatched = 0;
   class FakeTextArea {
@@ -33,13 +35,13 @@ function run({text, send=false, origin='https://character.ai', editorCount=1, bu
   const editors = Array.from({length:editorCount},()=>new FakeTextArea());
   const doc={ querySelectorAll:()=>editors };
   const win={}; win.top=frame?{}:win;
-  const context={window:win,location:{origin},document:doc,
+  const context={window:win,location:{origin,href},document:doc,
     getComputedStyle:()=>({visibility:'visible',display:'block'}),
     HTMLTextAreaElement:FakeTextArea,
     InputEvent:class { constructor(type,opts) { this.type=type;this.options=opts;} },
     Event:class{ constructor(type,opts) {this.type=type;this.options=opts;} }
   };
-  const script=template.replace('{{payload}}',JSON.stringify(text)).replace('{{sendArg}}',send?'true':'false');
+  const script=template.replace('{{payload}}',JSON.stringify(text)).replace('{{sendArg}}',send?'true':'false').replace('{{pageArg}}',JSON.stringify(expectedPage));
   const result=vm.runInNewContext(script,context,{timeout:1000});
   return {result,clicked,dispatched,editors};
 }
@@ -84,4 +86,21 @@ function run({text, send=false, origin='https://character.ai', editorCount=1, bu
   const x=run({text:'Hello',send:true,origin:'https://chat.character.ai'});
   assert.equal(x.result.ok,true);assert.equal(x.clicked,1);
 }
-console.log('ComposerBridge runtime: PASS 8 deterministic DOM scenarios');
+{
+  // A stale dictation must not edit/send to another chat on the same allowed origin.
+  const x=run({text:'Do not send', send:true,
+    href:'https://character.ai/chat/second', expectedPage:'https://character.ai/chat/first'});
+  assert.equal(x.result.ok,false); assert.equal(x.result.reason,'page-changed');
+  assert.equal(x.clicked,0); assert.equal(x.dispatched,0);
+}
+{
+  const x=run({text:'Do not send', send:true,
+    href:'https://character.ai/chat/first#different',expectedPage:'https://character.ai/chat/first'});
+  assert.equal(x.result.ok,false); assert.equal(x.clicked,0);
+}
+{
+  const x=run({text:'All good', send:true,
+    href:'https://character.ai/chat/first', expectedPage:'https://character.ai/chat/first'});
+  assert.equal(x.result.ok,true); assert.equal(x.clicked,1);
+}
+console.log('ComposerBridge runtime: PASS 11 deterministic DOM scenarios');

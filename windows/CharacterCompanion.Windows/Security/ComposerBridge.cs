@@ -8,18 +8,25 @@ namespace CharacterCompanion.Windows.Security;
 /// </summary>
 public static class ComposerBridge
 {
-    public static string BuildScript(string text, bool send)
+    public static string BuildScript(string text, bool send, string expectedPage)
     {
         // JSON encoding prevents script injection even for quotes, HTML or newlines.
         var payload = JsonSerializer.Serialize(text);
         var sendArg = send ? "true" : "false";
+        var pageArg = JsonSerializer.Serialize(expectedPage);
         return $$"""
         (() => {
           'use strict';
           const text = {{payload}};
           const send = {{sendArg}};
+          const expectedPage = {{pageArg}};
           if (window.top !== window || !/^https:\/\/([a-z0-9-]+\.)*character\.ai(?::443)?$/i.test(location.origin)) {
             return {ok:false, reason:'untrusted-origin'};
+          }
+          // CEF may navigate during recognition or before EvaluateScriptAsync runs.
+          // Validate the exact conversation page inside the same JS task that edits it.
+          if (location.href !== expectedPage) {
+            return {ok:false, reason:'page-changed'};
           }
           const visible = el => {
             const r = el.getBoundingClientRect();

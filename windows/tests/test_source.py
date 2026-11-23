@@ -39,6 +39,8 @@ class WindowsSourceAudit(unittest.TestCase):
         self.assertIn('unique.length !== 1',bridge)
         self.assertIn('buttons.length !== 1',bridge)
         self.assertIn('JsonSerializer.Serialize(text)',bridge)
+        self.assertIn('JsonSerializer.Serialize(expectedPage)',bridge)
+        self.assertIn('location.href !== expectedPage',bridge)
         self.assertIn('untrusted-origin',bridge)
         self.assertIn('click-invoked-unconfirmed',bridge)
 
@@ -88,11 +90,27 @@ class WindowsSourceAudit(unittest.TestCase):
         self.assertIn('draftEditedWhileWorking',code)
         self.assertIn('canAutoSend = sendAfter && string.IsNullOrWhiteSpace(draftBeforeTranscription)',code)
         self.assertIn('if (canAutoSend)',code)
-        self.assertIn('await InsertDraftAsync(true, fromTranscription: true)',code)
+        self.assertIn('await InsertDraftAsync(true, fromTranscription: true, expectedPage: originalPage)',code)
         self.assertIn('_bridgeBusy',code)
         self.assertIn('(_busy && !fromTranscription)',code)
+        self.assertIn('originalConversationStillOpen',code)
+        self.assertIn('_draftRevision != draftEpochAtStop',code)
+        self.assertIn('draftEpochAtStop != draftEpochAtStart',code)
+        self.assertIn('Interlocked.Read(ref _navigationEpoch) == originalEpoch',code)
+        self.assertIn('Interlocked.Increment(ref _navigationEpoch)',code)
+        self.assertIn('await recorder.CancelAsync()',code)
         self.assertIn('DraftText_KeyDown',code)
         self.assertIn('ClearDraft_Click',code)
+
+    def test_cancel_does_not_resample_or_transcribe(self):
+        code = self.src('Speech/MicrophoneRecorder.cs')
+        start = code.index('public async Task CancelAsync()')
+        end = code.index('public void Dispose()', start)
+        cancel = code[start:end]
+        self.assertIn('_stopped.Task.WaitAsync(TimeSpan.FromSeconds(5))',cancel)
+        self.assertIn('EraseTemporaryRecording(FilePath)',cancel)
+        self.assertNotIn('Pcm16Resampler.Convert',cancel)
+        self.assertIn('IsRecording = true;\n                _mic.StartRecording();',code)
 
     def test_whisper_cleanup_waits_for_exit(self):
         code=self.src('Speech/WhisperCliTranscriber.cs')

@@ -1,3 +1,8 @@
+## v0.30.0-source — 2026-11-23
+- Windows 0.6.0 pre-alpha: auto-send now binds the dictation to the original Character.AI conversation using browser navigation revision and an independent exact-page check inside the ComposerBridge JavaScript. Draft edits/undo always disable automatic send. Manual review remains available.
+- Cancel Recording stops and deletes temp audio without resampling; microphone capture fallback no longer shares completion state across failed formats.
+- Android gecko/legacy unchanged (0.25.0-rc1); source-only, no device-compiled APK/EXE, no CI or automations. [Release notes](RELEASE_NOTES_v0.30.0-source.md).
+
 ## v0.29.0-source — 2026-11-23
 - GeckoView revokes pending SAF uploads and unconfirmed downloads upon top-level URL changes or reload, with a pure Kotlin same-page guard. Android version 0.25.0-rc1.
 - Windows version 0.5.0 pre-alpha: PCM16 capture format fallback, local streamed native-rate-to-16k WAV conversion and source-linked .NET tests.

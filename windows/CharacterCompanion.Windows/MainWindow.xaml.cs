@@ -20,11 +20,18 @@ public partial class MainWindow : Window
     private bool _webReady;
     private bool _bridgeBusy;
     private volatile bool _filterTrackers;
+    private long _navigationEpoch;
+    private long _recordingEpoch;
+    private string? _recordingPage;
+    private long _draftRevision;
+    private long _recordingDraftRevision;
 
     public MainWindow()
     {
         _settings = AppSettings.Load();
         InitializeComponent();
+        // Track every edit, including a change that is later undone to identical text.
+        DraftText.TextChanged += (_, _) => _draftRevision++;
         _filterTrackers = _settings.FilterTrackers;
         FilterCheckbox.IsChecked = _settings.FilterTrackers;
         LanguageCombo.SelectedIndex = _settings.Language switch { "ru" => 1, "en" => 2, _ => 0 };
@@ -45,11 +52,15 @@ public partial class MainWindow : Window
                 else if (SitePolicy.IsExternalHttps(uri)) OfferExternal(uri);
                 else SetStatus("Заблокировано небезопасное всплывающее окно.");
             }));
-            Browser.AddressChanged += (_, e) => Dispatcher.BeginInvoke(() =>
+            Browser.AddressChanged += (_, e) =>
             {
-                LocationLabel.Text = SitePolicy.IsFirstParty(e.NewValue as string)
-                    ? "character.ai · локальный профиль CEF" : "Ожидание Character.AI";
-            });
+                System.Threading.Interlocked.Increment(ref _navigationEpoch);
+                Dispatcher.BeginInvoke(() =>
+                {
+                    LocationLabel.Text = SitePolicy.IsFirstParty(e.NewValue as string)
+                        ? "character.ai · локальный профиль CEF" : "Ожидание Character.AI";
+                });
+            };
             Browser.LoadError += (_, e) =>
             {
                 if (!e.Frame.IsMain || e.ErrorCode == CefErrorCode.Aborted) return;
@@ -152,6 +163,12 @@ public partial class MainWindow : Window
         {
             _recorder = new MicrophoneRecorder();
             _recorder.Start();
+            // Remember the destination at the moment recording begins. The user may
+            // navigate to another character/conversation while Whisper is running.
+            _recordingPage = Browser.IsBrowserInitialized && SitePolicy.IsFirstParty(Browser.Address)
+                ? Browser.Address : null;
+            _recordingEpoch = System.Threading.Interlocked.Read(ref _navigationEpoch);
+            _recordingDraftRevision = _draftRevision;
             RecordingStatus.Text = "Микрофон записывает · максимум 3 минуты";
             SetRecordingButtons(true);
         }
@@ -179,12 +196,12 @@ public partial class MainWindow : Window
         var recorder = _recorder;
         _busy = true;
         SetRecordingButtons(false);
-        try { await recorder.StopAsync(); }
+        try { await recorder.CancelAsync(); }
         catch (Exception) { /* Treat cancellation as no transcript. */ }
         finally
         {
             MicrophoneRecorder.EraseTemporaryRecording(recorder.FilePath);
-            recorder.Dispose(); _recorder = null; _busy = false;
+            recorder.Dispose(); _recorder = null; _recordingPage = null; _busy = false;
             SetRecordingButtons(false); RecordingStatus.Text = "Микрофон выключен";
             SetStatus("Запись отменена, временный WAV удалён.");
         }
@@ -196,6 +213,10 @@ public partial class MainWindow : Window
         var recorder = _recorder;
         // Never auto-send an earlier edited draft or text changed while Whisper is working.
         var draftBeforeTranscription = DraftText.Text;
+        var originalPage = _recordingPage;
+        var originalEpoch = _recordingEpoch;
+        var draftEpochAtStart = _recordingDraftRevision;
+        var draftEpochAtStop = _draftRevision;
         _busy = true;
         SetRecordingButtons(false);
         string? wav = null;
@@ -206,20 +227,25 @@ public partial class MainWindow : Window
             var transcript = await WhisperCliTranscriber.TranscribeAsync(
                 _settings.WhisperExecutable, _settings.WhisperModel, wav, _settings.Language);
             var draftEditedWhileWorking = !string.Equals(
-                DraftText.Text, draftBeforeTranscription, StringComparison.Ordinal);
+                DraftText.Text, draftBeforeTranscription, StringComparison.Ordinal)
+                || _draftRevision != draftEpochAtStop || draftEpochAtStop != draftEpochAtStart;
+            var originalConversationStillOpen = originalPage is not null
+                && SitePolicy.IsFirstParty(originalPage)
+                && string.Equals(Browser.Address, originalPage, StringComparison.Ordinal)
+                && System.Threading.Interlocked.Read(ref _navigationEpoch) == originalEpoch;
             var canAutoSend = sendAfter && string.IsNullOrWhiteSpace(draftBeforeTranscription)
-                && !draftEditedWhileWorking;
+                && !draftEditedWhileWorking && originalConversationStillOpen;
             DraftText.Text = string.IsNullOrWhiteSpace(DraftText.Text)
                 ? transcript : DraftText.Text.TrimEnd() + " " + transcript;
             RecordingStatus.Text = "Микрофон выключен";
             if (canAutoSend)
             {
                 SetStatus("Расшифровано локально. Выполняется отправка по запросу.");
-                await InsertDraftAsync(true, fromTranscription: true);
+                await InsertDraftAsync(true, fromTranscription: true, expectedPage: originalPage);
             }
             else if (sendAfter)
             {
-                SetStatus("Диктовка добавлена в существующий/изменённый черновик. Автоотправка отменена, чтобы не отправить чужой текст.");
+                SetStatus("Диктовка добавлена в черновик. Автоотправка отменена: прежний текст, правки или смена страницы. Проверь чат и отправь вручную.");
             }
             else SetStatus("Речь расшифрована локально. Текст можно отредактировать.");
         }
@@ -231,7 +257,7 @@ public partial class MainWindow : Window
         finally
         {
             MicrophoneRecorder.EraseTemporaryRecording(wav ?? recorder.FilePath);
-            recorder.Dispose(); _recorder = null; _busy = false;
+            recorder.Dispose(); _recorder = null; _recordingPage = null; _busy = false;
             SetRecordingButtons(false);
         }
     }
@@ -253,7 +279,7 @@ public partial class MainWindow : Window
         SetStatus("Черновик очищен по запросу.");
     }
 
-    private async Task InsertDraftAsync(bool send, bool fromTranscription = false)
+    private async Task InsertDraftAsync(bool send, bool fromTranscription = false, string? expectedPage = null)
     {
         if (_bridgeBusy || (_busy && !fromTranscription))
         {
@@ -266,12 +292,19 @@ public partial class MainWindow : Window
         {
             SetStatus("Вставка разрешена только на странице character.ai в приложении."); return;
         }
+        // No silent retargeting from the originally recorded conversation to another one.
+        var browserPage = Browser.Address;
+        if (expectedPage is not null && !string.Equals(browserPage, expectedPage, StringComparison.Ordinal))
+        {
+            SetStatus("Страница переписки изменилась. Автоотправка отменена; текст сохранён в черновике.");
+            return;
+        }
         _bridgeBusy = true;
         try
         {
             // CEF returns JS objects through dynamic value conversion. JSON.stringify gives
             // the same strict JSON envelope used by our existing tested ComposerBridge.
-            var expression = ComposerBridge.BuildScript(text, send).Trim().TrimEnd(';');
+            var expression = ComposerBridge.BuildScript(text, send, expectedPage ?? browserPage).Trim().TrimEnd(';');
             var script = "JSON.stringify(" + expression + ")";
             var response = await Browser.EvaluateScriptAsync(script, TimeSpan.FromSeconds(10));
             if (!response.Success || response.Result is not string json)

@@ -39,3 +39,8 @@ No scheduled work, automations, GitHub Actions, CI triggers or background checks
 User preference: no required separate installation of Edge or WebView2 Runtime, while retaining the Character.AI embedded site and native voice dictation. WPF/.NET 10 Windows project switched to bundled CEF through CefSharp.Wpf.NETCore 156.0.300, preserving NAudio and offline whisper.cpp. Direct CEF handlers enforce first-party top-level navigation, external-HTTPS popup confirmation and optional tracker domains; JavaScript bridge now uses CEF EvaluateScriptAsync with JSON envelope.
 
 Remember: this is SOURCE ONLY and CefSharp explicitly lacks Chromium sandbox; on Windows there is no .NET SDK to compile or verify CEF packaging, login, app size or memory. For Android the user wants independent engine research as well; GeckoView is an attractive Android-only engine, but migration requires deliberate implementation of media, downloads, permissions, cookie/profile, WebRTC and renderer recovery; original Android WebView remains a fallback until real Pixel 8a / LineageOS 24 tests. See docs/RENDERER_DECISION_2026-11-23.md.
+
+
+### v0.30.0-source continuation — November 23, 2026
+
+The new source-only Windows 0.6.0 checkpoint binds automatic speech-to-send to the exact conversation page at recording start and inside the JavaScript execution. A navigation revision prevents sending after A→B→A. Native draft edit revisions catch edits later undone. Manual Cancel stops/cleans the raw WAV without normalizing or transcription. Existing Android GeckoView/legacy is unchanged. See `docs/RELEASE_NOTES_v0.30.0-source.md`. No binary build or real website/device tests; no automations.

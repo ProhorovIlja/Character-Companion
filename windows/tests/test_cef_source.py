@@ -56,7 +56,7 @@ class BrowserEngineMigrationTests(unittest.TestCase):
         win=self.read('MainWindow.xaml.cs')
         for name in ('WhisperCliTranscriber.TranscribeAsync','StopAndTranscribeAsync(true)',
                      'StopAndTranscribeAsync(false)','CopyDraft_Click','SaveDraft_Click',
-                     'ClearDraft_Click','draftEditedWhileWorking','InsertDraftAsync(true, fromTranscription: true)'):
+                     'ClearDraft_Click','draftEditedWhileWorking','InsertDraftAsync(true, fromTranscription: true, expectedPage: originalPage)'):
             self.assertIn(name,win)
 
 if __name__=='__main__': unittest.main()
