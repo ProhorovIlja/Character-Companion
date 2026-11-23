@@ -3,7 +3,7 @@
 # Never creates a GitHub Release, starts CI, schedules tasks or stores signing keys.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-VERSION='0.10.0-rc1'
+VERSION='0.11.0-rc1'
 PKG='dev.caicompanion.app'
 APK="${1:-}"
 SIGNOFF="${2:-}"
@@ -26,9 +26,9 @@ if ! command -v git >/dev/null || ! git diff --quiet || ! git diff --cached --qu
 fi
 SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-${HOME}/Android/Sdk}}"
 APKSIGNER="$(find "$SDK/build-tools" -maxdepth 2 -name apksigner -type f 2>/dev/null | sort -V | tail -1 || true)"
-AAPT="$(find "$SDK/build-tools" -maxdepth 2 \( -name aapt2 -o -name aapt \) -type f 2>/dev/null | sort -V | tail -1 || true)"
+AAPT="$(find "$SDK/build-tools" -maxdepth 2 -name aapt -type f 2>/dev/null | sort -V | tail -1 || true)"
 if [[ -z "$APKSIGNER" || ! -x "$APKSIGNER" || -z "$AAPT" || ! -x "$AAPT" ]]; then
-  echo 'Android build-tools apksigner and aapt/aapt2 required.' >&2
+  echo 'Android build-tools apksigner and aapt (dump badging) required.' >&2
   exit 2
 fi
 SIGNATURE="$($APKSIGNER verify --verbose --print-certs "$APK" 2>&1)" || {
@@ -40,7 +40,7 @@ fi
 BADGING="$($AAPT dump badging "$APK" 2>&1)" || {
   echo 'APK manifest inspection failed.' >&2; exit 2;
 }
-if ! grep -Eq "^package: name='$PKG' versionCode='10' versionName='$VERSION'" <<< "$BADGING"; then
+if ! grep -Eq "^package: name='$PKG' versionCode='11' versionName='$VERSION'" <<< "$BADGING"; then
   echo 'Package ID/version mismatch. Refusing to label APK as this version.' >&2; exit 2
 fi
 if ! command -v unzip >/dev/null || ! unzip -tq "$APK" >/dev/null; then

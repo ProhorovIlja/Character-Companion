@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.11.0-rc1 — 2026-11-23 (source candidate; no APK release)
+
+- Added isolated, read-only XAPK inspection with basic binary Android Manifest analysis and ZIP traversal safeguards; SHA-256 verified reconstruction from original raw chunks; synthetic fixtures and tests.
+- Added manual 190-MiB XAPK splitter for files larger than the 256-MiB Drive connector transfer limit. The official 278,738,234-byte Character.AI XAPK **was not downloaded**; its actual app internals remain unexamined.
+- Android 17 / LineageOS read-only preflight and Pixel 8a compatibility plan. The current AGP 8.13 toolchain supports `compileSdk 36` only; target SDK remains 36 pending verified migration.
+- Explicit resizeable Activity and corrected manual release `aapt` choice. No signed APK, tests on hardware, scheduled operations or GitHub Release.
+
 ## v0.10.0-rc1 — 2026-11-23 (source candidate; no APK release)
 - Bounded renderer restart policy with explicit retry after repeated WebView crashes.
 - Manual local export of imported blocking rules to TXT, without cookies or private chat data.

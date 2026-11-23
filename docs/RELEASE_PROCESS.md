@@ -4,7 +4,7 @@ This repository has no GitHub Actions, schedules, upload hooks, services or auto
 
 ## Local requirements
 
-- Official Gradle 8.13 Wrapper binary (full GitHub checkout), JDK 17+, Android SDK Platform 36, build-tools with `aapt`/`aapt2` and `apksigner`.
+- Official Gradle 8.13 Wrapper binary (full GitHub checkout), JDK 17+, Android SDK Platform 36, build-tools with ``aapt` (for dump badging) and `apksigner`.
 - Release signing key owned by the maintainer. Never commit `.jks`, keystore properties, passwords or service-account credentials.
 - A configured build/signing method under maintainer control. `:app:assembleRelease` is not assumed to create a signed APK by default.
 - Real Android devices or emulators on API 29, 33, 35, 36; a separate manual device signoff.
@@ -36,3 +36,8 @@ Use the repository's **GitHub Releases** page only after verifying the source ar
 - Test imported filters, exceptions, huge malformed imports, export TXT, settings JSON roundtrip.
 - Measure cold start/heap/battery on representative Android 10–16 phones; check TalkBack and small screens.
 - Confirm source license notices, release notes, hashes and no signing secrets are shipped.
+
+
+## Android 17 and official-XAPK analysis
+
+`docs/ANDROID_17.md` describes a manual Pixel 8a/LineageOS API 37 device matrix. The current app targets API 36 intentionally; merely setting API 37 under AGP 8.13 is not a valid migration. `docs/XAPK_AUDIT.md` explains the 256-MiB Drive connector limit and safe, manual XAPK splitting and static inspection. Do not include third-party app APKs/Dex/assets in releases or claim successful reverse analysis before bytes are available.

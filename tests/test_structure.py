@@ -59,6 +59,30 @@ class Structure(unittest.TestCase):
         self.assertIn('denyPendingMedia()', activity)
         self.assertNotIn('webView.url?.takeIf(UrlPolicy::isHttps)', activity)
 
+    def test_android17_runtime_strategy_is_explicit(self):
+        manifest=(ROOT/'app/src/main/AndroidManifest.xml').read_text()
+        build=(ROOT/'app/build.gradle.kts').read_text()
+        self.assertIn('android:resizeableActivity="true"', manifest)
+        # AGP 8.13 supports max SDK 36.1: targeting 37 requires a toolchain migration.
+        self.assertIn('compileSdk = 36', build)
+        self.assertIn('targetSdk = 36', build)
+        self.assertIn('API 37', (ROOT/'docs/ANDROID_17.md').read_text())
+        preflight=(ROOT/'scripts/device-android17-preflight.sh').read_text()
+        self.assertIn('ANDROID_17_RUNTIME=DETECTED', preflight)
+        self.assertNotIn('shell logcat', preflight)
+
+    def test_manual_xapk_audit_has_no_proprietary_artifacts(self):
+        tool=(ROOT/'tools/inspect_xapk.py').read_text()
+        splitter=(ROOT/'tools/split_xapk.py').read_text()
+        self.assertIn('validate_info', tool)
+        self.assertIn('parse_axml_manifest', tool)
+        self.assertIn('inspect_apk', tool)
+        self.assertIn('MAX_EXPANDED', tool)
+        self.assertIn('--parts', tool)
+        self.assertIn('190 * 1024**2', splitter)
+        self.assertFalse(list(ROOT.rglob('*.xapk')))
+        self.assertFalse(list(ROOT.rglob('*.apk')))
+
     def test_no_scheduled_actions(self):
         self.assertFalse((ROOT/'.github/workflows').exists())
         source=''.join(p.read_text(errors='ignore') for p in ROOT.rglob('*.kt'))
@@ -233,7 +257,7 @@ class Structure(unittest.TestCase):
     def test_browser_dependencies_are_pinned_without_new_permissions(self):
         build=(ROOT/'app/build.gradle.kts').read_text()
         manifest=(ROOT/'app/src/main/AndroidManifest.xml').read_text()
-        self.assertIn('versionName = "0.10.0-rc1"', build)
+        self.assertIn('versionName = "0.11.0-rc1"', build)
         self.assertIn('androidx.browser:browser:1.10.0', build)
         self.assertIn('androidx.webkit:webkit:1.18.0', build)
         self.assertNotIn('android.permission.QUERY_ALL_PACKAGES', manifest)
@@ -274,7 +298,7 @@ class Structure(unittest.TestCase):
         script=(ROOT/'scripts/prepare-release.sh').read_text()
         self.assertIn('$APKSIGNER verify', script)
         self.assertIn('assembleRelease', (ROOT/'docs/RELEASE_PROCESS.md').read_text())
-        self.assertIn('No APK has been produced', (ROOT/'docs/RELEASE_NOTES_v0.10.0-rc1.md').read_text())
+        self.assertIn('No APK has been produced', (ROOT/'docs/RELEASE_NOTES_v0.11.0-rc1.md').read_text())
         self.assertFalse((ROOT/'.github/workflows').exists())
 
     def test_all_localized_keys_unique(self):

@@ -1,4 +1,4 @@
-# Quality assurance · 2026-11-23 · v0.10.0-rc1
+# Quality assurance · 2026-11-23 · v0.11.0-rc1
 
 ## Completed in offline environment
 
@@ -81,3 +81,13 @@
 - `scripts/prepare-release.sh` was exercised with no APK and correctly refused to produce release artifacts. This is NOT a substitute for verifying a signed APK.
 - Installed tools: JDK and CLI Kotlin. Missing: Android SDK Platform 36, Android build-tools, Gradle distribution, ADB. APK build and on-device compatibility remain unverified.
 - Manual device signoff and a user-owned release-signing key are mandatory before creating a published GitHub Release.
+
+
+## v0.11.0-rc1 — current offline source checks
+
+- 45 Python unit/structural tests and the standalone Kotlin smoke test passed locally. These do not prove Android code compiles or runs.
+
+- Static XAPK/AXML inspector and manual raw-part splitter tested on **synthetic** APK/XAPK payloads, including hostile path names, SHA mismatch, malformed binary manifests and nested native ABI detection. Official XAPK was not downloaded because 278,738,234 bytes exceeds the Drive transfer limit of 268,435,456 bytes.
+- Android 17 diagnostic script tests use a mocked `adb`; no real phone was connected and no auth, voice, UI or battery data was gathered.
+- AGP 8.13 API support max 36.1; keep target/compile SDK 36 and test runtime API 37 on a real LineageOS build before claiming compatibility.
+- Check that manual source packaging rejects unsigned/debug/no-signoff APKs, and that `aapt dump badging` is used for APK metadata.

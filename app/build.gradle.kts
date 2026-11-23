@@ -10,8 +10,8 @@ android {
         applicationId = "dev.caicompanion.app"
         minSdk = 29
         targetSdk = 36
-        versionCode = 10
-        versionName = "0.10.0-rc1"
+        versionCode = 11
+        versionName = "0.11.0-rc1"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

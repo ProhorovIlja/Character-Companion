@@ -1,8 +1,15 @@
 # Character Companion — Android
 
-**v0.10.0-rc1 source candidate · 23 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
+**v0.11.0-rc1 source candidate · 23 November 2026** · Unofficial native Android shell for `https://character.ai/`, built in Kotlin. **Android only; there is no Windows build.** MIT licensed. Not affiliated with Character.AI.
 
-**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (30 structural Python tests + 185 Kotlin assertions). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
+**Current delivery status:** project sources, tests, Android resources and build instructions are included. Offline checks pass (45 Python unit/structural tests + the existing Kotlin policy suite). **No APK has been compiled or device-tested** in the current execution environment: the Android SDK and Gradle distribution are unavailable. Therefore real Character.AI login, voice calls, media, site rendering and Google/Apple sign-in are **not verified**. Do not label an APK production ready until these tests pass.
+
+## v0.11.0-rc1 — Android 17 & XAPK research readiness (NOT an APK release)
+
+- **Official XAPK located, not downloaded:** `Character+AI_+Chat,+Talk,+Text_1.17.4_APKPure.xapk` on the user's Google Drive is 278,738,234 bytes; the connected download service rejects files over 268,435,456 bytes (256 MiB). We **have not** inspected its modules, runtime, code, resources or signing certificate. See `docs/XAPK_AUDIT.md`.
+- **Manual, local split & read-only audit:** `tools/split_xapk.py` creates sequential 190-MiB raw parts and a SHA-256 manifest for safe transfer. `tools/inspect_xapk.py` reassembles/verifies, inventories nested APK modules, DEX files/native ABI libraries, and decodes a strict subset of Android binary Manifest XML without running or extracting app code. Synthetic fixture tests are included; proprietary XAPK bytes are **never committed**.
+- **Android 17 / LineageOS:** API 37 device preflight and Pixel 8a manual test plan in `docs/ANDROID_17.md`. Manifest explicitly allows resizing. Current `compileSdk=36`/`targetSdk=36` are retained because **AGP 8.13 max supported SDK is 36.1**; true API 37 target migration requires a verified newer build toolchain. No device compatibility claims yet.
+- **Release safety:** improved `aapt` selection for signing/package validation, release notes for this source candidate, no Play Protect bypass and no background jobs. No APK / GitHub Release was published.
 
 ## v0.10.0-rc1 update (23 November 2026) — NOT an APK release
 
