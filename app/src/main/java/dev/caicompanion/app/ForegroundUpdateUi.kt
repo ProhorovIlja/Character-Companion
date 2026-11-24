@@ -15,15 +15,19 @@ object ForegroundUpdateUi {
             return
         }
         dialogs[activity] = dialog
-        dialog.setOnDismissListener {
+        var completed = false
+        fun complete() {
+            if (completed) return
+            completed = true
             if (dialogs[activity] === dialog) dialogs.remove(activity)
             onDismiss()
         }
+        dialog.setOnDismissListener { complete() }
         try {
             dialog.show()
         } catch (_: RuntimeException) {
-            if (dialogs[activity] === dialog) dialogs.remove(activity)
-            onDismiss()
+            runCatching { dialog.dismiss() }
+            complete()
         }
     }
 

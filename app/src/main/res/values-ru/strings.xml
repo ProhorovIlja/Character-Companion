@@ -276,7 +276,7 @@
     <string name="release_verified">APK соответствует размеру, хешу, пакету, более новой версии, движку и текущей подписи. Android запросит подтверждение установки.</string>
     <string name="release_verify_failed">Не удалось скачать, проверить или открыть обновление. Автоматическая установка не выполнялась.</string>
     <string name="release_install">Открыть установщик Android</string>
-    <string name="release_install_permission">Android запрещает установку из этого приложения. Вы можете изменить разрешение в системных настройках, затем снова проверить и скачать обновление.</string>
+    <string name="release_install_permission">Android запрещает установку из этого приложения. Обновление не будет скачано без разрешения на установку. Вернитесь в раздел обновлений и снова выберите скачивание. Android всё равно запросит подтверждение установки.</string>
     <string name="release_install_settings">Открыть настройки установки</string>
     <string name="library_order">Порядок библиотеки</string>
     <string name="library_order_format">Сортировка: %1$s</string>

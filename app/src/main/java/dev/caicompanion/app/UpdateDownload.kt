@@ -3,6 +3,7 @@ package dev.caicompanion.app
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.ClipData
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
@@ -25,7 +26,14 @@ object UpdateDownload {
         val arm64 = "arm64-v8a" in Build.SUPPORTED_ABIS
         if (activity.isFinishing || activity.isDestroyed || BuildConfig.DEBUG ||
             ReleasePolicy.status(BuildConfig.VERSION_NAME, tag, BuildConfig.FLAVOR, listOf(asset), arm64) !=
-                ReleasePolicy.Status.NEWER || !busy.compareAndSet(false, true)) return
+                ReleasePolicy.Status.NEWER) return
+        // Do not spend hundreds of MiB on an APK before the install-source permission is available.
+        if (busy.get()) return
+        if (!installationAllowed(activity)) {
+            showInstallPermission(activity)
+            return
+        }
+        if (!busy.compareAndSet(false, true)) return
         val cancelled = AtomicBoolean(false)
         val progress = AlertDialog.Builder(activity).setTitle(R.string.release_center)
             .setMessage(R.string.release_downloading).setNegativeButton(R.string.cancel, null).create()
@@ -38,18 +46,22 @@ object UpdateDownload {
             try {
                 val dir = File(activity.cacheDir, "verified-updates")
                 if (!dir.exists() && !dir.mkdirs()) error("cache")
-                if (dir.usableSpace < asset.size + 16_777_216L) error("space")
                 // An installer may still be reading a previously shared APK.
                 // Reclaim only old staging files during an explicit new request.
                 val cutoff = System.currentTimeMillis() - 86_400_000L
-                dir.listFiles()?.filter { it.isFile && it.lastModified() < cutoff }?.forEach { it.delete() }
+                dir.listFiles()?.filter {
+                    it.isFile && it.name.startsWith("candidate-") && it.name.endsWith(".apk") &&
+                        it.lastModified() < cutoff
+                }?.forEach { it.delete() }
+                if (dir.usableSpace < asset.size + 16_777_216L) error("space")
                 val retained = dir.listFiles()?.filter { it.isFile }?.sumOf { it.length() } ?: 0L
                 if (retained + asset.size > 1_073_741_824L) error("staging limit")
                 val target = File.createTempFile("candidate-", ".apk", dir)
                 file = target
-                verified = fetch(asset, target) {
-                    cancelled.get() || android.os.SystemClock.elapsedRealtime() - startedAt >= 300_000L
-                } && !cancelled.get() && verifyPackage(activity, target, tag)
+                fun expired(): Boolean = cancelled.get() ||
+                    android.os.SystemClock.elapsedRealtime() - startedAt >= 300_000L
+                verified = fetch(asset, target, ::expired) && !expired() &&
+                    verifyPackage(activity, target, tag) && !expired()
             } catch (_: Exception) {
                 verified = false
             }
@@ -137,26 +149,35 @@ object UpdateDownload {
                 current, tag, candidate)
     }
 
+    private fun installationAllowed(activity: Activity): Boolean =
+        runCatching { activity.packageManager.canRequestPackageInstalls() }.getOrDefault(false)
+
+    private fun showInstallPermission(activity: Activity) {
+        val prompt = AlertDialog.Builder(activity).setMessage(R.string.release_install_permission)
+            .setPositiveButton(R.string.release_install_settings) { _, _ ->
+                try {
+                    activity.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:" + activity.packageName)))
+                } catch (_: RuntimeException) {
+                    android.widget.Toast.makeText(activity, R.string.release_verify_failed,
+                        android.widget.Toast.LENGTH_LONG).show()
+                }
+            }.setNegativeButton(R.string.cancel, null).create()
+        ForegroundUpdateUi.show(activity, prompt)
+    }
+
     private fun install(activity: Activity, file: File, expectedSize: Long): Boolean {
         try {
             if (!file.isFile || file.length() != expectedSize) error("archive")
-            if (!activity.packageManager.canRequestPackageInstalls()) {
-                // No automatic return or installation after changing this system setting.
-                AlertDialog.Builder(activity).setMessage(R.string.release_install_permission)
-                    .setPositiveButton(R.string.release_install_settings) { _, _ ->
-                        try {
-                            activity.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                                Uri.parse("package:" + activity.packageName)))
-                        } catch (_: RuntimeException) {
-                            android.widget.Toast.makeText(activity, R.string.release_verify_failed,
-                                android.widget.Toast.LENGTH_LONG).show()
-                        }
-                    }.setNegativeButton(R.string.cancel, null).show()
+            if (!installationAllowed(activity)) {
+                showInstallPermission(activity)
                 return false
             }
             val uri = FileProvider.getUriForFile(activity, activity.packageName + ".updates", file)
-            activity.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, MIME)
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+            activity.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, MIME).apply {
+                clipData = ClipData.newRawUri("Verified update", uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            })
             return true
         } catch (_: Exception) {
             android.widget.Toast.makeText(activity, R.string.release_verify_failed,

@@ -276,7 +276,7 @@
     <string name="release_verified">The downloaded APK matches the expected size, hash, package, newer version, renderer and current signing identity. Android will ask for installation consent.</string>
     <string name="release_verify_failed">Could not download, verify or open this update. No automatic installation was performed.</string>
     <string name="release_install">Open Android installer</string>
-    <string name="release_install_permission">Android does not allow installs from this app. You can change that permission in system settings, then check and download the update again.</string>
+    <string name="release_install_permission">Android does not allow installs from this app. No update will be downloaded until you grant installation permission. Return to Updates and choose Download and verify again. Android will still ask for installation consent.</string>
     <string name="release_install_settings">Open installation settings</string>
     <string name="library_order">Library order</string>
     <string name="library_order_format">Sort: %1$s</string>
