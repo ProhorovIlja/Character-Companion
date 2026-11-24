@@ -22,5 +22,6 @@
     <!-- CEF binaries ship beside the app; no OS browser runtime installation. -->
     <PackageReference Include="CefSharp.Wpf.NETCore" Version="156.0.300" />
     <PackageReference Include="NAudio" Version="3.3.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.15" />
   </ItemGroup>
 </Project>
