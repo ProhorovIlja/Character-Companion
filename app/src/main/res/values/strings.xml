@@ -190,6 +190,9 @@
     <string name="voice_error_service">Speech service or connection error. No text was added; retry or check the available on-device service.</string>
     <string name="voice_system_missing">No system speech recognition activity was found.</string>
     <string name="voice_empty_or_full">No recognized text, or the 16,000-character draft limit was reached.</string>
+    <string name="voice_undo_speech">Undo last dictation</string>
+    <string name="voice_undo_done">Last dictation undone.</string>
+    <string name="voice_invalid_text">Draft contains invalid text. Edit it before use.</string>
     <string name="voice_ready">Recognized text added to the draft. Review it before use.</string>
     <string name="voice_copy_return">Copy and return</string>
     <string name="voice_copy_empty">Nothing to copy. Write or dictate text first.</string>

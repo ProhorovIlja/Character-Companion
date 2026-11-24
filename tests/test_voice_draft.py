@@ -122,6 +122,14 @@ class VoiceDraft(unittest.TestCase):
         self.assertIn('editor.setSelection(restored.first, restored.last)', ACTIVITY)
         self.assertNotIn('onSaveInstanceState', ACTIVITY)
 
+    def test_undo_is_memory_only_and_does_not_overwrite_manual_edits(self):
+        self.assertIn('lastSpeechEdit?.restore(editor.text.toString())', ACTIVITY)
+        self.assertIn('lastSpeechEdit = null', ACTIVITY)
+        self.assertIn('lastSpeechEdit?.available(s.toString())', ACTIVITY)
+        self.assertIn('lastSpeechEdit = retained.speechUndo?.takeIf', ACTIVITY)
+        self.assertIn('target.scheme != "content"', ACTIVITY)
+        self.assertIn('VoiceDraftPolicy.validText(content)', ACTIVITY)
+
     def test_locales_expose_same_strings(self):
         en = ET.parse(ROOT/'app/src/main/res/values/strings.xml').getroot()
         ru = ET.parse(ROOT/'app/src/main/res/values-ru/strings.xml').getroot()

@@ -5,6 +5,30 @@ object VoiceDraftPolicy {
     const val MAX_CHARS = 16_000
 
     data class Edit(val text: String, val caret: Int)
+    data class SpeechUndo(val before: String, val after: String, val start: Int, val end: Int) {
+        /** Never overwrite manual edits made after this recognition result. */
+        fun available(current: String): Boolean = current == after && before != after
+        fun restore(current: String): Pair<String, IntRange>? =
+            if (available(current)) before to selection(before, start, end) else null
+    }
+
+    /** Reject invalid UTF-16 and control characters from an external recognizer or IME. */
+    fun validText(text: String): Boolean {
+        if (text.length > MAX_CHARS) return false
+        var i = 0
+        while (i < text.length) {
+            val ch = text[i]
+            if (ch.isISOControl() && ch !in "\t\n\r") return false
+            if (Character.isHighSurrogate(ch)) {
+                if (i + 1 >= text.length || !Character.isLowSurrogate(text[i + 1])) return false
+                i += 2
+            } else {
+                if (Character.isLowSurrogate(ch)) return false
+                i++
+            }
+        }
+        return true
+    }
 
     /** Validate the transient language selector after a configuration change. */
     fun languageIndex(index: Int): Int = if (index in 0..2) index else 0
@@ -37,7 +61,7 @@ object VoiceDraftPolicy {
      */
     fun insert(current: String, candidate: String?, start: Int, end: Int): Edit? {
         val words = candidate?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-        if (current.length > MAX_CHARS || words.length > MAX_CHARS) return null
+        if (!validText(current) || !validText(words)) return null
         if (start !in 0..current.length || end !in 0..current.length) return null
         val bounds = selection(current, start, end)
         val left = current.substring(0, bounds.first)

@@ -17,6 +17,8 @@ import android.os.PersistableBundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -65,13 +67,16 @@ class VoiceDraftActivity : Activity() {
     private var backCallback: OnBackInvokedCallback? = null
     private var discardDialog: AlertDialog? = null
     private lateinit var cancelListenButton: Button
+    private lateinit var undoSpeechButton: Button
+    private var lastSpeechEdit: VoiceDraftPolicy.SpeechUndo? = null
     private val recognitionGuard = VoiceRecognitionGuard()
     // Only an explicit save action creates a document. Never save a transcript to Bundle.
     private var pendingSaveText: String? = null
     private data class RetainedDraft(
         val text: String, val pendingSave: String?, val languageIndex: Int,
         val selectionStart: Int, val selectionEnd: Int,
-        val allowInsert: Boolean, val systemPending: Boolean, val permissionPending: Boolean
+        val allowInsert: Boolean, val systemPending: Boolean, val permissionPending: Boolean,
+        val speechUndo: VoiceDraftPolicy.SpeechUndo?
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -157,6 +162,7 @@ class VoiceDraftActivity : Activity() {
                 editor.text.toString(), retained.selectionStart, retained.selectionEnd)
             editor.setSelection(restored.first, restored.last)
             pendingSaveText = retained.pendingSave
+            lastSpeechEdit = retained.speechUndo?.takeIf { it.available(editor.text.toString()) }
             languageSpinner.setSelection(VoiceDraftPolicy.languageIndex(retained.languageIndex))
         }
         // A fixed minimum editor viewport permits natural outer scrolling even under
@@ -169,6 +175,21 @@ class VoiceDraftActivity : Activity() {
         }
         status.setText(R.string.voice_idle)
         root.addView(status)
+        undoSpeechButton = Button(this).apply {
+            setText(R.string.voice_undo_speech)
+            isAllCaps = false
+            setOnClickListener { undoSpeech() }
+        }
+        root.addView(undoSpeechButton)
+        editor.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+            override fun afterTextChanged(s: Editable?) {
+                if (lastSpeechEdit?.available(s.toString()) != true) lastSpeechEdit = null
+                updateUndoSpeech()
+            }
+        })
+        updateUndoSpeech()
         listenButton = Button(this).apply {
             setText(R.string.voice_start_local)
             setOnClickListener { if (listening) requestFinalTranscript() else startOnDevice() }
@@ -405,8 +426,27 @@ class VoiceDraftActivity : Activity() {
         else {
             editor.setText(edit.text)
             editor.setSelection(edit.caret)
+            lastSpeechEdit = VoiceDraftPolicy.SpeechUndo(original, edit.text, start, end)
+            updateUndoSpeech()
             status.setText(R.string.voice_ready)
         }
+    }
+
+    private fun updateUndoSpeech() {
+        if (::undoSpeechButton.isInitialized) {
+            undoSpeechButton.visibility = if (lastSpeechEdit?.available(editor.text.toString()) == true)
+                View.VISIBLE else View.GONE
+        }
+    }
+
+    private fun undoSpeech() {
+        if (!draftActionReady()) return
+        val restored = lastSpeechEdit?.restore(editor.text.toString()) ?: return
+        lastSpeechEdit = null
+        editor.setText(restored.first)
+        editor.setSelection(restored.second.first, restored.second.last)
+        updateUndoSpeech()
+        status.setText(R.string.voice_undo_done)
     }
 
     /** Copy only on an explicit tap. Android clipboard is accessible outside this app. */
@@ -415,6 +455,10 @@ class VoiceDraftActivity : Activity() {
         val content = editor.text.toString()
         if (content.isBlank()) {
             status.setText(R.string.voice_copy_empty)
+            return false
+        }
+        if (!VoiceDraftPolicy.validText(content)) {
+            status.setText(R.string.voice_invalid_text)
             return false
         }
         val clip = ClipData.newPlainText(getString(R.string.voice_title), content)
@@ -444,6 +488,7 @@ class VoiceDraftActivity : Activity() {
     private fun saveDraft() {
         if (!draftActionReady()) return
         val snapshot = editor.text.toString().takeIf { it.isNotBlank() } ?: return
+        if (!VoiceDraftPolicy.validText(snapshot)) { status.setText(R.string.voice_invalid_text); return }
         if (pendingSaveText != null) return
         // SAF picker can outlive an Activity recreation. Keep the exact user-approved
         // text in memory; never write a blank/replaced draft after process death.
@@ -491,7 +536,11 @@ class VoiceDraftActivity : Activity() {
                 // Process-death restoration does not recover private draft text.
                 // Never open/truncate the output stream in that case.
                 if (snapshot == null) { status.setText(R.string.voice_save_failed); return }
-                val target = data?.data ?: return
+                val target = data?.data
+                if (target == null || target.scheme != "content" || target.authority.isNullOrBlank()) {
+                    status.setText(R.string.voice_save_failed)
+                    return
+                }
                 try {
                     val output = contentResolver.openOutputStream(target, "w")
                         ?: throw IOException("No output stream")
@@ -517,7 +566,8 @@ class VoiceDraftActivity : Activity() {
     @Deprecated("Keep transient private draft in memory only across configuration changes")
     override fun onRetainNonConfigurationInstance(): Any =
         RetainedDraft(editor.text.toString(), pendingSaveText, languageSpinner.selectedItemPosition,
-            editor.selectionStart, editor.selectionEnd, allowInsert, systemRecognitionPending, permissionPending)
+            editor.selectionStart, editor.selectionEnd, allowInsert, systemRecognitionPending, permissionPending,
+            lastSpeechEdit)
 
     override fun onResume() { super.onResume(); resumed = true }
 

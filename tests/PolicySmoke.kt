@@ -750,6 +750,19 @@ fun main() {
             check(changed.text.contains("вставка"))
         }
     }
+    val speechEdit = VoiceDraftPolicy.insert("Hello world", "hunter", 6, 11)!!
+    val undo = VoiceDraftPolicy.SpeechUndo("Hello world", speechEdit.text, 6, 11)
+    check(undo.available("Hello hunter"))
+    check(undo.restore("Hello hunter") == ("Hello world" to (6..11)))
+    check(undo.restore("Hello hunter!") == null)
+    check(VoiceDraftPolicy.SpeechUndo("a", "a", 1, 1).restore("a") == null)
+    check(VoiceDraftPolicy.validText("Привет 🧪\nhello\tworld"))
+    check(!VoiceDraftPolicy.validText("bad\u0000text"))
+    check(!VoiceDraftPolicy.validText("bad\u0007text"))
+    check(!VoiceDraftPolicy.validText("\uD800"))
+    check(!VoiceDraftPolicy.validText("\uDC00"))
+    check(VoiceDraftPolicy.insert("safe", "bad\u0000text", 4, 4) == null)
+    check(VoiceComposerPolicy.validDraft("bad\uD800") == null)
     val chat = "https://character.ai/chat/abc_123"
     check(VoiceComposerPolicy.chatPage(chat) == chat)
     check(VoiceComposerPolicy.chatPage("https://www.character.ai/chat?char=abc-123") != null)

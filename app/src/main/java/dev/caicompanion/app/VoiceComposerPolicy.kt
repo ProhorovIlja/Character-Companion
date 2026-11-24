@@ -23,8 +23,7 @@ object VoiceComposerPolicy {
     }
 
     fun validDraft(text: String?): String? = text?.takeIf {
-        it.isNotBlank() && it.length <= VoiceDraftPolicy.MAX_CHARS &&
-            !it.any { c -> c == '\u0000' }
+        it.isNotBlank() && VoiceDraftPolicy.validText(it)
     }
 
     /** Process-local recovery slot. Never overwrites an unsent draft or retries insertion. */
