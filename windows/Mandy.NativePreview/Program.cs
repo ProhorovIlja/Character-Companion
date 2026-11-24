@@ -855,6 +855,8 @@ internal sealed class ChatWindow : Window
         }
         else if (selected == null || selected.Character == w.Character.Character) return;
         var previous = w.Character;
+        var previousPending = pending;
+        var previousRows = history.ItemsSource;
         string previousDraft = draft.Text, previousSaved = lastSavedDraft;
         bool saveOld = pending == null && previousDraft != previousSaved;
         busy = true; UpdateControls();
@@ -882,10 +884,16 @@ internal sealed class ChatWindow : Window
         catch (Exception)
         {
             // Do not render another character's history alongside the old draft.
+            w.SelectCharacter(previous.Character);
             historyValid = false;
+            pending = previousPending;
+            history.ItemsSource = previousRows;
             draft.Text = previousDraft;
             lastSavedDraft = previousSaved;
-            status.Text = "Character operation failed. Reopen the workspace to recover the saved selection.";
+            name.Text = previous.Name;
+            identity.Text = previous.Identity;
+            characterTitle.Text = previous.Name;
+            status.Text = "Character operation failed. Refresh the original conversation before continuing.";
         }
         finally { Finish(); }
     }
