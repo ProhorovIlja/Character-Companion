@@ -310,12 +310,21 @@ class GeckoActivity : Activity() {
         layout.addView(list, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, dp(300)))
         var visible = emptyList<Pair<String, String>>()
-        val refresh: () -> Unit = {
-            visible = NativeLibrarySearch.filter(settings.listBookmarks(), search.text.toString())
-            adapter.clear()
-            adapter.addAll(visible.map { (title, _) -> title.take(90) })
-            adapter.notifyDataSetChanged()
+        var index = NativeLibrarySearch.Index(settings.listBookmarks())
+        val searchOnly: () -> Unit = {
+            val next = index.filter(search.text.toString())
+            if (next != visible) {
+                visible = next
+                adapter.setNotifyOnChange(false)
+                adapter.clear()
+                adapter.addAll(visible.map { (title, _) -> title.take(90) })
+                adapter.notifyDataSetChanged()
+            }
             empty.visibility = if (visible.isEmpty()) View.VISIBLE else View.GONE
+        }
+        val refresh: () -> Unit = {
+            index = NativeLibrarySearch.Index(settings.listBookmarks())
+            searchOnly()
         }
         val dialog = AlertDialog.Builder(this).setTitle(R.string.bookmarks)
             .setView(layout).setPositiveButton(R.string.close, null)
@@ -354,9 +363,9 @@ class GeckoActivity : Activity() {
         search.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
-            override fun afterTextChanged(s: Editable?) = refresh()
+            override fun afterTextChanged(s: Editable?) = searchOnly()
         })
-        refresh()
+        searchOnly()
         dialog.show()
         dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
             editLibraryBookmark("", null, refresh)

@@ -173,6 +173,13 @@ fun main() {
         "NOT SAFE" to "https://evil.example/chat/c",
         "Duplicate" to "https://character.ai/chat/a"
     )
+    val cachedLibrary = NativeLibrarySearch.Index(library)
+    check(cachedLibrary.filter("") == NativeLibrarySearch.filter(library, ""))
+    val normalizedLibrary = NativeLibrarySearch.Index(listOf(
+        "Cafe\u0301" to "https://character.ai/chat/a",
+        "Ｔｅｓｓａ" to "https://character.ai/chat/b"))
+    check(normalizedLibrary.filter("CAFÉ").single().first == "Cafe\u0301")
+    check(normalizedLibrary.filter("tessa").single().second == "https://character.ai/chat/b")
     check(NativeLibrarySearch.filter(library, "").size == 2)
     check(NativeLibrarySearch.filter(library, "GOTHIC").single().first == "Tessa | Gothic")
     check(NativeLibrarySearch.filter(listOf(

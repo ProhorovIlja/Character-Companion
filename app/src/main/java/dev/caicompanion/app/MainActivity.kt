@@ -889,9 +889,13 @@ class MainActivity : Activity() {
         layout.addView(search)
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         layout.addView(list)
+        var index = NativeLibrarySearch.Index(store.listBookmarks())
+        var rendered: List<Pair<String, String>>? = null
         fun refresh(query: String) {
+            val saved = index.filter(query)
+            if (saved == rendered) return
+            rendered = saved
             list.removeAllViews()
-            val saved = NativeLibrarySearch.filter(store.listBookmarks(), query)
             if (saved.isEmpty()) {
                 list.addView(infoLabel(getString(R.string.hub_empty)))
                 return
@@ -909,7 +913,7 @@ class MainActivity : Activity() {
                     setOnClickListener { openFirstPartyPage(url) }
                     contentDescription = getString(R.string.hub_bookmark_options_hint, title)
                     setOnLongClickListener {
-                        showNativeBookmarkActions(title, url) { refresh(search.text.toString()) }
+                        showNativeBookmarkActions(title, url) { refreshNativeBookmarks() }
                         true
                     }
                 }
@@ -926,7 +930,10 @@ class MainActivity : Activity() {
             }
             override fun afterTextChanged(s: Editable?) {}
         })
-        refreshNativeBookmarks = { refresh(search.text.toString()) }
+        refreshNativeBookmarks = {
+            index = NativeLibrarySearch.Index(store.listBookmarks())
+            refresh(search.text.toString())
+        }
         refresh("")
         addButton(layout, getString(R.string.close)) { closeNativeHub() }
         nativeHub = panel

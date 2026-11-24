@@ -1,32 +1,40 @@
 package dev.caicompanion.app
 
+import java.text.Normalizer
 import java.util.Locale
 
-/** Pure native, offline-only search for user-created bookmarks. No network or chat access. */
+/** Local bookmark search; build an immutable index once per library change. */
 object NativeLibrarySearch {
     private val whitespace = Regex("\\s+")
+    private fun fold(text: String): String = Normalizer.normalize(text, Normalizer.Form.NFKC)
+        .lowercase(Locale.ROOT)
 
-    fun filter(
-        bookmarks: List<Pair<String, String>>,
-        input: String,
-        limit: Int = 100
-    ): List<Pair<String, String>> {
-        if (limit <= 0) return emptyList()
-        val terms = input.take(80).trim().lowercase(Locale.ROOT).split(whitespace)
-            .filter { it.isNotEmpty() }.take(8)
-        val matched = ArrayList<Pair<String, String>>(minOf(bookmarks.size, limit.coerceIn(0, 100)))
-        val seen = HashSet<String>()
-        for ((rawTitle, rawUrl) in bookmarks) {
-            val url = UrlPolicy.sanitizeBookmark(rawUrl) ?: continue
+    class Index(bookmarks: List<Pair<String, String>>) {
+        private data class Entry(val title: String, val url: String, val searchable: String)
+        private val entries = bookmarks.mapNotNull { (rawTitle, rawUrl) ->
+            val url = UrlPolicy.sanitizeBookmark(rawUrl) ?: return@mapNotNull null
             val title = rawTitle.take(90).ifBlank { "Character.AI" }
-            val searchable = (title + " " + url).lowercase(Locale.ROOT)
-            // Deduplicate after matching: a differently titled duplicate may be the
-            // only entry that matches the user's current search.
-            if (terms.all { searchable.contains(it) } && seen.add(url)) {
-                matched.add(title to url)
-                if (matched.size >= limit.coerceIn(0, 100)) break
-            }
+            Entry(title, url, fold("$title $url"))
         }
-        return matched
+
+        fun filter(input: String, limit: Int = 100): List<Pair<String, String>> {
+            val cap = limit.coerceIn(0, 100)
+            if (cap == 0) return emptyList()
+            val terms = fold(input.take(80)).trim().split(whitespace)
+                .filter { it.isNotEmpty() }.take(8)
+            val matched = ArrayList<Pair<String, String>>(minOf(entries.size, cap))
+            val seen = HashSet<String>()
+            for (entry in entries) {
+                // Keep aliases searchable; deduplicate only after matching.
+                if (terms.all { entry.searchable.contains(it) } && seen.add(entry.url)) {
+                    matched.add(entry.title to entry.url)
+                    if (matched.size >= cap) break
+                }
+            }
+            return matched
+        }
     }
+
+    fun filter(bookmarks: List<Pair<String, String>>, input: String, limit: Int = 100): List<Pair<String, String>> =
+        Index(bookmarks).filter(input, limit)
 }
