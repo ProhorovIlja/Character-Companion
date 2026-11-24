@@ -1,5 +1,12 @@
 package dev.caicompanion.app
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.app.Activity
 import android.app.AlertDialog
 import android.os.Bundle
@@ -42,6 +49,14 @@ class MandyWorkspaceActivity : Activity() {
     private var busy = false
     private val stopped = AtomicBoolean(false)
     private lateinit var cancelGeneration: Button
+    private val dictation = NativeDictation()
+    private var speechToken: UUID? = null
+    private var recognizer: SpeechRecognizer? = null
+    private var speechStates: Map<View, Boolean> = emptyMap()
+    private lateinit var speechControls: LinearLayout
+    private lateinit var stopSpeech: Button
+    private lateinit var sendSpeech: Button
+    private var resumed = false
     private fun modelLibrary() = NativeModelLibrary(applicationContext.noBackupFilesDir.toPath().resolve("mandy-models-v1"))
     private fun dp(n: Int) = (n * resources.displayMetrics.density + .5f).toInt()
     private fun alive() = !isFinishing && !isDestroyed
@@ -69,6 +84,22 @@ class MandyWorkspaceActivity : Activity() {
             setOnClickListener { stopped.set(true); isEnabled = false; status.text = "Stopping…" }
         }
         root.addView(cancelGeneration)
+        speechControls = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
+        stopSpeech = Button(this).apply {
+            text = "Stop · keep draft"; isAllCaps = false
+            setOnClickListener { finishSpeech(false) }
+        }
+        sendSpeech = Button(this).apply {
+            text = "Stop · send"; isAllCaps = false
+            setOnClickListener { finishSpeech(true) }
+        }
+        speechControls.addView(stopSpeech)
+        speechControls.addView(sendSpeech)
+        speechControls.addView(Button(this).apply {
+            text = "Cancel dictation"; isAllCaps = false
+            setOnClickListener { cancelSpeech("Dictation cancelled") }
+        })
+        root.addView(speechControls)
         val scroll = ScrollView(this).apply { isFillViewport = true }
         panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -113,7 +144,7 @@ class MandyWorkspaceActivity : Activity() {
         view.isEnabled = false
         if (view is ViewGroup) for (i in 0 until view.childCount) suspendInputs(view.getChildAt(i), states)
     }
-    private fun work(action: () -> Unit) {
+    private fun work(afterSuccess: (Snapshot) -> Unit = {}, action: () -> Unit) {
         if (busy || !alive()) return
         busy = true
         val states = mutableMapOf<View, Boolean>()
@@ -128,6 +159,7 @@ class MandyWorkspaceActivity : Activity() {
                     current = it
                     render(it)
                     status.text = if (BuildConfig.MANDY_EMBEDDED_PREVIEW) "Experimental local inference • select a trusted model per send" else "Local workspace • embedded build unavailable"
+                    afterSuccess(it)
                 }.onFailure {
                     // Preserve the visible editor; do not reset or overwrite damaged files.
                     status.text = "Local operation failed. Saved data has not been reset."
@@ -198,6 +230,7 @@ class MandyWorkspaceActivity : Activity() {
         val field = input("Message " + profile.name, 16000, s.draft.draft)
         editor = field
         panel.addView(field)
+        panel.addView(button("Dictate on device…") { chooseSpeechLanguage(s) })
         panel.addView(button("Save draft") { saveAnd {} })
         if (BuildConfig.MANDY_EMBEDDED_PREVIEW) {
             panel.addView(button("Refresh model inventory") { saveAnd {} })
@@ -205,7 +238,7 @@ class MandyWorkspaceActivity : Activity() {
             else panel.addView(label("Import a trusted model in AI models, then refresh."))
         } else panel.addView(Button(this).apply { text = "Send • embedded build unavailable"; isAllCaps = false; isEnabled = false })
     }
-    private fun chooseModel(s: Snapshot) {
+    private fun chooseModel(s: Snapshot, mode: String = "text") {
         val ticket = s.ticket ?: return
         val draft = editor?.text?.toString() ?: return
         if (s.draft.pending == null && draft.isBlank()) { editor?.error = "Enter a message"; return }
@@ -215,10 +248,10 @@ class MandyWorkspaceActivity : Activity() {
             AlertDialog.Builder(this).setTitle("Experimental inference")
                 .setMessage("Only continue if you trust the publisher of this file. Real model compatibility is not yet verified. This may be slow or fail. No network fallback.\nSHA-256: " + model.sha256)
                 .setNegativeButton(android.R.string.cancel, null)
-                .setPositiveButton("Generate locally") { _, _ -> generate(ticket, draft, model.sha256, s.draft.pending != null) }.show()
+                .setPositiveButton("Generate locally") { _, _ -> generate(ticket, draft, model.sha256, s.draft.pending != null, mode) }.show()
         }.setNegativeButton(android.R.string.cancel, null).show()
     }
-    private fun generate(ticket: NativeChatWorkspace.Ticket, draft: String, sha: String, retry: Boolean) {
+    private fun generate(ticket: NativeChatWorkspace.Ticket, draft: String, sha: String, retry: Boolean, mode: String) {
         if (busy || !alive() || !BuildConfig.MANDY_EMBEDDED_PREVIEW || current?.ticket != ticket) return
         busy = true
         stopped.set(false)
@@ -236,7 +269,7 @@ class MandyWorkspaceActivity : Activity() {
             val result = runCatching {
                 workspace.edit(ticket, draft)
                 saved = true
-                if (!retry) workspace.prepare(ticket)
+                if (!retry) workspace.prepare(ticket, mode)
                 AndroidConversationStore(applicationContext, account).use { history ->
                     EmbeddedChatTurn.sendWithMemory(workspace, ticket, library, history, modelLibrary(), sha, memory, stopped::get) { origin, part ->
                         text.append(part)
@@ -272,6 +305,150 @@ class MandyWorkspaceActivity : Activity() {
             }
         }
     }
+    private fun chooseSpeechLanguage(s: Snapshot) {
+        if (!resumed || busy || current?.ticket != s.ticket || s.ticket == null) return
+        if (Build.VERSION.SDK_INT < 31 || !SpeechRecognizer.isOnDeviceRecognitionAvailable(this)) {
+            status.text = "On-device recognition unavailable. No remote recognizer will be used."
+            return
+        }
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            status.text = "Grant microphone permission, then tap Dictate again."
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 940)
+            return
+        }
+        val languages = VoiceRecognitionOptions.languages
+        val names = languages.map { tag -> tag?.let { java.util.Locale.forLanguageTag(it).getDisplayName(resources.configuration.locales[0]) } ?: "Device language" }
+        AlertDialog.Builder(this).setTitle("On-device dictation language").setItems(names.toTypedArray()) { _, index ->
+            beginSpeech(s, languages[index])
+        }.setNegativeButton(android.R.string.cancel, null).show()
+    }
+
+    private fun beginSpeech(s: Snapshot, language: String?) {
+        val ticket = s.ticket ?: return
+        val field = editor ?: return
+        if (!resumed || busy || current?.ticket != ticket || Build.VERSION.SDK_INT < 31 ||
+            checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
+        if (!SpeechRecognizer.isOnDeviceRecognitionAvailable(this)) {
+            status.text = "On-device recognition unavailable"
+            return
+        }
+        val draft = field.text.toString()
+        val start = field.selectionStart.takeIf { it >= 0 } ?: draft.length
+        val end = field.selectionEnd.takeIf { it >= 0 } ?: start
+        val canSend = BuildConfig.MANDY_EMBEDDED_PREVIEW && s.draft.pending == null && s.models.isNotEmpty()
+        val token = runCatching { dictation.begin(ticket, draft, start, end, canSend) }.getOrElse {
+            status.text = "Draft is invalid for dictation"; return
+        }
+        speechToken = token
+        busy = true
+        val states = mutableMapOf<View, Boolean>()
+        suspendInputs(panel, states)
+        speechStates = states
+        speechControls.visibility = View.VISIBLE
+        stopSpeech.isEnabled = true
+        sendSpeech.visibility = if (canSend) View.VISIBLE else View.GONE
+        sendSpeech.isEnabled = canSend
+        status.text = "Opening on-device microphone…"
+        try {
+            val engine = SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
+            recognizer = engine
+            engine.setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) { if (speechToken == token && resumed && stopSpeech.isEnabled) status.text = "Listening on device…" }
+                override fun onBeginningOfSpeech() {}
+                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onBufferReceived(buffer: ByteArray?) {}
+                override fun onEndOfSpeech() {
+                    if (speechToken == token) {
+                        stopSpeech.isEnabled = false; sendSpeech.isEnabled = false
+                        status.text = "Transcribing…"
+                    }
+                }
+                override fun onError(error: Int) {
+                    if (speechToken == token) cancelSpeech("Recognition failed or language unavailable · draft preserved")
+                }
+                override fun onResults(results: Bundle?) {
+                    if (speechToken != token) return
+                    if (!resumed || !alive()) { cancelSpeech("Dictation cancelled"); return }
+                    val result = dictation.complete(token, current?.ticket, editor?.text?.toString(),
+                        results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION))
+                    releaseSpeech(token, cancel = false)
+                    if (result == null) { status.text = "No valid transcript · draft preserved"; return }
+                    val target = editor ?: return
+                    if (current?.ticket != ticket) return
+                    target.setText(result.edit.text)
+                    target.setSelection(result.edit.caret)
+                    // Persist before asking to send. Failed persistence leaves editable visible text.
+                    work(afterSuccess = { updated ->
+                        if (updated.ticket == ticket) {
+                            editor?.setSelection(result.edit.caret.coerceIn(0, editor?.length() ?: 0))
+                            status.text = "Dictation saved to draft"
+                            if (result.requestSend && resumed && updated.draft.pending == null && updated.models.isNotEmpty())
+                                chooseModel(updated, mode = "dictation")
+                        }
+                    }) { workspace.edit(ticket, result.edit.text) }
+                }
+                override fun onPartialResults(partialResults: Bundle?) {}
+                override fun onEvent(eventType: Int, params: Bundle?) {}
+            })
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+                if (language != null) putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
+            }
+            engine.startListening(intent)
+        } catch (_: Exception) {
+            cancelSpeech("On-device recognition could not start · draft preserved")
+        }
+    }
+
+    private fun finishSpeech(send: Boolean) {
+        val token = speechToken ?: return
+        if (!resumed || !stopSpeech.isEnabled || (send && !sendSpeech.isEnabled)) return
+        if (!dictation.stop(token, send)) return
+        stopSpeech.isEnabled = false; sendSpeech.isEnabled = false
+        status.text = "Transcribing…"
+        try { checkNotNull(recognizer).stopListening() }
+        catch (_: Exception) { cancelSpeech("Recognition failed · draft preserved") }
+    }
+
+    private fun releaseSpeech(token: UUID, cancel: Boolean) {
+        if (speechToken != token) return
+        speechToken = null
+        val engine = recognizer
+        recognizer = null
+        if (cancel) runCatching { engine?.cancel() }
+        runCatching { engine?.destroy() }
+        speechControls.visibility = View.GONE
+        speechStates.forEach { (view, enabled) -> view.isEnabled = enabled }
+        speechStates = emptyMap()
+        busy = false
+    }
+
+    private fun cancelSpeech(message: String) {
+        val token = speechToken ?: return
+        dictation.cancel(token)
+        releaseSpeech(token, cancel = true)
+        status.text = message
+    }
+
+    override fun onResume() {
+        super.onResume()
+        resumed = true
+    }
+
+    override fun onPause() {
+        resumed = false
+        cancelSpeech("Dictation cancelled · draft preserved")
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        cancelSpeech("Dictation cancelled")
+        super.onDestroy()
+    }
+
     override fun onStop() {
         stopped.set(true)
         super.onStop()
@@ -439,6 +616,7 @@ class MandyWorkspaceActivity : Activity() {
     }
     @Deprecated("Legacy back callback for this preview")
     override fun onBackPressed() {
+        if (speechToken != null) { cancelSpeech("Dictation cancelled · draft preserved"); return }
         if (busy) { stopped.set(true); return }
         if (editor?.text?.toString() != current?.draft?.draft && editor != null) {
             AlertDialog.Builder(this).setMessage("Unsaved draft. Save it before leaving?")
