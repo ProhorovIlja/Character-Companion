@@ -48,3 +48,21 @@ Actual Android/Windows build; test small display, keyboard insets, large fonts, 
 - GitHub releases: https://docs.github.com/en/rest/releases/releases
 
 These are references and candidates, not imported code or verified hardware performance. Assess licenses, security, dependencies, and measurable value before reuse.
+
+## Signature refinement — 2026-11-25
+The existing Signature prototype remains the design baseline: compact character header, fixed composer, separate call and dictation, collapsible library, AMOLED with a restrained accent. Avoid repeated redesigns and preserve touch/keyboard accessibility.
+
+- Android 65b4564: explicit chat-model approval scoped to the exact conversation selection ticket; no permanent trust grant. Reuse only while the approved digest remains in the available model inventory. Settings can forget approval. Both on-device and offline Whisper dictation can request stop-and-send, while Stop keeps an editable transcript. If no chat model is approved, the first send still requires model selection/consent. Existing validation, pending-ID retry and cancellation remain. Streaming follows new text only when at the bottom, and history scrolling no longer moves keyboard focus on snapshot render.
+- Windows 59d40e3: original native vector icons for settings, call, attach, microphone, send/retry and stop; accessibility names, disabled-action tooltips, no icon fonts or additional UI packages. Empty sends are disabled; pending retry remains available. Attach, microphone and call still require functional integration in this standalone preview.
+- Both revisions: source readback verified; Android APK and Windows EXE not built or device-tested in this pass. No performance claims without measurements.
+
+### External references reviewed
+- ChatGPT editable dictation: https://help.openai.com/en/articles/12168547-voice-dictation-faq
+- Claude dictation and voice distinction: https://support.claude.com/en/articles/10065434-use-dictation-on-claude-mobile
+- Android adaptive quality: https://developer.android.com/docs/quality-guidelines/adaptive-app-quality/tier-2
+- WPF Fluent source: https://github.com/dotnet/wpf/blob/main/Documentation/docs/using-fluent.md
+- Android Macrobenchmark: https://developer.android.com/topic/performance/benchmarking/macrobenchmark-overview
+- Upstream Whisper streaming: https://github.com/ggml-org/whisper.cpp/tree/master/examples/stream
+- Offline ASR implementation candidate: https://github.com/voiceping-ai/android-offline-transcribe
+
+Next acceptance gates: verify Android real recording, stop, cancel, review/send, no cross-character stale callbacks; compare English/Russian transcription quality and latency before introducing streaming ASR or VAD. On Windows, verify native package startup, keyboard and accessibility, and connect the existing local speech stack to the standalone workspace. Add attachment capabilities only when a real provider can consume the selected media. Measure startup, frame time, memory, power and inference latency on real hardware before claiming improvements. No scheduled/background tasks or new workflow triggers.
