@@ -167,6 +167,7 @@ fun main() {
     verifyDeviceRuntimeCapabilities()
     verifyReleasePolicy()
     verifyUpdateIntegrity()
+    verifyUpdateProgress()
     verifyLoginCompatibility()
     verifyVoiceDraft()
     verifyVoiceRecognitionOptions()

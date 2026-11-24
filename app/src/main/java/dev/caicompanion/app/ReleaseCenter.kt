@@ -65,7 +65,11 @@ object ReleaseCenter {
                     request.readTimeout = 5000
                     request.setRequestProperty("Accept", "application/vnd.github+json")
                     request.setRequestProperty("User-Agent", "CharacterCompanion-Android")
-                    when (request.responseCode) {
+                    when (val code = request.responseCode) {
+                        403, 429 -> if (!expired() && UpdateProgress.rateLimited(code,
+                            request.getHeaderField("X-RateLimit-Remaining"), request.getHeaderField("Retry-After"))) {
+                            result = R.string.release_rate_limited
+                        }
                         404 -> if (!expired()) result = R.string.release_none
                         200 -> {
                             val body = request.inputStream.bufferedReader(Charsets.UTF_8).use {

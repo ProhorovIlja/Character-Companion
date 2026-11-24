@@ -10,6 +10,8 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.widget.LinearLayout
+import android.widget.ProgressBar
 import androidx.core.content.FileProvider
 import java.io.File
 import java.net.URL
@@ -35,8 +37,19 @@ object UpdateDownload {
         }
         if (!busy.compareAndSet(false, true)) return
         val cancelled = AtomicBoolean(false)
+        val bar = ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 100
+            isIndeterminate = false
+        }
+        val progressView = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            val margin = (24 * resources.displayMetrics.density).toInt()
+            setPadding(margin, 0, margin, margin)
+            addView(bar, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        }
         val progress = AlertDialog.Builder(activity).setTitle(R.string.release_center)
-            .setMessage(R.string.release_downloading).setNegativeButton(R.string.cancel, null).create()
+            .setMessage(R.string.release_downloading).setView(progressView)
+            .setNegativeButton(R.string.cancel, null).create()
         ForegroundUpdateUi.show(activity, progress) { cancelled.set(true) }
         if (!progress.isShowing) { busy.set(false); return }
         val startedAt = android.os.SystemClock.elapsedRealtime()
@@ -60,8 +73,27 @@ object UpdateDownload {
                 file = target
                 fun expired(): Boolean = cancelled.get() ||
                     android.os.SystemClock.elapsedRealtime() - startedAt >= 300_000L
-                verified = fetch(asset, target, ::expired) && !expired() &&
-                    verifyPackage(activity, target, tag) && !expired()
+                val gate = UpdateProgress(asset.size, startedAt)
+                val downloaded = fetch(asset, target, ::expired) { bytes ->
+                    val percent = gate.next(bytes, android.os.SystemClock.elapsedRealtime())
+                    if (percent != null && !expired()) {
+                        activity.runOnUiThread {
+                            if (!cancelled.get() && !activity.isDestroyed && progress.isShowing) {
+                                bar.progress = percent
+                                progress.setMessage(activity.getString(R.string.release_download_progress, percent))
+                            }
+                        }
+                    }
+                }
+                if (downloaded && !expired()) {
+                    activity.runOnUiThread {
+                        if (!cancelled.get() && !activity.isDestroyed && progress.isShowing) {
+                            bar.progress = 100
+                            progress.setMessage(R.string.release_verifying_package)
+                        }
+                    }
+                    verified = verifyPackage(activity, target, tag) && !expired()
+                }
             } catch (_: Exception) {
                 verified = false
             }
@@ -93,7 +125,8 @@ object UpdateDownload {
         }.start()
     }
 
-    private fun fetch(asset: ReleasePolicy.Asset, target: File, cancelled: () -> Boolean): Boolean {
+    private fun fetch(asset: ReleasePolicy.Asset, target: File, cancelled: () -> Boolean,
+                      onProgress: (Long) -> Unit): Boolean {
         var address = asset.url
         repeat(4) {
             if (cancelled()) return false
@@ -115,7 +148,7 @@ object UpdateDownload {
                         if (length >= 0 && length != asset.size) return false
                         return connection.inputStream.use { input ->
                             target.outputStream().use { output ->
-                                UpdateIntegrity.copyVerified(input, output, asset.size, asset.digest, cancelled)
+                                UpdateIntegrity.copyVerified(input, output, asset.size, asset.digest, onProgress, cancelled)
                             }
                         }
                     }

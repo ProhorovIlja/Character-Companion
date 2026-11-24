@@ -398,4 +398,7 @@
     <string name="character_draft_export_backup">Экспорт резервной копии</string>
     <string name="character_draft_backup_warning">Копия содержит личный текст без шифрования. Выберите доверенное место хранения.</string>
     <string name="character_draft_backup_exported">Резервная копия экспортирована</string>
+    <string name="release_download_progress">Скачано %1$d%%. Проверка ещё не завершена.</string>
+    <string name="release_verifying_package">Проверка пакета, версии и подписи APK…</string>
+    <string name="release_rate_limited">GitHub временно ограничил запросы. Повторите проверку вручную позже.</string>
 </resources>

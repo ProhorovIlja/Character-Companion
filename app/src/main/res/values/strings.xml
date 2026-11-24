@@ -398,4 +398,7 @@
     <string name="character_draft_export_backup">Export draft backup</string>
     <string name="character_draft_backup_warning">This backup contains private text without encryption. Choose a trusted storage location.</string>
     <string name="character_draft_backup_exported">Draft backup exported</string>
+    <string name="release_download_progress">Downloaded %1$d%%. Verification is not complete.</string>
+    <string name="release_verifying_package">Verifying APK package, version and signing identity…</string>
+    <string name="release_rate_limited">GitHub temporarily rate-limited requests. Try checking manually later.</string>
 </resources>
