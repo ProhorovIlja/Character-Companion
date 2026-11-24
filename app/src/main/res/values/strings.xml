@@ -406,4 +406,10 @@
     <string name="character_draft_move_up">Move up</string>
     <string name="character_draft_move_down">Move down</string>
     <string name="character_draft_remove_item_confirm">Remove this item?</string>
+    <string name="free_experience_title">Free experience and delays</string>
+    <string name="free_experience_summary">Core Character.AI chat is free. Slow Mode and feature limits are controlled by the service, not the Companion renderer. If Charms are available, earn them through quests and use them to skip Slow Mode or ads. Choose an available free chat style. If a response is delayed, avoid resending or unnecessary reloads. Check service status manually. Companion drafts, dictation and local editors do not require a Character.AI subscription.</string>
+    <string name="free_experience_charms">Charms help</string>
+    <string name="free_experience_status">Service status</string>
+    <string name="free_experience_http429">The service rate-limited requests (HTTP 429). Wait before trying again.</string>
+    <string name="free_experience_http503">The service is temporarily unavailable (HTTP 503). Its original page is preserved.</string>
 </resources>

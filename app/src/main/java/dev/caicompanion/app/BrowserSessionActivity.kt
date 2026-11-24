@@ -90,6 +90,7 @@ class BrowserSessionActivity : Activity() {
         })
         column.addView(action(R.string.browser_mode_embedded) { returnToEmbedded() })
         column.addView(action(R.string.release_center) { ReleaseCenter.show(this) })
+        column.addView(action(R.string.free_experience_title) { FreeExperienceHelp.show(this) })
         column.addView(action(R.string.lorebook_title) { startActivity(Intent(this, LorebookActivity::class.java)) })
         column.addView(action(R.string.character_draft_title) { startActivity(Intent(this, CharacterDraftActivity::class.java)) })
         column.addView(action(R.string.section_data) { settingsBackup.show() })

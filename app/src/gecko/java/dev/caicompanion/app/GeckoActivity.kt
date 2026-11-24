@@ -232,6 +232,7 @@ class GeckoActivity : Activity() {
         ShellMenu.show(this, anchor, listOf(
             ShellMenu.Action(R.string.settings) { showGeckoSettings() },
             ShellMenu.Action(R.string.release_center) { ReleaseCenter.show(this) },
+            ShellMenu.Action(R.string.free_experience_title) { FreeExperienceHelp.show(this) },
             ShellMenu.Action(R.string.lorebook_title) { startActivity(Intent(this, LorebookActivity::class.java)) },
             ShellMenu.Action(R.string.character_draft_title) { startActivity(Intent(this, CharacterDraftActivity::class.java)) },
             ShellMenu.Action(R.string.section_data) { settingsBackup.show() },

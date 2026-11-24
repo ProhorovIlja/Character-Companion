@@ -78,6 +78,7 @@ class MainActivity : Activity() {
     private lateinit var filter: FilterEngine
     private val loginProtection = LoginCompatibilitySession()
     private val voiceHandoff = VoiceComposerHandoff()
+    private val serviceLoadFeedback = ServiceLoadFeedback()
     private lateinit var importedRuleStore: ImportedRuleStore
     private var importedRules: RuleListParser.Rules = RuleListParser.Rules()
     private lateinit var container: FrameLayout
@@ -273,6 +274,7 @@ class MainActivity : Activity() {
             }
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 if (destroyed || rendererNeedsNavigation || !::webView.isInitialized || view !== webView) return
+                serviceLoadFeedback.beginNavigation()
                 voiceHandoff.invalidate()
                 observeLoginPage(url)
                 // WebRTC grants are scoped to the page that requested them, not its successor.
@@ -301,14 +303,21 @@ class MainActivity : Activity() {
                 observeLoginPage(url)
             }
             override fun onReceivedError(view: WebView?, request: WebResourceRequest, error: WebResourceError) {
-                if (request.isForMainFrame && !destroyed) {
+                if (request.isForMainFrame && !destroyed && !rendererDisposed &&
+                    ::webView.isInitialized && view === webView) {
                     showError(error.description?.toString() ?: getString(R.string.error_loading))
                 }
             }
             override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest,
                 response: android.webkit.WebResourceResponse) {
-                if (!destroyed && request.isForMainFrame && response.statusCode in 500..599) {
-                    showError(getString(R.string.error_server, response.statusCode))
+                if (destroyed || rendererDisposed || !::webView.isInitialized || view !== webView) return
+                val notice = serviceLoadFeedback.notice(response.statusCode, request.isForMainFrame,
+                    UrlPolicy.isTrustedMediaOrigin(request.url.toString()))
+                when (notice) {
+                    ServiceLoadFeedback.Notice.RATE_LIMIT -> showToast(getString(R.string.free_experience_http429))
+                    ServiceLoadFeedback.Notice.UNAVAILABLE -> showToast(getString(R.string.free_experience_http503))
+                    ServiceLoadFeedback.Notice.SERVER_ERROR -> showError(getString(R.string.error_server, response.statusCode))
+                    ServiceLoadFeedback.Notice.NONE -> Unit
                 }
             }
             override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler, error: android.net.http.SslError?) {
@@ -609,6 +618,7 @@ class MainActivity : Activity() {
         ShellMenu.show(this, anchor, listOf(
             ShellMenu.Action(R.string.settings) { showSettings() },
             ShellMenu.Action(R.string.release_center) { ReleaseCenter.show(this) },
+            ShellMenu.Action(R.string.free_experience_title) { FreeExperienceHelp.show(this) },
             ShellMenu.Action(R.string.lorebook_title) { startActivity(Intent(this, LorebookActivity::class.java)) },
             ShellMenu.Action(R.string.character_draft_title) { startActivity(Intent(this, CharacterDraftActivity::class.java)) },
             ShellMenu.Action(R.string.engine_use_gecko, BuildConfig.FLAVOR == "gecko") { returnToGecko() },

@@ -406,4 +406,10 @@
     <string name="character_draft_move_up">Переместить выше</string>
     <string name="character_draft_move_down">Переместить ниже</string>
     <string name="character_draft_remove_item_confirm">Удалить этот элемент?</string>
+    <string name="free_experience_title">Бесплатный режим и задержки</string>
+    <string name="free_experience_summary">Основной чат Character.AI доступен бесплатно. Slow Mode и лимиты функций зависят от сервиса, а не от движка Companion. Если доступны Charms, их можно заработать за задания и использовать для пропуска Slow Mode или рекламы. Выбирайте доступный бесплатный стиль чата. При задержке ответа не отправляйте сообщение повторно и не перезагружайте страницу без необходимости. Проверьте статус сервиса вручную. Черновики, голосовой ввод и редакторы Companion не требуют подписки Character.AI.</string>
+    <string name="free_experience_charms">Справка Charms</string>
+    <string name="free_experience_status">Статус сервиса</string>
+    <string name="free_experience_http429">Сервис ограничил запросы (HTTP 429). Подождите перед повторной попыткой.</string>
+    <string name="free_experience_http503">Сервис временно недоступен (HTTP 503). Оригинальная страница сохранена.</string>
 </resources>

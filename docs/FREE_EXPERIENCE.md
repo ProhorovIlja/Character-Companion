@@ -1,0 +1,8 @@
+# Free experience and service load
+Character.AI's official free plan includes core messaging but has service-side Slow Mode and feature limits. The official Charms FAQ documents earning rewards through quests and using them to skip Slow Mode or ads when available. Companion cannot establish the account's eligibility or change server entitlements. The free experience dialog is accessible from WebView, Gecko and browser-session mode and opens official help/status only on explicit taps. No status polling, account access, token extraction, background work, retry loop, automated rewards or paid-feature unlocking.
+
+WebView top-level first-party HTTP 429 and 503 now give one advisory toast per navigation rather than replacing a 503 response with the app error overlay. The actual server page remains visible; these status codes alone do not prove Slow Mode. Other first-party 5xx errors retain the prior overlay. Detached renderer callbacks are ignored. Subresource responses are not inspected for chat limits. Gecko and external browser HTTP diagnostics are unchanged; no measured inference acceleration is claimed.
+
+16 executable Kotlin/JVM assertions passed for ServiceLoadFeedback and ServiceLoadSmoke; Android UI, full repository tests, live service and device not tested.
+
+References: https://support.character.ai/hc/en-us/articles/43610534413211-Charms-FAQ ; https://support.character.ai/hc/en-us/articles/56173313531675-About-c-ai-lite ; https://blog.character.ai/new-styles-new-plan/ ; https://developer.android.com/reference/android/webkit/WebViewClient ; https://github.com/Kajitsy/Emilia ; https://github.com/kramcat/CharacterAI ; https://github.com/realcoloride/node_characterai . Unofficial client/API repositories are research references, not integrated.
