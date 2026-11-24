@@ -89,7 +89,7 @@ def _latest(store, character, chat):
 
 
 def chat_turn(store, provider, *, character, chat, device, message_id, text,
-              identity, mode='text', context_units=12000):
+              identity, mode='text', context_units=12000, relationships=None):
     """Yield display fragments; persist only a normally completed text reply.
 
     Consume on one thread. Close iterator to cancel; user text remains recoverable.
@@ -100,6 +100,10 @@ def chat_turn(store, provider, *, character, chat, device, message_id, text,
         raise ValueError('invalid character identity')
     if type(context_units) is not int or not 256 <= context_units <= 64000:
         raise ValueError('invalid context budget')
+    if relationships is not None:
+        if relationships.store is not store:
+            raise ValueError('relationship store mismatch')
+        identity += '\n' + relationships.context(character)
     if units(identity) + units(text) > context_units:
         raise ValueError('latest message exceeds context budget')
     user = store.append(id=message_id, device=device, character=character, chat=chat,
