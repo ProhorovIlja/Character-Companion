@@ -85,7 +85,8 @@ internal sealed class ChatWindow : Window
         var header = new DockPanel { Margin = new Thickness(0,0,0,10), LastChildFill = true };
         DockPanel.SetDock(header, Dock.Top);
         layout.Children.Add(header);
-        var headerActions = Buttons(Unavailable("Call", "Live voice calls are not implemented in this preview."), settingsButton);
+        SetActionIcon(settingsButton, "settings", "Settings");
+        var headerActions = Buttons(Unavailable("call", "Call", "Live voice calls are not implemented in this preview."), settingsButton);
         DockPanel.SetDock(headerActions, Dock.Right);
         header.Children.Add(headerActions);
         header.Children.Add(characterTitle);
@@ -111,11 +112,13 @@ internal sealed class ChatWindow : Window
         draft.FontSize = 16;
         composer.Children.Add(draft);
         var composerActions = new DockPanel { LastChildFill = false };
+        SetActionIcon(send, "send", "Send message (Ctrl+Enter)");
+        SetActionIcon(stop, "stop", "Stop generation (Escape)");
         var primaryActions = Buttons(send, stop);
         DockPanel.SetDock(primaryActions, Dock.Right);
         composerActions.Children.Add(primaryActions);
-        var mediaActions = Buttons(Unavailable("Attach", "Multimodal attachments are not implemented in this preview."),
-            Unavailable("Dictate", "Native speech recognition is not connected to this workspace yet."));
+        var mediaActions = Buttons(Unavailable("attach", "Attach", "Multimodal attachments are not implemented in this preview."),
+            Unavailable("mic", "Dictate", "Native speech recognition is not connected to this workspace yet."));
         DockPanel.SetDock(mediaActions, Dock.Left);
         composerActions.Children.Add(mediaActions);
         composer.Children.Add(composerActions);
@@ -159,6 +162,7 @@ internal sealed class ChatWindow : Window
         AutomationProperties.SetName(liveReply, "Incomplete streamed reply");
         AutomationProperties.SetName(key, "Local server API key");
         AutomationProperties.SetName(settingsButton, "Show or hide settings");
+        draft.TextChanged += (_, _) => UpdateSendAvailability();
         draft.PreviewKeyDown += async (_, e) =>
         {
             if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control && send.IsEnabled)
@@ -198,9 +202,40 @@ internal sealed class ChatWindow : Window
         UpdateControls();
     }
 
-    private static Button Unavailable(string label, string reason)
+    // Matching original line icons with native vector rendering and inherited theme color.
+    private static void SetActionIcon(Button button, string kind, string description)
     {
-        var button = new Button { Content = label, IsEnabled = false, ToolTip = reason };
+        var geometry = Geometry.Parse(kind switch
+        {
+            "settings" => "M4,6 L6,6 M10,6 L20,6 M8,4 A2,2 0 1 1 8,8 A2,2 0 1 1 8,4 M4,12 L14,12 M18,12 L20,12 M16,10 A2,2 0 1 1 16,14 A2,2 0 1 1 16,10 M4,18 L8,18 M12,18 L20,18 M10,16 A2,2 0 1 1 10,20 A2,2 0 1 1 10,16",
+            "call" => "M4,4 L8,3 L11,8 L8,11 Q10,15 14,17 L17,14 L21,17 L20,21 C10,21 3,14 4,4 Z",
+            "attach" => "M8,13 L14,7 C17,4 21,8 18,11 L10,19 C5,24 -1,17 4,12 L13,3",
+            "mic" => "M9,6 A3,3 0 0 1 15,6 L15,11 A3,3 0 0 1 9,11 Z M5,11 A7,7 0 0 0 19,11 M12,18 L12,21 M8,21 L16,21",
+            "send" => "M12,20 L12,4 M5,11 L12,4 L19,11",
+            "retry" => "M20,9 L20,3 M20,9 L14,9 M20,9 A8,8 0 1 0 20,15",
+            "stop" => "M6,6 L18,6 L18,18 L6,18 Z",
+            _ => throw new ArgumentException("Unknown action icon.")
+        });
+        if (geometry.CanFreeze) geometry.Freeze();
+        var path = new System.Windows.Shapes.Path
+        {
+            Data = geometry, StrokeThickness = 1.8, StrokeStartLineCap = PenLineCap.Round,
+            StrokeEndLineCap = PenLineCap.Round, StrokeLineJoin = PenLineJoin.Round,
+            Width = 22, Height = 22, Stretch = Stretch.Uniform, IsHitTestVisible = false
+        };
+        path.SetBinding(System.Windows.Shapes.Shape.StrokeProperty,
+            new System.Windows.Data.Binding(nameof(Control.Foreground)) { Source = button });
+        button.Content = path;
+        button.MinWidth = 44; button.MinHeight = 44;
+        button.ToolTip = description;
+        AutomationProperties.SetName(button, description);
+    }
+
+    private static Button Unavailable(string kind, string label, string reason)
+    {
+        var button = new Button { IsEnabled = false };
+        SetActionIcon(button, kind, label);
+        button.ToolTip = reason;
         ToolTipService.SetShowOnDisabled(button, true);
         AutomationProperties.SetName(button, label);
         AutomationProperties.SetHelpText(button, reason);
@@ -233,13 +268,17 @@ internal sealed class ChatWindow : Window
         name.IsEnabled = identity.IsEnabled = !busy && workspace == null;
         alias.IsEnabled = port.IsEnabled = key.IsEnabled = !busy;
         draft.IsEnabled = ready && pending == null;
-        send.IsEnabled = ready;
-        send.Content = pending != null ? "Retry pending message" : "Send";
+        UpdateSendAvailability();
+        string action = pending != null ? "Retry pending message (Ctrl+Enter)" : "Send message (Ctrl+Enter)";
+        if (AutomationProperties.GetName(send) != action)
+            SetActionIcon(send, pending != null ? "retry" : "send", action);
         refresh.IsEnabled = workspace != null && !busy;
         stop.IsEnabled = busy && operation != null && !operation.IsCancellationRequested;
         stop.Visibility = busy && operation != null ? Visibility.Visible : Visibility.Collapsed;
         send.Visibility = busy && operation != null ? Visibility.Collapsed : Visibility.Visible;
     }
+    private void UpdateSendAvailability() => send.IsEnabled = workspace != null && historyValid && !busy &&
+        (pending != null || !string.IsNullOrWhiteSpace(draft.Text));
     private void Finish()
     {
         operation?.Dispose(); operation = null; busy = false; UpdateControls();
