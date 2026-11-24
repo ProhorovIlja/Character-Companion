@@ -52,7 +52,7 @@ internal sealed class ChatWindow : Window
     private readonly TextBlock characterTitle = new() { Text = "No character selected", FontSize = 18, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
     private readonly Button settingsButton = new() { Content = "Settings" };
     private readonly Button charactersButton = new() { Content = "Characters", IsEnabled = false };
-    private readonly Button chatsButton = new() { Content = "Conversations", IsEnabled = false };
+
     private readonly TextBox liveReply = new() { IsReadOnly = true, TextWrapping = TextWrapping.Wrap, MaxHeight = 160, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Visibility = Visibility.Collapsed, IsUndoEnabled = false, Margin = new Thickness(0, 0, 0, 8) };
     private readonly TextBlock status = new() { Text = "Choose an empty folder to create a workspace, or open an existing one.", TextWrapping = TextWrapping.Wrap };
     private readonly Button choose = new() { Content = "Choose folder" };
@@ -115,10 +115,8 @@ internal sealed class ChatWindow : Window
         charactersButton.Margin = new Thickness(0,0,12,0);
         header.Children.Add(charactersButton);
         charactersButton.Click += async (_, _) => await ChooseCharacterAsync();
-        DockPanel.SetDock(chatsButton, Dock.Left);
-        chatsButton.Margin = new Thickness(0,0,8,0);
-        header.Children.Add(chatsButton);
-        chatsButton.Click += async (_, _) => await ChooseConversationAsync();
+        charactersButton.Content = "Library";
+        AutomationProperties.SetName(charactersButton, "Character and conversation library");
         header.Children.Add(characterTitle);
         var settings = new StackPanel();
         DockPanel.SetDock(configuration, Dock.Top);
@@ -662,7 +660,7 @@ internal sealed class ChatWindow : Window
         saveDraft.IsEnabled = ready && pending == null;
         earlier.IsEnabled = ready;
         charactersButton.IsEnabled = ready && !closeRequested;
-        chatsButton.IsEnabled = ready && !closeRequested;
+
         bool recording = recorder != null;
         chooseSpeechExe.IsEnabled = chooseSpeechModel.IsEnabled = speechLanguage.IsEnabled = !busy;
         dictate.IsEnabled = ready && pending == null;
@@ -809,7 +807,7 @@ internal sealed class ChatWindow : Window
             if (pending == null) draft.Text = lastSavedDraft;
             configuration.Visibility = Visibility.Collapsed;
             characterTitle.Text = workspace.Character.Name;
-            chatsButton.ToolTip = workspace.ConversationTitle;
+            charactersButton.ToolTip = workspace.ConversationTitle;
             status.Text = pending == null ? "Local workspace ready." : "A saved user message is awaiting a reply.";
         }
         catch (Exception)
@@ -831,14 +829,18 @@ internal sealed class ChatWindow : Window
         var cancel = new Button { Content = "Cancel", IsCancel = true };
         var panel = new StackPanel { Margin = new Thickness(16) };
         panel.Children.Add(list);
+        var chats = new Button { Content = "Current character conversations" };
         panel.Children.Add(Buttons(select, add, cancel));
+        panel.Children.Add(chats);
         var dialog = new Window { Owner = this, Title = "Characters", Width = 430, SizeToContent = SizeToContent.Height,
             WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false, Content = panel };
         Workspace.Profile? selected = null;
-        bool creating = false;
+        bool creating = false, browseChats = false;
+        chats.Click += (_, _) => { browseChats = true; dialog.DialogResult = true; };
         select.Click += (_, _) => { selected = list.SelectedItem as Workspace.Profile; if (selected != null) dialog.DialogResult = true; };
         add.Click += (_, _) => { creating = true; dialog.DialogResult = true; };
         if (dialog.ShowDialog() != true) return;
+        if (browseChats) { await ChooseConversationAsync(); return; }
         string newName = "", newIdentity = "";
         if (creating)
         {
@@ -888,14 +890,14 @@ internal sealed class ChatWindow : Window
             name.Text = w.Character.Name;
             identity.Text = w.Character.Identity;
             characterTitle.Text = w.Character.Name;
-            chatsButton.ToolTip = w.ConversationTitle;
+            charactersButton.ToolTip = w.ConversationTitle;
             status.Text = pending == null ? "Character opened." : "Character opened · pending reply recovered.";
         }
         catch (Exception)
         {
             // Do not render another character's history alongside the old draft.
             w.SelectConversation(previous.Character, previous.Chat);
-            chatsButton.ToolTip = w.ConversationTitle;
+            charactersButton.ToolTip = w.ConversationTitle;
             historyValid = false;
             pending = previousPending;
             history.ItemsSource = previousRows;
@@ -955,7 +957,7 @@ internal sealed class ChatWindow : Window
             draft.Text = loaded.Draft;
             lastSavedDraft = loaded.Draft;
             ShowRows(loaded.Rows);
-            chatsButton.ToolTip = w.ConversationTitle;
+            charactersButton.ToolTip = w.ConversationTitle;
             status.Text = pending == null ? "Conversation opened." : "Conversation opened · pending reply recovered.";
         }
         catch (Exception)
@@ -965,7 +967,7 @@ internal sealed class ChatWindow : Window
             history.ItemsSource = previousRows;
             draft.Text = previousDraft;
             lastSavedDraft = previousSaved;
-            chatsButton.ToolTip = w.ConversationTitle;
+            charactersButton.ToolTip = w.ConversationTitle;
             historyValid = false;
             status.Text = "Conversation operation failed. Refresh the original conversation before continuing.";
         }
