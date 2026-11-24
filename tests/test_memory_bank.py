@@ -21,4 +21,4 @@ class MemoryBankTests(unittest.TestCase):
             return {x.get('name') for x in ET.parse(ROOT / f'app/src/main/res/{locale}/strings.xml').getroot()
                     if x.get('name', '').startswith('memory_bank_')}
         self.assertEqual(keys('values'), keys('values-ru'))
-        self.assertEqual(len(keys('values')), 13)
+        self.assertEqual(len(keys('values')), 14)
