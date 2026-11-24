@@ -77,10 +77,18 @@ private fun verifyVoiceDraft() {
 
 fun verifyLoginCompatibility() {
     val login = LoginCompatibilitySession()
+    check(!login.observePage("https://character.ai/login"))
+    check(!login.toggleManual("https://character.ai/"))
+    login.setVisible(true)
     check(LoginCompatibilityPolicy.isLoginPage("https://character.ai/login"))
     check(LoginCompatibilityPolicy.isLoginPage("https://auth.character.ai/auth/authorize"))
     check(LoginCompatibilityPolicy.isLoginPage("https://c.ai/signup?method=email"))
     check(!LoginCompatibilityPolicy.isLoginPage("https://character.ai/chat/login-story"))
+    check(!LoginCompatibilityPolicy.isLoginPage("https://character.ai/chat/login"))
+    check(LoginCompatibilityPolicy.isLoginPage("https://character.ai/en-US/login"))
+    check(!LoginCompatibilityPolicy.isLoginPage("https://character.ai/" + "x".repeat(8192)))
+    check(LoginCompatibilityPolicy.pageKey("https://character.ai/Aa") !=
+        LoginCompatibilityPolicy.pageKey("https://character.ai/BB"))
     check(!LoginCompatibilityPolicy.isLoginPage("https://example.com/login"))
     check(!LoginCompatibilityPolicy.isLoginPage("https://character.ai.evil.com/login"))
     check(!LoginCompatibilityPolicy.isLoginPage("http://character.ai/login"))
@@ -106,6 +114,18 @@ fun verifyLoginCompatibility() {
     check(login.observePage("https://character.ai/signin"))
     check(!login.observePage("https://accounts.google.com/"))
     login.reset()
+    check(!login.bypass)
+    check(login.toggleManual("https://character.ai/Aa"))
+    check(!login.observePage("https://character.ai/BB"))
+    check(login.toggleManual("https://character.ai/"))
+    login.setVisible(false)
+    check(!login.manual && !login.bypass)
+    check(!login.observePage("https://character.ai/auth"))
+    check(!login.toggleManual("https://character.ai/"))
+    login.setVisible(true)
+    check(!login.observePage("https://character.ai/"))
+    check(login.observePage("https://character.ai/auth"))
+    login.setVisible(false)
     check(!login.bypass)
     val filter = FilterEngine(listOf("doubleclick.net", "statsigapi.net"))
     check(filter.shouldBlock("https://doubleclick.net/ad"))
@@ -346,6 +366,12 @@ fun main() {
     threads.forEach { it.start() }; threads.forEach { it.join() }
     check(concurrent.blockedRequestCount.get() == 1000L)
     check(concurrent.topBlockedRules()[0] == ("ad.test" to 1000L))
+    // Reset and request accounting share one lock; final counters describe the same epoch.
+    val race = FilterEngine(listOf("ad.test"))
+    val writers = (1..3).map { Thread { repeat(2000) { race.shouldBlock("https://ad.test/") } } }
+    val resets = Thread { repeat(1000) { race.clearStats() } }
+    (writers + resets).forEach { it.start() }; (writers + resets).forEach { it.join() }
+    check(race.topBlockedRules().sumOf { it.second } == race.blockedRequestCount.get())
     // A manually imported list is deliberately not a full cosmetic or URL-path adblock engine.
     val imported = RuleListParser.parse("""
         ! example list

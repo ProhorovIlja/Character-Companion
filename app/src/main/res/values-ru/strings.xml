@@ -27,7 +27,7 @@
     <string name="bookmark_remove">− Удалить страницу</string>
     <string name="section_privacy">ПРИВАТНОСТЬ И ЗАЩИТА</string>
     <string name="toggle_filter">Блокировать рекламные домены и трекеры</string>
-    <string name="toggle_filter_desc">Локальные правила без обхода подписки</string>
+    <string name="toggle_filter_desc">Локальные правила доменов, без полной косметической блокировки.</string>
     <string name="toggle_cookies">Разрешить сторонние cookie</string>
     <string name="toggle_cookies_desc">Может помочь входу, снижает приватность</string>
     <string name="toggle_media">Разрешить запросы микрофона и камеры</string>
@@ -154,7 +154,7 @@
     <string name="hub_bookmark_invalid">Можно сохранить только безопасную ссылку Character.AI</string>
     <string name="hub_bookmark_rename">Переименовать закладку</string>
     <string name="device_compat_title">Совместимость устройства и прошивки</string>
-    <string name="gecko_preview_title">Character.AI · GeckoView (проверка)</string>
+    <string name="gecko_preview_title">Character.AI · GeckoView</string>
     <string name="gecko_legacy">Инструменты</string>
     <string name="gecko_media">Микрофон и камера</string>
     <string name="gecko_media_on">Запросы доступа включены. Отключить? Сайт по-прежнему будет запрашивать разрешение для каждого сеанса.</string>
@@ -204,7 +204,7 @@
     <string name="voice_permission_denied">Нет доступа к микрофону; предыдущий текст сохранён.</string>
 
     <string name="login_compatibility_button">Совместимость входа (временно)</string>
-    <string name="login_compatibility_info">Если окно входа Character.AI не показывается с блокировкой (или удерживайте значок защиты): временно разрешить ресурсы страницы. При переходе на другой адрес защита восстановится. Если вход открылся окном без смены адреса, нажмите ещё раз после авторизации. Это не исправляет запрет OAuth во встроенных браузерах.</string>
+    <string name="login_compatibility_info">Временно разрешает ресурсы текущей страницы входа. Защита восстановится при смене страницы или уходе приложения в фон. Для окна входа без смены адреса удерживайте значок защиты либо повторно выберите эту команду. Не снимает ограничений Google OAuth во встроенных браузерах.</string>
     <string name="login_compatibility_on">Временный режим входа: фильтрация приостановлена</string>
     <string name="login_compatibility_off">Режим входа выключен: защита восстановлена</string>
     <string name="login_compatibility_unavailable">Сначала откройте Character.AI</string>
@@ -243,4 +243,6 @@
     <string name="voice_handoff_recover">Не удалось открыть редактор. Нажмите «Голос» ещё раз, чтобы восстановить черновик, пока приложение открыто.</string>
     <string name="browser_mode_open_failed">Не удалось открыть режим сессии браузера. Встроенный режим доступен.</string>
     <string name="browser_mode_switch_failed">Не удалось открыть встроенный режим. Сессия браузера по-прежнему доступна.</string>
+    <string name="gecko_tracking_protection">Защита от трекеров (GeckoView)</string>
+    <string name="gecko_tracking_explanation">Встроенная защита Gecko от трекеров, а не пользовательские списки доменов WebView. Системный браузер использует собственные настройки защиты.</string>
 </resources>

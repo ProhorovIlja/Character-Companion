@@ -353,11 +353,15 @@ class GeckoActivity : Activity() {
             })
         }
         if (section == R.string.section_privacy) {
-            options.addView(settingCheckbox(R.string.toggle_filter, settings.blocking) {
+            options.addView(settingCheckbox(R.string.gecko_tracking_protection, settings.blocking) {
                 settings.blocking = it
-                if (::session.isInitialized && session.isOpen)
-                    session.settings.setUseTrackingProtection(it && !loginProtection.bypass)
-                updatePrivacy()
+                refreshTrackingProtection()
+            })
+            options.addView(TextView(this).apply {
+                text = getString(R.string.gecko_tracking_explanation)
+                setTextColor(fg)
+                textSize = 13f
+                setPadding(dp(8), dp(0), dp(8), dp(10))
             })
             options.addView(button(getString(R.string.login_compatibility_button)) {
                 toggleLoginProtection()
@@ -414,6 +418,8 @@ class GeckoActivity : Activity() {
     private fun geckoExited() {
         voiceHandoff.invalidate()
         needsRecovery = true
+        loginProtection.reset()
+        updatePrivacy()
         // A destroyed renderer cannot satisfy old site permissions, pending file
         // prompts or downloads. Keep no callback into the failed session.
         revokeMediaPermissions()
@@ -449,6 +455,7 @@ class GeckoActivity : Activity() {
             session.open(engine(applicationContext))
             surface.setSession(session)
             needsRecovery = false
+            loginProtection.setVisible(started && hasWindowFocus())
             canGoBack = false
             canGoForward = false
             updateNavigation()
@@ -905,12 +912,11 @@ class GeckoActivity : Activity() {
     }
 
     private fun toggleLoginProtection() {
-        val manual = loginProtection.toggleManual(activeUrl)
-        if (!manual && !loginProtection.bypass &&
-            LoginCompatibilityPolicy.pageKey(activeUrl) == null) {
+        if (!sessionReady() || !started || LoginCompatibilityPolicy.pageKey(activeUrl) == null) {
             Toast.makeText(this, R.string.login_compatibility_unavailable, Toast.LENGTH_SHORT).show()
             return
         }
+        loginProtection.toggleManual(activeUrl)
         refreshTrackingProtection()
         Toast.makeText(this, if (loginProtection.bypass) R.string.login_compatibility_on
             else R.string.login_compatibility_off, Toast.LENGTH_SHORT).show()
@@ -1025,10 +1031,19 @@ class GeckoActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        loginProtection.setVisible(sessionReady())
+        if (sessionReady()) observeLoginPage(activeUrl)
         deliverVoiceDraft()
     }
 
+    override fun onPause() {
+        loginProtection.setVisible(false)
+        if (::settings.isInitialized) refreshTrackingProtection()
+        super.onPause()
+    }
+
     override fun onDestroy() {
+        loginProtection.setVisible(false)
         voiceHandoff.clear()
         revokeMediaPermissions()
         finishFilePrompt(emptyList())

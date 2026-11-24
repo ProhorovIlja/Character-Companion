@@ -27,7 +27,7 @@
     <string name="bookmark_remove">− Remove current page</string>
     <string name="section_privacy">PRIVACY &amp; PROTECTION</string>
     <string name="toggle_filter">Block known ad and tracking domains</string>
-    <string name="toggle_filter_desc">Local rules; does not bypass subscription</string>
+    <string name="toggle_filter_desc">Local domain rules; not a full cosmetic ad blocker.</string>
     <string name="toggle_cookies">Allow third-party cookies</string>
     <string name="toggle_cookies_desc">May help sign-in; reduces privacy</string>
     <string name="toggle_media">Allow microphone / camera requests</string>
@@ -154,7 +154,7 @@
     <string name="hub_bookmark_invalid">Only safe Character.AI links can be saved</string>
     <string name="hub_bookmark_rename">Rename bookmark</string>
     <string name="device_compat_title">Device and ROM compatibility</string>
-    <string name="gecko_preview_title">Character.AI · GeckoView preview</string>
+    <string name="gecko_preview_title">Character.AI · GeckoView</string>
     <string name="gecko_legacy">Tools</string>
     <string name="gecko_media">Media access</string>
     <string name="gecko_media_on">Media requests enabled. Turn them off? The site still asks for permission each time.</string>
@@ -204,7 +204,7 @@
     <string name="voice_permission_denied">Microphone permission denied; previous draft preserved.</string>
 
     <string name="login_compatibility_button">Login compatibility (temporary)</string>
-    <string name="login_compatibility_info">Use if the Character.AI sign-in dialog stays blank while the shield is on. Long-press the shield indicator for quick access. The app temporarily allows site resources during sign-in; it restores filtering when you navigate to another page. For login popups without a URL change, tap again after signing in. This does not fix sign-in providers that refuse embedded browsers.</string>
+    <string name="login_compatibility_info">Temporarily allow resources on the current sign-in page. Protection resumes on a different route or when the app is hidden. For a login dialog without a URL change, long-press the shield or use this action again. This does not make embedded Google OAuth supported.</string>
     <string name="login_compatibility_on">Login compatibility active: protection temporarily paused</string>
     <string name="login_compatibility_off">Login compatibility off: protection restored</string>
     <string name="login_compatibility_unavailable">Open Character.AI first to activate login compatibility</string>
@@ -243,4 +243,6 @@
     <string name="voice_handoff_recover">Could not reopen the editor. Tap Voice again to recover the draft while the app stays open.</string>
     <string name="browser_mode_open_failed">Could not open browser-session mode. Embedded mode is still available.</string>
     <string name="browser_mode_switch_failed">Could not open embedded mode. Your browser session is still available.</string>
+    <string name="gecko_tracking_protection">Tracking protection (GeckoView)</string>
+    <string name="gecko_tracking_explanation">Uses Gecko’s built-in tracker protection, not the WebView custom domain lists. System browser sessions use their own protection settings.</string>
 </resources>

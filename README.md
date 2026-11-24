@@ -1,3 +1,5 @@
+**0.38.0-rc1 (source):** foreground-only sign-in compatibility, stale navigation protection, exact route fingerprints, accurate Gecko tracker-protection labels, and coherent filter counters. Android build and hardware QA pending.
+
 **0.37.0-rc1 (source):** safer private draft recovery, discard confirmation, keyboard-learning opt-out, adaptive voice actions, and browser-session launch recovery. Android compilation and device verification pending.
 
 **0.36.0-rc1 (source):** private, explicitly requested focused-editor dictation handoff in both embedded engines; safe draft fallback, fixed Unicode cursor behavior and browser-provider continuity. Hardware validation required. [Details](docs/ANDROID_VOICE_HANDOFF_0.36.md).

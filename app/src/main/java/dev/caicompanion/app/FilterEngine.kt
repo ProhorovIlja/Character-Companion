@@ -45,8 +45,8 @@ class FilterEngine(private val defaults: List<String>, private val strictRules: 
     fun shouldBlock(url: String): Boolean {
         if (!enabled || loginBypass) return false
         val matched = blocker.matchedBlockedDomain(url) ?: return false
-        blockedRequestCount.incrementAndGet()
         synchronized(statsLock) {
+            blockedRequestCount.incrementAndGet()
             if (matched in counters || counters.size < 128) {
                 counters[matched] = (counters[matched] ?: 0L) + 1
             }

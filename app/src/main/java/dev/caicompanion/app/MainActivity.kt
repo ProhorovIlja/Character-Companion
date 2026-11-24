@@ -270,6 +270,7 @@ class MainActivity : Activity() {
                 return filterResponse(request.url.toString())
             }
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                if (destroyed || !::webView.isInitialized || view !== webView) return
                 voiceHandoff.invalidate()
                 observeLoginPage(url)
                 // WebRTC grants are scoped to the page that requested them, not its successor.
@@ -279,6 +280,7 @@ class MainActivity : Activity() {
                 status.setText(R.string.status_loading)
             }
             override fun onPageFinished(view: WebView?, url: String?) {
+                if (destroyed || !::webView.isInitialized || view !== webView || url != view?.url) return
                 observeLoginPage(url)
                 titleLabel.text = view?.title?.take(65)?.ifBlank { "character.ai" } ?: "character.ai"
                 // Persist only a canonical content link, not the raw page URL or fragment.
@@ -292,6 +294,7 @@ class MainActivity : Activity() {
             }
             override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
                 super.doUpdateVisitedHistory(view, url, isReload)
+                if (destroyed || !::webView.isInitialized || view !== webView) return
                 if (isReload) voiceHandoff.invalidate() else voiceHandoff.observe(url)
                 observeLoginPage(url)
             }
@@ -316,6 +319,8 @@ class MainActivity : Activity() {
                 voiceHandoff.invalidate()
                 // Old WebView is unusable. Replace it; don't crash the whole application.
                 if (destroyed) return true
+                loginProtection.reset()
+                filter.loginBypass = false
                 denyPendingMedia()
                 leaveFullscreen()
                 chooser?.onReceiveValue(null)
@@ -468,10 +473,11 @@ class MainActivity : Activity() {
     }
 
     private fun toggleLoginProtection() {
-        val manual = loginProtection.toggleManual(if (::webView.isInitialized) webView.url else null)
-        if (!manual && !loginProtection.bypass && !::webView.isInitialized) {
+        val page = if (::webView.isInitialized && activityResumed && nativeHub == null) webView.url else null
+        if (LoginCompatibilityPolicy.pageKey(page) == null) {
             showToast(getString(R.string.login_compatibility_unavailable)); return
         }
+        loginProtection.toggleManual(page)
         filter.loginBypass = loginProtection.bypass
         updateStatus()
         showToast(getString(if (loginProtection.bypass) R.string.login_compatibility_on
@@ -919,6 +925,8 @@ class MainActivity : Activity() {
         // A hidden web page cannot keep a pending microphone/camera prompt alive.
         denyPendingMedia()
         // No WebView exists on cold native startup, so nothing Chromium-related is loaded.
+        loginProtection.setVisible(false)
+        filter.loginBypass = false
         if (::webView.isInitialized) webView.onPause()
         container.addView(panel, FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
@@ -962,8 +970,13 @@ class MainActivity : Activity() {
     }
 
     private fun syncRendererLifecycle() {
+        val visible = !destroyed && ::webView.isInitialized &&
+            NativeWorkspaceNavigation.shouldResumeRenderer(activityResumed, nativeHub != null)
+        loginProtection.setVisible(visible)
+        if (::filter.isInitialized) filter.loginBypass = loginProtection.bypass
         if (!::webView.isInitialized || destroyed) return
-        if (NativeWorkspaceNavigation.shouldResumeRenderer(activityResumed, nativeHub != null)) {
+        if (visible) {
+            observeLoginPage(webView.url)
             webView.onResume()
         } else {
             webView.onPause()
@@ -1433,6 +1446,9 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         voiceHandoff.clear()
         destroyed = true
+        loginProtection.setVisible(false)
+        // The process-wide service-worker hook may retain the filter after Activity destruction.
+        if (::filter.isInitialized) filter.loginBypass = false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             modernBackCallback?.let { onBackInvokedDispatcher.unregisterOnBackInvokedCallback(it) }
             modernBackCallback = null
