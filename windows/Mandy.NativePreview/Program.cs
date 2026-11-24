@@ -125,17 +125,33 @@ internal sealed class ChatWindow : Window
         var amoled = new CheckBox { Content = "Material AMOLED", IsChecked = true, Margin = new Thickness(0,8,0,8) };
         AutomationProperties.SetName(amoled, "Material AMOLED appearance (off: graphite dark)");
         amoled.IsEnabled = !SystemParameters.HighContrast && Application.Current.Resources.MergedDictionaries.Count > 0;
-        void ApplyAppearance()
+        var colors = DefaultColors(true);
+        void ApplyColors(Dictionary<string, Color> values)
         {
             if (!amoled.IsEnabled || SystemParameters.HighContrast) return;
-            bool black = amoled.IsChecked == true;
-            Background = black ? Brushes.Black : Palette(33,33,33);
-            composerSurface.Background = black ? Palette(20,20,20) : Palette(48,48,48);
-            composerSurface.BorderBrush = black ? Palette(61,61,61) : Palette(85,85,85);
+            colors = values;
+            foreach (var entry in values)
+                Resources["MandyColor_" + entry.Key] = Palette(entry.Value.R, entry.Value.G, entry.Value.B);
+            Color accent = values["accent"];
+            Color onAccent = Contrast(Colors.Black, accent) >= Contrast(Colors.White, accent) ? Colors.Black : Colors.White;
+            Resources["MandyColor_onAccent"] = Palette(onAccent.R, onAccent.G, onAccent.B);
+            SetResourceReference(BackgroundProperty, "MandyColor_canvas");
+            SetResourceReference(ForegroundProperty, "MandyColor_text");
+            composerSurface.SetResourceReference(Border.BackgroundProperty, "MandyColor_composer");
+            composerSurface.SetResourceReference(Border.BorderBrushProperty, "MandyColor_outline");
         }
+        void ApplyAppearance() => ApplyColors(DefaultColors(amoled.IsChecked == true));
         amoled.Checked += (_, _) => ApplyAppearance();
         amoled.Unchecked += (_, _) => ApplyAppearance();
         settings.Children.Add(amoled);
+        var customColors = new Button { Content = "Custom colors…", IsEnabled = amoled.IsEnabled, Margin = new Thickness(0,0,0,8) };
+        customColors.Click += (_, _) =>
+        {
+            if (SystemParameters.HighContrast) return;
+            var edited = EditColors(colors, DefaultColors(amoled.IsChecked == true));
+            if (edited != null) ApplyColors(edited);
+        };
+        settings.Children.Add(customColors);
         ApplyAppearance();
         draft.Padding = new Thickness(12,8,12,8);
         draft.FontSize = 16;
@@ -153,6 +169,21 @@ internal sealed class ChatWindow : Window
         DockPanel.SetDock(mediaActions, Dock.Left);
         composerActions.Children.Add(mediaActions);
         composerContent.Children.Add(composerActions);
+        if (amoled.IsEnabled)
+        {
+            foreach (var button in headerActions.Children.OfType<Button>().Concat(mediaActions.Children.OfType<Button>()))
+                button.SetResourceReference(Control.ForegroundProperty, "MandyColor_icons");
+            foreach (var button in new[] { send, stop })
+            {
+                button.SetResourceReference(Control.BackgroundProperty, "MandyColor_accent");
+                button.SetResourceReference(Control.ForegroundProperty, "MandyColor_onAccent");
+            }
+            draft.SetResourceReference(Control.ForegroundProperty, "MandyColor_text");
+            liveReply.SetResourceReference(Control.ForegroundProperty, "MandyColor_text");
+            liveReply.SetResourceReference(Control.BackgroundProperty, "MandyColor_composer");
+            history.SetResourceReference(Control.ForegroundProperty, "MandyColor_text");
+            status.SetResourceReference(TextBlock.ForegroundProperty, "MandyColor_muted");
+        }
         status.FontSize = 12;
         status.Margin = new Thickness(8,4,8,0);
         composer.Children.Add(status);
@@ -186,10 +217,15 @@ internal sealed class ChatWindow : Window
         bubble.Name = "MessageSurface";
         bubble.AppendChild(stack);
         template.VisualTree = bubble;
+        if (amoled.IsEnabled)
+        {
+            author.SetResourceReference(TextBlock.ForegroundProperty, "MandyColor_text");
+            text.SetResourceReference(TextBlock.ForegroundProperty, "MandyColor_text");
+        }
         if (!SystemParameters.HighContrast && Application.Current.Resources.MergedDictionaries.Count > 0)
         {
             var bubbleTrigger = new DataTrigger { Binding = new System.Windows.Data.Binding(nameof(MessageRow.IsUser)), Value = true };
-            bubbleTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(42,42,42)), "MessageSurface"));
+            bubbleTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new DynamicResourceExtension("MandyColor_bubble"), "MessageSurface"));
             template.Triggers.Add(bubbleTrigger);
         }
         history.ItemTemplate = template;
@@ -248,6 +284,76 @@ internal sealed class ChatWindow : Window
     }
 
     // Matching original line icons with native vector rendering and inherited theme color.
+    private static readonly (string Key, string Label)[] ColorRoles =
+    {
+        ("canvas", "Chat background"), ("composer", "Composer surface"), ("bubble", "Your message bubble"),
+        ("text", "Message text"), ("muted", "Secondary text"), ("accent", "Send button"),
+        ("outline", "Composer border"), ("icons", "Action icons")
+    };
+    private static Dictionary<string, Color> DefaultColors(bool black)
+    {
+        string[] values = black
+            ? new[] { "#000000", "#141414", "#232323", "#F2F2F2", "#B5B5B5", "#F2F2F2", "#3D3D3D", "#CCCCCC" }
+            : new[] { "#212121", "#303030", "#383838", "#F2F2F2", "#B5B5B5", "#F2F2F2", "#555555", "#CCCCCC" };
+        return ColorRoles.Select((role, i) => (role.Key, Value: (Color)ColorConverter.ConvertFromString(values[i])))
+            .ToDictionary(x => x.Key, x => x.Value);
+    }
+    private static double Contrast(Color a, Color b)
+    {
+        static double Linear(byte n) { double v = n / 255.0; return v <= .04045 ? v / 12.92 : Math.Pow((v + .055) / 1.055, 2.4); }
+        static double L(Color c) => .2126 * Linear(c.R) + .7152 * Linear(c.G) + .0722 * Linear(c.B);
+        double x = L(a), y = L(b);
+        return (Math.Max(x, y) + .05) / (Math.Min(x, y) + .05);
+    }
+    private Dictionary<string, Color>? EditColors(Dictionary<string, Color> existing, Dictionary<string, Color> defaults)
+    {
+        var panel = new StackPanel { Margin = new Thickness(16) };
+        var dialog = new Window { Owner = this, Title = "Custom colors", Width = 450, Height = 590,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false,
+            Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } };
+        var fields = new Dictionary<string, TextBox>();
+        string Hex(Color c) => $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+        foreach (var role in ColorRoles)
+        {
+            var box = new TextBox { Text = Hex(existing[role.Key]), MaxLength = 7 };
+            AutomationProperties.SetName(box, role.Label);
+            fields.Add(role.Key, box);
+            panel.Children.Add(Labeled(role.Label, box));
+        }
+        var warning = new TextBlock { Text = "Use #RRGGBB. Contrast is checked before applying.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0,12,0,8) };
+        panel.Children.Add(warning);
+        var reset = new Button { Content = "Reset fields" };
+        var apply = new Button { Content = "Apply", IsDefault = true };
+        var cancel = new Button { Content = "Cancel", IsCancel = true };
+        panel.Children.Add(Buttons(reset, apply, cancel));
+        Dictionary<string, Color>? result = null;
+        reset.Click += (_, _) => { foreach (var field in fields) field.Value.Text = Hex(defaults[field.Key]); };
+        apply.Click += (_, _) =>
+        {
+            var candidate = new Dictionary<string, Color>();
+            foreach (var field in fields)
+            {
+                if (!System.Text.RegularExpressions.Regex.IsMatch(field.Value.Text, @"\A#[0-9a-fA-F]{6}\z"))
+                { warning.Text = "Enter a six-digit hexadecimal color."; field.Value.Focus(); return; }
+                candidate.Add(field.Key, (Color)ColorConverter.ConvertFromString(field.Value.Text));
+            }
+            foreach (string surface in new[] { "canvas", "composer", "bubble" })
+                if (Contrast(candidate["text"], candidate[surface]) < 4.5)
+                { warning.Text = "Message text requires 4.5:1 contrast against " + surface; return; }
+            foreach (string surface in new[] { "canvas", "composer" })
+            {
+                if (Contrast(candidate["muted"], candidate[surface]) < 4.5)
+                { warning.Text = "Secondary text requires 4.5:1 contrast against " + surface; return; }
+                if (Contrast(candidate["icons"], candidate[surface]) < 3.0)
+                { warning.Text = "Icons require 3:1 contrast against " + surface; return; }
+            }
+            if (Contrast(candidate["accent"], candidate["composer"]) < 3.0)
+            { warning.Text = "Send button requires 3:1 contrast against composer."; return; }
+            result = candidate; dialog.DialogResult = true;
+        };
+        return dialog.ShowDialog() == true ? result : null;
+    }
+
     private static SolidColorBrush Palette(byte red, byte green, byte blue)
     {
         var brush = new SolidColorBrush(Color.FromRgb(red, green, blue));
