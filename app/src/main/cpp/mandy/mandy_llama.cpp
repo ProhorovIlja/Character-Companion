@@ -124,10 +124,9 @@ Java_dev_caicompanion_app_EmbeddedLlama_nativeGenerateV2(JNIEnv * env, jobject, 
         std::vector<char> prompt(MAX_PROMPT_BYTES);
         std::vector<llama_token> tokens(context_tokens);
         int prompt_tokens = 0;
-        // Keep the complete system message and newest user message. Reduce only older history.
-        // Geometric suffix reduction bounds template/tokenizer retries for long conversations.
-        int first = 1;
-        while (true) {
+        // Test the full prompt first, then search user-boundary suffixes for a larger fit.
+        // Token counts need not be monotonic for every template; only use actually tested tokens.
+        auto fits = [&](int first) {
             cb.check();
             std::vector<llama_chat_message> chat;
             chat.reserve(count - first + 1);
@@ -135,15 +134,29 @@ Java_dev_caicompanion_app_EmbeddedLlama_nativeGenerateV2(JNIEnv * env, jobject, 
             for (int i = first; i < count; ++i) chat.push_back({role[i].c_str(), content[i].c_str()});
             int n = llama_chat_apply_template(tmpl, chat.data(), chat.size(), true, prompt.data(), prompt.size());
             require(n > 0);
-            if (n < MAX_PROMPT_BYTES) {
-                prompt_tokens = llama_tokenize(vocab, prompt.data(), n, tokens.data(), context_tokens, true, true);
-                require(prompt_tokens != 0);
-                if (prompt_tokens > 0 && prompt_tokens <= context_tokens - output_tokens) break;
+            if (n >= MAX_PROMPT_BYTES) return false;
+            prompt_tokens = llama_tokenize(vocab, prompt.data(), n, tokens.data(), context_tokens, true, true);
+            require(prompt_tokens != 0);
+            return prompt_tokens > 0 && prompt_tokens <= context_tokens - output_tokens;
+        };
+        if (!fits(1)) {
+            std::vector<int> starts;
+            for (int i = 2; i < count; ++i) if (role[i] == "user") starts.push_back(i);
+            size_t lo = 0, hi = starts.size();
+            std::vector<llama_token> best;
+            while (lo < hi) {
+                const size_t mid = lo + (hi - lo) / 2;
+                if (fits(starts[mid])) {
+                    best.assign(tokens.begin(), tokens.begin() + prompt_tokens);
+                    hi = mid;
+                } else {
+                    lo = mid + 1;
+                }
             }
-            if (first == count - 1) { fail(env, "Character context and latest message exceed model context"); return; }
-            first += (count - first) / 2;
-            // After trimming, do not leave an orphan assistant at the start of retained history.
-            while (first < count - 1 && role[first] != "user") ++first;
+            if (best.empty()) { fail(env, "Character context and latest message exceed model context"); return; }
+            // A later failed probe may have overwritten the scratch buffer.
+            prompt_tokens = static_cast<int>(best.size());
+            tokens.swap(best);
         }
         cb.check();
         auto params = llama_context_default_params();

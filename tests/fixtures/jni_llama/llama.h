@@ -17,6 +17,7 @@ struct llama_chat_message { const char * role; const char * content; };
 struct llama_batch { llama_token * tokens; int count; };
 inline int live_contexts = 0, live_samplers = 0;
 inline int expected_context = 0, expected_threads = 0;
+inline int fitting_probes = 0;
 inline void llama_log_set(void (*)(ggml_log_level, const char *, void *), void *) {}
 inline void llama_backend_init() {}
 inline llama_model_params llama_model_default_params() { return {}; }
@@ -38,6 +39,17 @@ inline int llama_chat_apply_template(const char *, const llama_chat_message * ch
             assert(n == 2 || (n == 4 && std::string(chat[1].role) == "user" && std::string(chat[1].content) == "recent" && std::string(chat[2].content) == "recent-reply"));
             text = text == "fit-required" ? "fit-overflow" : "fit-ok";
         }
+    }
+    if (text == "fit-maximal" || text == "fit-single") {
+        assert(std::string(chat[0].content) == u8"Мэнди 🌙");
+        assert(std::string(chat[1].role) == "user");
+        const size_t target = text == "fit-maximal" ? 6 : 2;
+        text = n > target ? "fit-overflow" : n == target ? "large-piece" : "fit-ok";
+    }
+    if (text == "fit-many") {
+        if (n == 201) fitting_probes = 0;
+        assert(++fitting_probes <= 9);
+        text = n > 77 ? "fit-overflow" : n == 77 ? "large-piece" : "fit-ok";
     }
     if (text == "history") assert(n == 4 && std::string(chat[1].content) == "earlier" && std::string(chat[2].content) == "reply");
     if (text == "unicode-input") assert(std::string(chat[0].content) == u8"Мэнди 🌙");

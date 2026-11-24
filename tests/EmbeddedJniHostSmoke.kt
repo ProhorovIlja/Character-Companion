@@ -35,6 +35,13 @@ fun main() {
             for (marker in listOf("fit-context", "fit-template", "fit-negative")) {
                 verify(it.generate(fitting(marker), contextTokens = 512, outputTokens = 256, onText = {}) == "Hello 🌙")
             }
+            // The fixture emits a distinct result only for the longest fitting suffix.
+            for (marker in listOf("fit-maximal", "fit-single")) {
+                verify(it.generate(fitting(marker), contextTokens = 512, outputTokens = 256, onText = {}) == "x".repeat(300))
+            }
+            val many = listOf(NativeConversation.Message("system", "Мэнди 🌙")) +
+                List(199) { n -> NativeConversation.Message("user", "message-$n") } + NativeConversation.Message("user", "fit-many")
+            verify(it.generate(many, contextTokens = 512, outputTokens = 256, onText = {}) == "x".repeat(300))
             val required = runCatching { it.generate(fitting("fit-required"), contextTokens = 512, outputTokens = 256, onText = { error("unexpected output") }) }.exceptionOrNull()
             verify(required is java.io.IOException && required.message == "Character context and latest message exceed model context")
             var probes = 0
