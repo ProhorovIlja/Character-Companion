@@ -61,6 +61,8 @@ class LorebookTests(unittest.TestCase):
     def test_png_card_metadata_import(self):
         a = (JAVA/'LorebookActivity.kt').read_text()
         parser = (JAVA/'PngLorebookCard.kt').read_text()
+        self.assertIn('CharxCard.isZip(input)', a)
+        self.assertIn('CharxCard.extract(input) { closed.get() }', a)
         self.assertIn('PngLorebookCard.isPng(input)', a)
         self.assertIn('PngLorebookCard.extract(input) { closed.get() }', a)
         for token in ('MAX_PNG = 32L * 1024 * 1024', 'MAX_CHUNKS = 4096',

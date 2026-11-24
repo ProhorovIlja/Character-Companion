@@ -16,6 +16,7 @@ class CharacterDraftTests(unittest.TestCase):
     def test_local_import_and_editing(self):
         activity = (JAVA/'CharacterDraftActivity.kt').read_text()
         for token in ('PngLorebookCard.extract(input) { closed.get() }',
+                      'CharxCard.isZip(input)', 'CharxCard.extract(input) { closed.get() }',
                       'BoundedText.read(reader, LorebookPolicy.MAX_CHARS)',
                       'CodingErrorAction.REPORT', 'CharacterCardJson::parse',
                       'CharacterDraftPolicy.needsReview', 'CharacterDraftPolicy.edit',

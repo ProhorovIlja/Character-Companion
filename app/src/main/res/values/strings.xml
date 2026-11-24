@@ -302,7 +302,7 @@
     <string name="shell_theme_amoled">AMOLED black</string>
     <string name="shell_theme_restart">Apply appearance and reopen this screen? Unsaved page text may be lost. Web content keeps its own appearance.</string>
     <string name="lorebook_title">Lorebook import</string>
-    <string name="lorebook_help">Prepare a lorebook locally from structured TXT, JSON or embedded PNG character-card metadata (up to 2 million text characters). Export a file or copy text, then use Create → Lorebook → Import in Character.AI. Service access, linking and publishing depend on your account.</string>
+    <string name="lorebook_help">Prepare a lorebook locally from structured TXT, JSON or PNG/CHARX character-card metadata (up to 2 million text characters). Export a file or copy text, then use Create → Lorebook → Import in Character.AI. Service access, linking and publishing depend on your account.</string>
     <string name="lorebook_open">Open lorebook file</string>
     <string name="lorebook_paste">Paste lorebook text or JSON</string>
     <string name="lorebook_empty">No lorebook loaded.</string>
@@ -356,7 +356,7 @@
     <string name="lorebook_creator_guide">Creator guide</string>
     <string name="lorebook_creator_tips">Keep identity, core personality and always-needed behavior in the Character Definition. Use lorebooks for facts needed only in context.\n\nEntry ideas: side character, location, item, event, faction, system or rule, culture or religion, species. A useful entry explains how the fact should affect a reply. Choose specific names and phrases, not common words. Use at most eight activation keywords. {{user}} refers to the current Persona; {{char}} refers to the linked Character. Name a particular character directly if a shared rule is not true of every linked character.\n\nTest in the official editor and in chat before publishing. Local saving does not link or publish a lorebook.</string>
     <string name="character_draft_title">Character Studio</string>
-    <string name="character_draft_help">Prepare editable Character.AI fields locally from a new draft or V1/V2/V3 JSON or PNG card. Copy individual fields into the official creator. The original file is unchanged. This draft is memory-only; copy your work before closing.</string>
+    <string name="character_draft_help">Prepare editable Character.AI fields locally from a new draft or JSON, PNG or CHARX card. CHARX import reads text only, not embedded assets. Copy fields into the official creator and save your draft locally. The original file is unchanged.</string>
     <string name="character_draft_import">Import character card</string>
     <string name="character_draft_paste">Paste card JSON</string>
     <string name="character_draft_new">New character draft</string>

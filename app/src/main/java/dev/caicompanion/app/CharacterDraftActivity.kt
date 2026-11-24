@@ -229,7 +229,8 @@ class CharacterDraftActivity : Activity() {
         }
         importWork {
             contentResolver.openInputStream(uri)?.buffered()?.use { input ->
-                if (PngLorebookCard.isPng(input)) PngLorebookCard.extract(input) { closed.get() }
+                if (CharxCard.isZip(input)) CharxCard.extract(input) { closed.get() }
+                else if (PngLorebookCard.isPng(input)) PngLorebookCard.extract(input) { closed.get() }
                 else InputStreamReader(input, Charsets.UTF_8.newDecoder()
                     .onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT)).use { reader ->
                     BoundedText.read(reader, LorebookPolicy.MAX_CHARS) { closed.get() }
