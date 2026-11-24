@@ -104,13 +104,28 @@ internal sealed class ChatWindow : Window
         settings.Children.Add(Labeled("Loopback port", port));
         settings.Children.Add(Labeled("Local server API key (not saved)", key));
         settings.Children.Add(Buttons(refresh));
-        var composer = new StackPanel { Margin = new Thickness(0,8,0,0) };
+        var composer = new StackPanel { Margin = new Thickness(0,8,0,0), MaxWidth = 800 };
         DockPanel.SetDock(composer, Dock.Bottom);
         layout.Children.Add(composer);
         composer.Children.Add(liveReply);
+        var composerContent = new StackPanel();
+        var composerSurface = new Border { CornerRadius = new CornerRadius(22), BorderThickness = new Thickness(1), Padding = new Thickness(8), Child = composerContent };
+        if (SystemParameters.HighContrast || Application.Current.Resources.MergedDictionaries.Count == 0)
+        {
+            composerSurface.SetResourceReference(Border.BackgroundProperty, SystemColors.WindowBrushKey);
+            composerSurface.SetResourceReference(Border.BorderBrushProperty, SystemColors.WindowTextBrushKey);
+        }
+        else
+        {
+            composerSurface.Background = new SolidColorBrush(Color.FromRgb(24,24,24));
+            composerSurface.BorderBrush = new SolidColorBrush(Color.FromRgb(66,66,66));
+        }
+        composer.Children.Add(composerSurface);
         draft.Padding = new Thickness(12,8,12,8);
         draft.FontSize = 16;
-        composer.Children.Add(draft);
+        draft.Background = Brushes.Transparent;
+        draft.BorderThickness = new Thickness(0);
+        composerContent.Children.Add(draft);
         var composerActions = new DockPanel { LastChildFill = false };
         SetActionIcon(send, "send", "Send message (Ctrl+Enter)");
         SetActionIcon(stop, "stop", "Stop generation (Escape)");
@@ -121,7 +136,9 @@ internal sealed class ChatWindow : Window
             Unavailable("mic", "Dictate", "Native speech recognition is not connected to this workspace yet."));
         DockPanel.SetDock(mediaActions, Dock.Left);
         composerActions.Children.Add(mediaActions);
-        composer.Children.Add(composerActions);
+        composerContent.Children.Add(composerActions);
+        status.FontSize = 12;
+        status.Margin = new Thickness(8,4,8,0);
         composer.Children.Add(status);
         history.Background = Brushes.Transparent;
         history.BorderThickness = new Thickness(0);
@@ -132,6 +149,9 @@ internal sealed class ChatWindow : Window
         ScrollViewer.SetHorizontalScrollBarVisibility(history, ScrollBarVisibility.Disabled);
         // Preserve virtualization: bounded data, native text layout, no embedded browser.
         var template = new DataTemplate(typeof(MessageRow));
+        var bubble = new FrameworkElementFactory(typeof(Border));
+        bubble.SetValue(Border.CornerRadiusProperty, new CornerRadius(18));
+        bubble.SetValue(Border.PaddingProperty, new Thickness(12,8,12,8));
         var stack = new FrameworkElementFactory(typeof(StackPanel));
         stack.SetValue(FrameworkElement.MarginProperty, new Thickness(8, 12, 8, 12));
         stack.SetValue(FrameworkElement.MaxWidthProperty, 760d);
@@ -146,7 +166,15 @@ internal sealed class ChatWindow : Window
         text.SetValue(TextBlock.TextWrappingProperty, TextWrapping.Wrap);
         text.SetValue(TextBlock.LineHeightProperty, 24d);
         stack.AppendChild(text);
-        template.VisualTree = stack;
+        bubble.Name = "MessageSurface";
+        bubble.AppendChild(stack);
+        template.VisualTree = bubble;
+        if (!SystemParameters.HighContrast && Application.Current.Resources.MergedDictionaries.Count > 0)
+        {
+            var bubbleTrigger = new DataTrigger { Binding = new System.Windows.Data.Binding(nameof(MessageRow.IsUser)), Value = true };
+            bubbleTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(42,42,42)), "MessageSurface"));
+            template.Triggers.Add(bubbleTrigger);
+        }
         history.ItemTemplate = template;
         var items = new Style(typeof(ListBoxItem));
         items.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
