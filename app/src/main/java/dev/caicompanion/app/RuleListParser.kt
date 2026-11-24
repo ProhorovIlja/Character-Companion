@@ -1,5 +1,9 @@
 package dev.caicompanion.app
 
+import java.io.InputStream
+import java.io.InputStreamReader
+import java.nio.charset.CodingErrorAction
+
 /**
  * Intentionally small, auditable subset of hosts and Adblock Plus domain-only syntax.
  * Not a full EasyList parser: path, cosmetic, regex, options and redirect rules are skipped.
@@ -11,6 +15,11 @@ object RuleListParser {
     const val MAX_DOMAINS = 40_000
     private val whitespace = Regex("\\s+")
     private val sinkAddresses = setOf("0.0.0.0", "127.0.0.1", "::1")
+
+    /** Reject malformed UTF-8 instead of silently substituting replacement characters. */
+    fun utf8Reader(input: InputStream): InputStreamReader = InputStreamReader(input,
+        Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+            .onUnmappableCharacter(CodingErrorAction.REPORT))
 
     data class Rules(
         val blocked: Set<String> = emptySet(),
@@ -46,7 +55,16 @@ object RuleListParser {
                 entry.startsWith("||") && entry.endsWith("^") -> listOf(entry.removePrefix("||").dropLast(1))
                 !isAllow && entry.any { it.isWhitespace() } -> {
                     val fields = entry.substringBefore('#').trim().split(whitespace)
-                    if (fields.size >= 2 && fields[0] in sinkAddresses) fields.drop(1) else emptyList()
+                    val hash = entry.indexOf('#')
+                    // Only a whitespace-delimited comment with a plain hash may follow a bare domain.
+                    // Never turn cosmetic syntax (##, #@#, #$#, #?#) into a domain-wide block.
+                    val plainComment = hash > 0 && entry[hash - 1].isWhitespace() &&
+                        (hash == entry.lastIndex || entry[hash + 1].isWhitespace())
+                    when {
+                        fields.size >= 2 && fields[0] in sinkAddresses -> fields.drop(1)
+                        plainComment && fields.size == 1 -> fields
+                        else -> emptyList()
+                    }
                 }
                 !isAllow && !entry.any { it == '|' || it == '^' || it == '*' || it == '$' ||
                     it == '/' || it == '#' || it == '@' || it == ':' || it == ' ' } -> listOf(entry)

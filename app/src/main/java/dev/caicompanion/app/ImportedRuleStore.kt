@@ -3,7 +3,6 @@ package dev.caicompanion.app
 import android.content.Context
 import android.util.AtomicFile
 import java.io.File
-import java.io.InputStreamReader
 import java.nio.charset.StandardCharsets
 
 /** Only user-selected normalized rules; stored atomically in private application storage. */
@@ -12,7 +11,7 @@ class ImportedRuleStore(context: Context) {
 
     @Synchronized fun load(): RuleListParser.Rules = try {
         file.openRead().use { input ->
-            val text = InputStreamReader(input, StandardCharsets.UTF_8).use { reader ->
+            val text = RuleListParser.utf8Reader(input).use { reader ->
                 BoundedText.read(reader, RuleListParser.MAX_CHARACTERS)
             }
             // BoundedText returns null for oversized or unreadable input.

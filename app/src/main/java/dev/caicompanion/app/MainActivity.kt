@@ -1361,7 +1361,7 @@ class MainActivity : Activity() {
         Thread({
             val result = runCatching {
                 val text = contentResolver.openInputStream(uri)?.use { stream ->
-                    stream.bufferedReader(Charsets.UTF_8).use { reader ->
+                    RuleListParser.utf8Reader(stream).use { reader ->
                         BoundedText.read(reader, RuleListParser.MAX_CHARACTERS)
                     }
                 } ?: throw IllegalArgumentException("empty or oversized list")

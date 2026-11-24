@@ -32,9 +32,14 @@ class FilterEngine(defaults: List<String>, strictRules: List<String> = emptyList
         customRules: String, exclusions: String,
         imported: RuleListParser.Rules = RuleListParser.Rules()
     ) {
-        val configuration = RuleConfiguration(strict, customRules, exclusions,
+        val strictSnapshot = strict
+        val previous = appliedConfiguration
+        // Compare against the existing defensive snapshots before allocating new sets.
+        if (previous != null && previous.strict == strictSnapshot && previous.custom == customRules &&
+            previous.excluded == exclusions && previous.importedBlocked == imported.blocked &&
+            previous.importedAllowed == imported.allowed) return
+        val configuration = RuleConfiguration(strictSnapshot, customRules, exclusions,
             imported.blocked.toSet(), imported.allowed.toSet())
-        if (configuration == appliedConfiguration) return
         val newBlocker = HostBlocker(
             defaults + (if (configuration.strict) strictRules else emptyList()) + configuration.importedBlocked,
             configuration.custom.lineSequence().take(500).toList(),

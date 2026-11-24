@@ -1,0 +1,46 @@
+import dev.caicompanion.app.*
+
+fun verifyFilterImport() {
+    fun parse(s: String) = RuleListParser.parse(s)
+    fun read(bytes: ByteArray) = RuleListParser.utf8Reader(bytes.inputStream()).use {
+        BoundedText.read(it, RuleListParser.MAX_CHARACTERS)?.let(RuleListParser::parse)
+    }
+    check(parse("ads.example # comment")!!.blocked == setOf("ads.example"))
+    check(parse("ads.example\t# comment")!!.blocked == setOf("ads.example"))
+    check(parse("ads.example #")!!.blocked == setOf("ads.example"))
+    check(parse("ads.example##.ad") == null)
+    check(parse("ads.example ##.ad") == null)
+    check(parse("ads.example #@#.ad") == null)
+    check(parse("ads.example #$#.ad") == null)
+    check(parse("ads.example #?#.ad") == null)
+    check(parse("||ads.example^ # comment") == null)
+    check(parse("@@||ads.example^ # comment") == null)
+    check(parse("0.0.0.0 ads.example #comment")!!.blocked == setOf("ads.example"))
+    check(parse("character.ai # comment") == null)
+    check(parse("ads.example # comment\n@@||safe.ads.example^")!!.size == 2)
+    check(read("\uFEFFbücher.example # text\n".toByteArray())!!.blocked == setOf("xn--bcher-kva.example"))
+    check(runCatching { read("ads.example\n".toByteArray() + byteArrayOf(0xc3.toByte(), 0x28)) }.isFailure)
+    check(runCatching { read(byteArrayOf(0xf0.toByte(), 0x9f.toByte())) }.isFailure)
+    val blocked = (1..40000).map { "host$it.example" }.toMutableSet()
+    val allowed = mutableSetOf("safe.host1.example")
+    val rules = RuleListParser.Rules(blocked, allowed)
+    val engine = FilterEngine(listOf("base.example"), listOf("strict.example"))
+    engine.replace("", "", rules)
+    check(engine.ruleCount() == 40001)
+    check(engine.shouldBlock("https://host1.example/ad"))
+    check(!engine.shouldBlock("https://safe.host1.example/ad"))
+    repeat(20) { engine.replace("", "", rules) }
+    check(engine.blockedRequestCount.get() == 1L)
+    blocked.remove("host1.example")
+    allowed.clear()
+    check(engine.shouldBlock("https://host1.example/ad"))
+    check(!engine.shouldBlock("https://safe.host1.example/ad"))
+    engine.replace("", "", rules)
+    check(!engine.shouldBlock("https://host1.example/ad"))
+    engine.strict = true
+    engine.replace("", "", rules)
+    check(engine.shouldBlock("https://strict.example/ad"))
+    engine.replace("", "strict.example", rules)
+    check(!engine.shouldBlock("https://strict.example/ad"))
+    println("FilterImport: 25 checks passed")
+}

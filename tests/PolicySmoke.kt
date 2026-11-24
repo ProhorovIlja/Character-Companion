@@ -171,6 +171,7 @@ fun main() {
     verifyLoginCompatibility()
     verifyBrowserRestore()
     verifyLoginRoutes()
+    verifyFilterImport()
     verifyVoiceDraft()
     verifyVoiceRecognitionOptions()
     verifyVoiceAlternatives()
