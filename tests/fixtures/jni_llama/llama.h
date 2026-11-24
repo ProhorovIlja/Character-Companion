@@ -29,6 +29,16 @@ inline int llama_chat_apply_template(const char *, const llama_chat_message * ch
     assert(add && n >= 2 && std::string(chat[0].role) == "system");
     std::string text = chat[n-1].content;
     if (text == "bad-template") return -1;
+    if (text == "fit-context" || text == "fit-template" || text == "fit-required" || text == "fit-negative") {
+        assert(std::string(chat[0].content) == u8"Мэнди 🌙");
+        if (n > 4) {
+            if (text == "fit-template") return capacity;
+            text = text == "fit-negative" ? "overflow" : "fit-overflow";
+        } else {
+            assert(n == 2 || (n == 4 && std::string(chat[1].role) == "user" && std::string(chat[1].content) == "recent" && std::string(chat[2].content) == "recent-reply"));
+            text = text == "fit-required" ? "fit-overflow" : "fit-ok";
+        }
+    }
     if (text == "history") assert(n == 4 && std::string(chat[1].content) == "earlier" && std::string(chat[2].content) == "reply");
     if (text == "unicode-input") assert(std::string(chat[0].content) == u8"Мэнди 🌙");
     assert(text.size() < static_cast<size_t>(capacity));
@@ -40,6 +50,7 @@ inline int llama_tokenize(const llama_vocab *, const char * text, int n, llama_t
     expected_context = s == "profile-low" ? 2048 : s == "profile-quality" ? 6144 : 0;
     expected_threads = s == "profile-low" ? 2 : s == "profile-quality" ? 6 : 0;
     if (s == "overflow") return -capacity - 1;
+    if (s == "fit-overflow") return capacity;
     out[0] = s == "decode-error" ? 91 : s == "limit" ? 92 : s == "bad-utf8" ? 93 : s == "empty" ? 94 : s == "large-piece" ? 95 : 90;
     return 1;
 }

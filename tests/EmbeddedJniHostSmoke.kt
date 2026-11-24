@@ -29,6 +29,18 @@ fun main() {
             bad { it.generate(messages("normal"), threads = 9, onText = {}) }
             val history = messages("earlier") + listOf(NativeConversation.Message("assistant", "reply"), NativeConversation.Message("user", "history"))
             verify(it.generate(history, onText = {}) == "Hello 🌙")
+            fun fitting(last: String) = listOf(NativeConversation.Message("system", "Мэнди 🌙")) +
+                (1..3).flatMap { n -> listOf(NativeConversation.Message("user", "old-$n"), NativeConversation.Message("assistant", "reply-$n")) } +
+                listOf(NativeConversation.Message("user", "recent"), NativeConversation.Message("assistant", "recent-reply"), NativeConversation.Message("user", last))
+            for (marker in listOf("fit-context", "fit-template", "fit-negative")) {
+                verify(it.generate(fitting(marker), contextTokens = 512, outputTokens = 256, onText = {}) == "Hello 🌙")
+            }
+            val required = runCatching { it.generate(fitting("fit-required"), contextTokens = 512, outputTokens = 256, onText = { error("unexpected output") }) }.exceptionOrNull()
+            verify(required is java.io.IOException && required.message == "Character context and latest message exceed model context")
+            var probes = 0
+            bad { it.generate(fitting("fit-context"), contextTokens = 512, outputTokens = 256, cancelled = { ++probes >= 4 }, onText = { error("unexpected output") }) }
+            verify(probes >= 4)
+            verify(it.generate(messages("normal"), onText = {}) == "Hello 🌙")
             for (input in listOf("bad-template", "overflow", "decode-error", "bad-utf8", "empty")) {
                 bad { it.generate(messages(input), onText = {}) }
                 verify(it.generate(messages("normal"), onText = {}) == "Hello 🌙")
