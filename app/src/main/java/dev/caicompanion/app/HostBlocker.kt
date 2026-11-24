@@ -21,6 +21,7 @@ class HostBlocker(
 
     /** Returns the matched rule for statistics. Never returns full URLs. */
     fun matchedBlockedDomain(rawUrl: String?): String? {
+        if (blockedDomains.isEmpty()) return null
         val host = hostFromUrl(rawUrl) ?: return null
         if (isCriticalHost(host)) return null
         var suffix = host
@@ -29,7 +30,10 @@ class HostBlocker(
             if (suffix in allowDomains) return null // exceptions always override other matches
             // Attribute the block to the most specific matching domain.
             // We walk from hostname to parent suffix, so keep the first hit.
-            if (matched == null && suffix in blockedDomains) matched = suffix
+            if (matched == null && suffix in blockedDomains) {
+                if (allowDomains.isEmpty()) return suffix
+                matched = suffix
+            }
             val index = suffix.indexOf('.')
             if (index < 0) break
             suffix = suffix.substring(index + 1)
@@ -40,10 +44,37 @@ class HostBlocker(
     fun shouldBlock(rawUrl: String?): Boolean = matchedBlockedDomain(rawUrl) != null
 
     companion object {
-        private val rule = Regex("^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$")
+        /** One pass over ASCII labels; no regex matcher or split-list allocation. */
+        private fun validAsciiDomain(value: String): Boolean {
+            if (value.length !in 1..253) return false
+            var labelLength = 0
+            var hasDot = false
+            var previous = '.'
+            for (ch in value) {
+                when (ch) {
+                    '.' -> {
+                        if (labelLength == 0 || previous == '-') return false
+                        labelLength = 0
+                        hasDot = true
+                    }
+                    in 'a'..'z', in '0'..'9', '-' -> {
+                        if (labelLength == 0 && ch == '-') return false
+                        if (++labelLength > 63) return false
+                    }
+                    else -> return false
+                }
+                previous = ch
+            }
+            return hasDot && labelLength > 0 && previous != '-'
+        }
         fun normalizeRule(input: String): String? {
             val raw = input.trim().removeSuffix(".")
-            if (raw.length !in 1..253 || raw.any { it.isWhitespace() || it.isISOControl() ||
+            if (raw.length !in 1..253) return null
+            if (raw.all { it.code < 128 }) {
+                val ascii = raw.lowercase(Locale.ROOT)
+                return ascii.takeIf(::validAsciiDomain)
+            }
+            if (raw.any { it.isWhitespace() || it.isISOControl() ||
                     Character.getType(it) == Character.FORMAT.toInt() || it in "\u3002\uff0e\uff61" }) return null
             val canonical = Normalizer.normalize(raw, Normalizer.Form.NFC).lowercase(Locale.ROOT)
             val value = if (canonical.all { it.code < 128 }) canonical else {
@@ -54,10 +85,7 @@ class HostBlocker(
                 if (roundTrip != canonical) return null
                 ascii.lowercase(Locale.ROOT)
             }
-            return if (value.length <= 253 && value.contains('.') && rule.matches(value) &&
-                !value.contains("..") && !value.startsWith('#') && !value.startsWith('-') &&
-                value.split('.').all { it.isNotEmpty() && it.length <= 63 && !it.startsWith('-') && !it.endsWith('-') }
-            ) value else null
+            return value.takeIf(::validAsciiDomain)
         }
         fun hostFromUrl(rawUrl: String?): String? {
             val uri = try { URI(rawUrl ?: return null) } catch (_: Exception) { return null }

@@ -139,6 +139,21 @@ fun verifyLoginCompatibility() {
 }
 
 fun main() {
+    // ASCII fast path must preserve label boundaries and allowlist precedence.
+    for (bad in listOf("a..b", "-a.b", "a-.b", "a.b-", "a.b..", "a_b.example",
+        "a\u0000.b", "a".repeat(64) + ".b", "a。b", "a\u200B.b")) {
+        check(HostBlocker.normalizeRule(bad) == null)
+    }
+    check(HostBlocker.normalizeRule(" A.B. ") == "a.b")
+    check(HostBlocker.normalizeRule("a".repeat(63) + ".b") == "a".repeat(63) + ".b")
+    check(HostBlocker.normalizeRule("café.example") == "xn--caf-dma.example")
+    check(HostBlocker(emptyList()).matchedBlockedDomain("https://example.com") == null)
+    check(HostBlocker(listOf("example.com", "ads.example.com"))
+        .matchedBlockedDomain("https://x.ads.example.com") == "ads.example.com")
+    check(HostBlocker(listOf("ads.example.com"), excludedHosts = listOf("example.com"))
+        .matchedBlockedDomain("https://x.ads.example.com") == null)
+    check(HostBlocker(listOf("character.ai")).matchedBlockedDomain("https://character.ai/chat") == null)
+
     for (crash in listOf(false, true)) for (visible in listOf(false, true)) for (hub in listOf(false, true)) {
         check(RendererRecoveryBudget.canRestoreAutomatically(crash, visible, hub) == (!crash && visible && !hub))
     }
