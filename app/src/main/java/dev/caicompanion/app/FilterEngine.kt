@@ -3,12 +3,14 @@ package dev.caicompanion.app
 import java.util.concurrent.atomic.AtomicLong
 
 /** Requests can be intercepted from multiple WebView threads. Rules are immutable snapshots. */
-class FilterEngine(private val defaults: List<String>, private val strictRules: List<String> = emptyList()) {
+class FilterEngine(defaults: List<String>, strictRules: List<String> = emptyList()) {
+    private val defaults = defaults.toList()
+    private val strictRules = strictRules.toList()
     @Volatile var strict: Boolean = false
     @Volatile var enabled: Boolean = true
     /** Only in-memory login flow; never persisted to a profile or filter export. */
     @Volatile var loginBypass: Boolean = false
-    @Volatile private var blocker: HostBlocker = HostBlocker(defaults)
+    @Volatile private var blocker: HostBlocker = HostBlocker(this.defaults)
     val blockedRequestCount = AtomicLong(0)
 
     // Store only matched rule domains, never paths, query strings or per-user chat URLs.
@@ -31,12 +33,12 @@ class FilterEngine(private val defaults: List<String>, private val strictRules: 
         imported: RuleListParser.Rules = RuleListParser.Rules()
     ) {
         val configuration = RuleConfiguration(strict, customRules, exclusions,
-            imported.blocked, imported.allowed)
+            imported.blocked.toSet(), imported.allowed.toSet())
         if (configuration == appliedConfiguration) return
         val newBlocker = HostBlocker(
-            defaults + (if (strict) strictRules else emptyList()) + imported.blocked,
-            customRules.lineSequence().take(500).toList(),
-            exclusions.lineSequence().take(500).toList() + imported.allowed
+            defaults + (if (configuration.strict) strictRules else emptyList()) + configuration.importedBlocked,
+            configuration.custom.lineSequence().take(500).toList(),
+            configuration.excluded.lineSequence().take(500).toList() + configuration.importedAllowed
         )
         blocker = newBlocker
         appliedConfiguration = configuration
