@@ -243,6 +243,7 @@ class GeckoActivity : Activity() {
             ShellMenu.Action(R.string.free_experience_title) { FreeExperienceHelp.show(this) },
             ShellMenu.Action(R.string.lorebook_title) { startActivity(Intent(this, LorebookActivity::class.java)) },
             ShellMenu.Action(R.string.character_draft_title) { startActivity(Intent(this, CharacterDraftActivity::class.java)) },
+            ShellMenu.Action(R.string.roleplay_title) { RoleplayToolkitUi.show(this) },
             ShellMenu.Action(R.string.section_data) { settingsBackup.show() },
             ShellMenu.Action(R.string.gecko_legacy) { confirmWebViewSwitch() },
             ShellMenu.Action(R.string.device_compat_title) { DeviceRuntimeProbe.show(this, "gecko") },

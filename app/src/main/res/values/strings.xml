@@ -413,4 +413,19 @@
     <string name="free_experience_http429">The service rate-limited requests (HTTP 429). Wait before trying again.</string>
     <string name="free_experience_http503">The service is temporarily unavailable (HTTP 503). Its original page is preserved.</string>
     <string name="refresh_current_chat">Refresh current chat</string>
+    <string name="roleplay_title">Roleplay toolkit</string>
+    <string name="roleplay_persona">Persona</string>
+    <string name="roleplay_scene">Scene</string>
+    <string name="roleplay_memory">Chat memory</string>
+    <string name="roleplay_prompt">Message template</string>
+    <string name="roleplay_dice">Dice roller</string>
+    <string name="roleplay_dice_count">Number of dice</string>
+    <string name="roleplay_dice_result">%1$dd%2$d: %3$s. Total: %4$d</string>
+    <string name="roleplay_privacy">Local draft, not synced to Character.AI. Save manually; saving empty text clears the slot. The clipboard is accessible to other apps. Unsaved changes may be lost when closing.</string>
+    <string name="roleplay_save">Save</string>
+    <string name="roleplay_saved">Local draft saved</string>
+    <string name="roleplay_invalid">Empty or invalid text</string>
+    <string name="roleplay_failed">Operation failed</string>
+    <string name="roleplay_damaged">The local draft could not be read. Reset deletes the damaged file.</string>
+    <string name="roleplay_reset">Reset file</string>
 </resources>

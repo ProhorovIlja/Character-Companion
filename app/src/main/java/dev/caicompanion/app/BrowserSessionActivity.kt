@@ -93,6 +93,7 @@ class BrowserSessionActivity : Activity() {
         column.addView(action(R.string.free_experience_title) { FreeExperienceHelp.show(this) })
         column.addView(action(R.string.lorebook_title) { startActivity(Intent(this, LorebookActivity::class.java)) })
         column.addView(action(R.string.character_draft_title) { startActivity(Intent(this, CharacterDraftActivity::class.java)) })
+        column.addView(action(R.string.roleplay_title) { RoleplayToolkitUi.show(this) })
         column.addView(action(R.string.section_data) { settingsBackup.show() })
         column.addView(action(R.string.shell_theme_title) { ShellAppearance.choose(this) })
         column.addView(action(R.string.device_compat_title) { DeviceRuntimeProbe.show(this, "browser") })

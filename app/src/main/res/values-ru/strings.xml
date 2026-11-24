@@ -413,4 +413,19 @@
     <string name="free_experience_http429">Сервис ограничил запросы (HTTP 429). Подождите перед повторной попыткой.</string>
     <string name="free_experience_http503">Сервис временно недоступен (HTTP 503). Оригинальная страница сохранена.</string>
     <string name="refresh_current_chat">Обновить текущий чат</string>
+    <string name="roleplay_title">Инструменты ролевой игры</string>
+    <string name="roleplay_persona">Персона</string>
+    <string name="roleplay_scene">Сцена</string>
+    <string name="roleplay_memory">Память чата</string>
+    <string name="roleplay_prompt">Шаблон сообщения</string>
+    <string name="roleplay_dice">Бросок кубиков</string>
+    <string name="roleplay_dice_count">Количество кубиков</string>
+    <string name="roleplay_dice_result">%1$dd%2$d: %3$s. Сумма: %4$d</string>
+    <string name="roleplay_privacy">Локальный черновик, не синхронизируется с Character.AI. Сохранение только вручную; пустой текст очищает поле. Буфер обмена доступен другим приложениям. Несохранённые изменения могут потеряться при закрытии.</string>
+    <string name="roleplay_save">Сохранить</string>
+    <string name="roleplay_saved">Локальный черновик сохранён</string>
+    <string name="roleplay_invalid">Пустой или некорректный текст</string>
+    <string name="roleplay_failed">Не удалось выполнить операцию</string>
+    <string name="roleplay_damaged">Не удалось прочитать локальный черновик. Сброс удалит повреждённый файл.</string>
+    <string name="roleplay_reset">Сбросить файл</string>
 </resources>
