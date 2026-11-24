@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Manual preflight only: never installs packages, downloads files, schedules tasks or changes settings.
+# Manual, foreground-only Android build prerequisite audit. No downloads or changes.
 set -u
 cd "$(dirname "$0")/.."
 fail=0
@@ -9,23 +9,43 @@ if command -v java >/dev/null 2>&1; then
 else
   echo 'JAVA_FOUND=NO'; fail=1
 fi
-if [[ -f gradle/wrapper/gradle-wrapper.jar && -x ./gradlew ]]; then
+expected_jar='81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f'
+expected_dist='20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78'
+wrapper='gradle/wrapper/gradle-wrapper.jar'
+props='gradle/wrapper/gradle-wrapper.properties'
+if [[ -f "$wrapper" ]]; then
   echo 'GRADLE_WRAPPER_FOUND=YES'
-  expected='81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f'
-  actual=''
+  checksum=''
   if command -v sha256sum >/dev/null 2>&1; then
-    actual="$(sha256sum gradle/wrapper/gradle-wrapper.jar | cut -d' ' -f1)"
+    checksum="$(sha256sum "$wrapper" | cut -d' ' -f1)"
   elif command -v shasum >/dev/null 2>&1; then
-    actual="$(shasum -a 256 gradle/wrapper/gradle-wrapper.jar | cut -d' ' -f1)"
+    checksum="$(shasum -a 256 "$wrapper" | cut -d' ' -f1)"
   fi
-  if [[ -n "$actual" && "$actual" == "$expected" ]]; then
+  if [[ "$checksum" == "$expected_jar" ]]; then
     echo 'GRADLE_WRAPPER_SHA256=PASS'
   else
     echo 'GRADLE_WRAPPER_SHA256=FAIL_OR_UNAVAILABLE'; fail=1
   fi
+  if [[ -f "$props" ]] && \
+      grep -Fxq 'distributionUrl=https\://services.gradle.org/distributions/gradle-8.13-bin.zip' "$props" && \
+      grep -Fxq "distributionSha256Sum=$expected_dist" "$props"; then
+    echo 'GRADLE_DISTRIBUTION_PIN=PASS'
+  else
+    echo 'GRADLE_DISTRIBUTION_PIN=FAIL'; fail=1
+  fi
 elif command -v gradle >/dev/null 2>&1; then
   echo 'GRADLE_FOUND=YES'
-  gradle --version | sed -n '/^Gradle /p' | head -1
+  if raw_version="$(gradle --version 2>/dev/null)"; then
+    :
+  else
+    raw_version=''
+  fi
+  gradle_version="$(printf '%s\n' "$raw_version" | sed -nE 's/^Gradle ([0-9]+\.[0-9]+)$/\1/p' | head -1)"
+  if [[ "$gradle_version" == '8.13' ]]; then
+    echo 'GRADLE_VERSION=8.13_VERIFIED'
+  else
+    echo 'GRADLE_VERSION=UNSUPPORTED_EXPECT_8.13'; fail=1
+  fi
 else
   echo 'GRADLE_FOUND=NO'; fail=1
 fi

@@ -6,7 +6,7 @@ This is a **one-time user-initiated command sequence**, not a CI workflow, sched
 
 Install a trusted Java JDK 17 or newer, Android Studio/Android SDK with platform `android-36` and platform-tools, and Git for Windows. The repository pins Gradle **8.13** with a verified wrapper JAR, AGP **8.13** and Android compile/target API **36**. The device runtime target is Android 17 (API 37); **compiling with API 36 is not the same as targeting API 37**. This old build configuration is preserved until a real Android 17 toolchain migration can be compiled and tested.
 
-Clone the full repository; lightweight source-only archives exclude `gradle-wrapper.jar`. There is no need to install system WebView for the `gecko` flavor: its Firefox/Gecko libraries are bundled at packaging time. The `legacy` flavor uses the Android System WebView provider. The two flavors use the same package name and cannot safely be installed side by side without modifying the package ID.
+Clone the full repository to use the SHA-256-verified Gradle Wrapper. Alternatively, extract a lightweight source ZIP and install a trusted **Gradle 8.13** into PATH: the manual Windows build script verifies that exact installed version and refuses others. The source ZIP intentionally excludes `gradle-wrapper.jar`. There is no need to install system WebView for the `gecko` flavor: its Firefox/Gecko libraries are bundled at packaging time. The `legacy` flavor uses the Android System WebView provider. The two flavors use the same package name and cannot safely be installed side by side without modifying the package ID.
 
 Open PowerShell interactively from the repository root:
 
@@ -16,14 +16,16 @@ Open PowerShell interactively from the repository root:
 # Alternative fallback: .\scripts\build-apk-windows.ps1 legacy
 ```
 
-If PowerShell's script execution policy refuses local scripts, review the source and execute individual commands rather than disabling your machine's security policy globally. The build helper checks the official wrapper JAR SHA-256 (`81a82aae...c7ae45f`), Java availability and the Android SDK platform, then invokes Gradle's `:app:assembleGeckoDebug` or `:app:assembleLegacyDebug`. It prints the output APK path and SHA-256 only if the debug build produces a nonempty file.
+If PowerShell's script execution policy refuses local scripts, review the source and execute individual commands rather than disabling your machine's security policy globally. The build helper checks the official wrapper JAR SHA-256 (`81a82aae...c7ae45f`) and the Gradle distribution ZIP checksum, **or** verifies that locally installed Gradle reports exactly 8.13. It then checks Java and Android SDK platform 36, deletes any previous output APK, and invokes `:app:assembleGeckoDebug` or `:app:assembleLegacyDebug`. It prints the output path and SHA-256 only when the new debug APK exists and has non-empty `AndroidManifest.xml` and `classes.dex` entries. This limited ZIP inspection does **not** verify the APK installs or runs on Android 17.
 
-For direct Gradle inspection without the helper:
+For direct Gradle inspection from a full GitHub checkout with wrapper:
 
 ```powershell
 .\gradlew.bat --version
 .\gradlew.bat --no-daemon :app:assembleGeckoDebug
 ```
+
+For the ZIP-based build, run the same PowerShell script after installing Gradle 8.13; do **not** invoke `gradlew.bat` without its verified wrapper JAR. Linux/macOS users can run `bash scripts/build-apk.sh gecko` or `legacy` with either a verified full wrapper or installed Gradle 8.13. Neither helper auto-installs an SDK or triggers scheduled jobs.
 
 ## Optional manual device verification
 

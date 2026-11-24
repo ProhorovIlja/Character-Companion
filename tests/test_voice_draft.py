@@ -86,6 +86,20 @@ class VoiceDraft(unittest.TestCase):
                         'voice_error_microphone', 'voice_error_service'):
                 self.assertIn(key, names)
 
+    def test_clipboard_handoff_is_user_initiated_and_keeps_draft_on_failure(self):
+        self.assertIn('setOnClickListener { copyAndReturn() }', ACTIVITY)
+        self.assertIn('if (copyDraft()) finish()', ACTIVITY)
+        self.assertIn('if (content.isBlank()) {', ACTIVITY)
+        self.assertIn('ClipDescription.EXTRA_IS_SENSITIVE', ACTIVITY)
+        self.assertIn('PersistableBundle()', ACTIVITY)
+        self.assertIn('status.setText(R.string.voice_copy_failed)', ACTIVITY)
+        self.assertNotIn('evaluateJavascript(', ACTIVITY)
+        self.assertNotIn('webView.loadUrl(', ACTIVITY)
+        for rel in ('values', 'values-ru'):
+            strings = ET.parse(ROOT/f'app/src/main/res/{rel}/strings.xml').getroot()
+            names = {e.attrib['name'] for e in strings.findall('string')}
+            self.assertTrue({'voice_copy_return', 'voice_copy_empty', 'voice_copy_failed'} <= names)
+
     def test_locales_expose_same_strings(self):
         en = ET.parse(ROOT/'app/src/main/res/values/strings.xml').getroot()
         ru = ET.parse(ROOT/'app/src/main/res/values-ru/strings.xml').getroot()

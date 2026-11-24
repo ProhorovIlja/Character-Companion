@@ -5,6 +5,7 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.ClipData
+import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -12,6 +13,7 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.os.PersistableBundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -127,6 +129,11 @@ class VoiceDraftActivity : Activity() {
         action(R.string.voice_save) { saveDraft() }
         action(R.string.voice_clear) { clearDraft() }
         root.addView(actions)
+        // A deliberate handoff back to the browser: no DOM access, no auto-paste/send.
+        root.addView(Button(this).apply {
+            setText(R.string.voice_copy_return)
+            setOnClickListener { copyAndReturn() }
+        })
     }
 
     private fun dp(px: Int) = (px * resources.displayMetrics.density + 0.5f).toInt()
@@ -251,12 +258,35 @@ class VoiceDraftActivity : Activity() {
         }
     }
 
-    private fun copyDraft() {
+    /** Copy only on an explicit tap. Android clipboard is accessible outside this app. */
+    private fun copyDraft(): Boolean {
         val content = editor.text.toString()
-        if (content.isBlank()) return
-        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText(getString(R.string.voice_title), content))
-        status.setText(R.string.voice_copied)
+        if (content.isBlank()) {
+            status.setText(R.string.voice_copy_empty)
+            return false
+        }
+        val clip = ClipData.newPlainText(getString(R.string.voice_title), content)
+        if (Build.VERSION.SDK_INT >= 33) {
+            // Hides the recognized text from Android 13+ clipboard previews.
+            // This does NOT encrypt or isolate the clipboard from other apps.
+            clip.description.extras = PersistableBundle().apply {
+                putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
+            }
+        }
+        return try {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(clip)
+            status.setText(R.string.voice_copied)
+            true
+        } catch (_: RuntimeException) {
+            status.setText(R.string.voice_copy_failed)
+            false
+        }
+    }
+
+    private fun copyAndReturn() {
+        // Never dismiss the editor if clipboard handoff failed or was empty.
+        if (copyDraft()) finish()
     }
 
     private fun saveDraft() {

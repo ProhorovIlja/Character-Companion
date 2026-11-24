@@ -1,3 +1,9 @@
+## v0.40.0-source — 2026-11-24
+
+- Android 0.31.0-rc1: explicit user-driven **Copy and return** from voice draft to browser; no auto-injection, auto-paste or sending. Empty draft and clipboard failure keep the editor open. Mark copied text as sensitive in Android 13+ clipboard previews (does not isolate clipboard data).
+- Repair manual Windows ZIP build with a separately installed, version-checked Gradle 8.13; full-clone verified wrapper still preferred. Harden Windows/Linux checks for wrapper distribution pin, stale APK reuse, non-ZIP output and absent AndroidManifest/classes.dex.
+- Expand Python offline regression tests with isolated fake-Gradle build-helper tests; Kotlin/JVM smoke still included. No SDK/APK/Windows build/device validation; no automations or CI. [Notes](RELEASE_NOTES_v0.40.0-source.md).
+
 ## v0.39.0-source — 2026-11-23
 
 - Android 0.30.0-rc1: retain voice dictation language selection across configuration changes in volatile memory and show localized, actionable Android speech recognition errors (including unavailable or unsupported offline language packs).

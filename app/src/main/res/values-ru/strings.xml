@@ -191,6 +191,9 @@
     <string name="voice_system_missing">Не найдено системное приложение распознавания речи.</string>
     <string name="voice_empty_or_full">Текст не распознан или превышен лимит черновика в 16 000 символов.</string>
     <string name="voice_ready">Распознанный текст добавлен в черновик. Проверьте его.</string>
+    <string name="voice_copy_return">Копировать и вернуться</string>
+    <string name="voice_copy_empty">Нечего копировать. Введите или продиктуйте текст.</string>
+    <string name="voice_copy_failed">Не удалось скопировать в буфер Android. Черновик сохранён.</string>
     <string name="voice_copy">Копировать</string>
     <string name="voice_save">Сохранить TXT</string>
     <string name="voice_clear">Очистить</string>

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Manual foreground-only Android build. No CI, background tasks, signing or upload.
-# Run from the full GitHub checkout with Gradle wrapper, JDK 17 and Android SDK 36.
+# Accepts an official Gradle wrapper OR a locally installed Gradle 8.13.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 FLAVOR="${1:-}"
@@ -9,20 +9,30 @@ case "$FLAVOR" in
   legacy) TASK=':app:assembleLegacyDebug'; APK='app/build/outputs/apk/legacy/debug/app-legacy-debug.apk' ;;
   *) echo 'Usage: bash scripts/build-apk.sh gecko|legacy (manual foreground build)' >&2; exit 2 ;;
 esac
-if [[ -f gradle/wrapper/gradle-wrapper.jar && -x ./gradlew ]]; then
-  bash scripts/doctor.sh
-  ./gradlew --no-daemon "$TASK"
-elif command -v gradle >/dev/null 2>&1; then
-  bash scripts/doctor.sh
-  gradle --no-daemon "$TASK"
+bash scripts/doctor.sh
+if [[ ! -f gradle/wrapper/gradle-wrapper.jar ]] && ! command -v gradle >/dev/null 2>&1; then
+  echo 'Gradle 8.13 is required for lightweight source archives.' >&2; exit 1
+fi
+# Refuse stale output; report success only for the current invocation.
+rm -f -- "$APK"
+if [[ -f gradle/wrapper/gradle-wrapper.jar ]]; then
+  sh ./gradlew --no-daemon "$TASK"
 else
-  echo 'Cannot build APK: full Gradle Wrapper or installed Gradle 8.13 and Android SDK 36 required.' >&2
-  exit 1
+  gradle --no-daemon "$TASK"
 fi
 if [[ ! -s "$APK" ]]; then
   echo 'Build did not produce the expected nonempty flavor-specific APK.' >&2; exit 1
 fi
-printf 'APK_FLAVOR=%s\nAPK_READY=%s\n' "$FLAVOR" "$APK"
+# A nonempty arbitrary file or stale .apk name is not an Android package.
+if ! command -v unzip >/dev/null 2>&1 || ! unzip -tqq "$APK" >/dev/null; then
+  echo 'APK failed ZIP integrity validation (unzip required).' >&2; exit 1
+fi
+entries="$(unzip -Z -1 "$APK")"
+if ! grep -Fxq 'AndroidManifest.xml' <<< "$entries" || \
+    ! grep -Fxq 'classes.dex' <<< "$entries"; then
+  echo 'Build output lacks AndroidManifest.xml or classes.dex; not a valid APK.' >&2; exit 1
+fi
+printf 'APK_FLAVOR=%s\nAPK_READY=%s\nDEBUG_ONLY=YES_DEVICE_UNTESTED\n' "$FLAVOR" "$APK"
 if command -v sha256sum >/dev/null 2>&1; then
   echo "APK_SHA256=$(sha256sum "$APK" | awk '{print $1}')"
 fi
