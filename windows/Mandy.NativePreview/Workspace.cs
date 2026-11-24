@@ -79,5 +79,15 @@ internal sealed class Workspace : IDisposable
         using var store = new LocalHistory(Database, Character.Account);
         return store.Page(Character.Character, Character.Chat, 50, before);
     }
+    internal string ReadDraft()
+    {
+        using var store = new LocalHistory(Database, Character.Account);
+        return store.ReadDraft(Character.Character, Character.Chat);
+    }
+    internal void SaveDraft(string text)
+    {
+        using var store = new LocalHistory(Database, Character.Account);
+        store.SaveDraft(Character.Character, Character.Chat, text);
+    }
     public void Dispose() => lease.Dispose();
 }
