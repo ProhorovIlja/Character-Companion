@@ -202,4 +202,11 @@
     <string name="voice_saved">Черновик сохранён в указанное место.</string>
     <string name="voice_clear_confirm">Удалить несохранённый черновик?</string>
     <string name="voice_permission_denied">Нет доступа к микрофону; предыдущий текст сохранён.</string>
+
+    <string name="login_compatibility_button">Совместимость входа (временно)</string>
+    <string name="login_compatibility_info">Если окно входа Character.AI не показывается с блокировкой (или удерживайте значок защиты): временно разрешить ресурсы страницы. При переходе на другой адрес защита восстановится. Если вход открылся окном без смены адреса, нажмите ещё раз после авторизации. Это не исправляет запрет OAuth во встроенных браузерах.</string>
+    <string name="login_compatibility_on">Временный режим входа: фильтрация приостановлена</string>
+    <string name="login_compatibility_off">Режим входа выключен: защита восстановлена</string>
+    <string name="login_compatibility_unavailable">Сначала откройте Character.AI</string>
+    <string name="shield_login">◇ ВХОД</string>
 </resources>

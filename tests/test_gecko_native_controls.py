@@ -21,7 +21,7 @@ class GeckoNativeControlsTests(unittest.TestCase):
     def test_options_are_real_local_preferences_not_dead_switches(self):
         self.assertIn('private fun showGeckoSettings()', ACTIVITY)
         self.assertIn('settings.blocking = it', ACTIVITY)
-        self.assertIn('session.settings.setUseTrackingProtection(it)', ACTIVITY)
+        self.assertIn('session.settings.setUseTrackingProtection(it && !loginProtection.bypass)', ACTIVITY)
         self.assertIn('settings.mediaAllowed = it', ACTIVITY)
         self.assertIn('settings.protectScreen = it', ACTIVITY)
         self.assertIn('settings.resumePage = it', ACTIVITY)

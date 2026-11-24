@@ -77,6 +77,7 @@ class MainActivity : Activity() {
     private lateinit var webView: WebView
     private lateinit var store: SettingsStore
     private lateinit var filter: FilterEngine
+    private val loginProtection = LoginCompatibilitySession()
     private lateinit var importedRuleStore: ImportedRuleStore
     private var importedRules: RuleListParser.Rules = RuleListParser.Rules()
     private lateinit var container: FrameLayout
@@ -252,7 +253,10 @@ class MainActivity : Activity() {
                     confirmIdentityNavigation(url)
                     return true
                 }
-                if (UrlPolicy.isInternal(url)) return false
+                if (UrlPolicy.isInternal(url)) {
+                    observeLoginPage(url)
+                    return false
+                }
                 // Never launch an external application from a background redirect.
                 if (request.hasGesture()) confirmExternalNavigation(url)
                 return true
@@ -262,6 +266,7 @@ class MainActivity : Activity() {
                 return filterResponse(request.url.toString())
             }
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                observeLoginPage(url)
                 // WebRTC grants are scoped to the page that requested them, not its successor.
                 denyPendingMedia()
                 errorOverlay.visibility = View.GONE
@@ -269,6 +274,7 @@ class MainActivity : Activity() {
                 status.setText(R.string.status_loading)
             }
             override fun onPageFinished(view: WebView?, url: String?) {
+                observeLoginPage(url)
                 titleLabel.text = view?.title?.take(65)?.ifBlank { "character.ai" } ?: "character.ai"
                 // Persist only a canonical content link, not the raw page URL or fragment.
                 if (store.resumePage) {
@@ -278,6 +284,10 @@ class MainActivity : Activity() {
                 // WebView handles cookies; flush them onPause instead of forcing disk IO
                 // after each navigation (including the many SPA route changes).
                 refreshBackForward()
+            }
+            override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                super.doUpdateVisitedHistory(view, url, isReload)
+                observeLoginPage(url)
             }
             override fun onReceivedError(view: WebView?, request: WebResourceRequest, error: WebResourceError) {
                 if (request.isForMainFrame && !destroyed) {
@@ -444,6 +454,24 @@ class MainActivity : Activity() {
     private fun desktopAgent(): String = defaultAgent.replace(Regex("\\([^)]*\\)"), "(X11; Linux x86_64)")
         .replace(" Mobile ", " ")
 
+    private fun observeLoginPage(url: String?) {
+        loginProtection.observePage(url)
+        if (::filter.isInitialized) filter.loginBypass = loginProtection.bypass
+        if (::status.isInitialized) updateStatus()
+    }
+
+    private fun toggleLoginProtection() {
+        val manual = loginProtection.toggleManual(if (::webView.isInitialized) webView.url else null)
+        if (!manual && !loginProtection.bypass && !::webView.isInitialized) {
+            showToast(getString(R.string.login_compatibility_unavailable)); return
+        }
+        filter.loginBypass = loginProtection.bypass
+        updateStatus()
+        showToast(getString(if (loginProtection.bypass) R.string.login_compatibility_on
+            else R.string.login_compatibility_off))
+        if (::webView.isInitialized) webView.reload()
+    }
+
     private fun filterResponse(url: String): WebResourceResponse? = emptyBlockedResponse(filter, url)
 
     private fun installServiceWorkerFilter() {
@@ -535,6 +563,7 @@ class MainActivity : Activity() {
             webView.clearCache(true); webView.reload(); showToast(getString(R.string.cache_refreshed)); true
         }
         findViewById<View>(R.id.status_badge).setOnClickListener { showDiagnostics() }
+        findViewById<View>(R.id.status_badge).setOnLongClickListener { toggleLoginProtection(); true }
         findViewById<View>(R.id.bookmarks).setOnClickListener { showBookmarks() }
         findViewById<View>(R.id.filter).setOnClickListener {
             store.blocking = !store.blocking
@@ -679,9 +708,12 @@ class MainActivity : Activity() {
     }
     private fun updateStatus() {
         val blocked = filter.blockedRequestCount.get()
-        status.text = if (store.blocking && blocked > 0) "◈ $blocked" else if (store.blocking) getString(R.string.shield_on) else getString(R.string.shield_off)
-        status.contentDescription = if (store.blocking)
-            getString(R.string.status_blocked_accessibility, blocked)
+        status.text = if (store.blocking && loginProtection.bypass) getString(R.string.shield_login)
+            else if (store.blocking && blocked > 0) "◈ $blocked"
+            else if (store.blocking) getString(R.string.shield_on) else getString(R.string.shield_off)
+        status.contentDescription = if (store.blocking && loginProtection.bypass)
+            getString(R.string.login_compatibility_on)
+            else if (store.blocking) getString(R.string.status_blocked_accessibility, blocked)
             else getString(R.string.shield_disabled)
         findViewById<TextView>(R.id.filter).setTextColor(if (store.blocking) ACCENT else MUTED)
     }
@@ -703,6 +735,7 @@ class MainActivity : Activity() {
         if (store.protectScreen) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         filter.enabled = store.blocking
+        filter.loginBypass = loginProtection.bypass
         filter.strict = store.strictBlocking
         filter.replace(store.customRules, store.excludeRules, importedRules)
         header.visibility = if (store.compactChrome || fullscreenView != null) View.GONE else View.VISIBLE
@@ -873,6 +906,7 @@ class MainActivity : Activity() {
     private fun openFirstPartyPage(rawUrl: String) {
         val safeUrl = NativeWorkspaceNavigation.safeDestination(rawUrl)
         lastUrl = safeUrl
+        observeLoginPage(safeUrl)
         deferredWebReload.consumedByNavigation()
         if (!ensureWebView()) {
             closeNativeHub(loadIfBlank = false)
@@ -1037,6 +1071,8 @@ class MainActivity : Activity() {
         addToggle(layout, getString(R.string.toggle_media), getString(R.string.toggle_media_desc), store.mediaAllowed) {
             store.mediaAllowed = it
         }
+        addButton(layout, getString(R.string.login_compatibility_button)) { toggleLoginProtection() }
+        layout.addView(infoLabel(getString(R.string.login_compatibility_info)))
         addButton(layout, getString(R.string.filter_edit)) { showFilterRules() }
         addButton(layout, getString(R.string.import_filter_list)) { chooseFilterList() }
         if (importedRules.size > 0) {

@@ -6,6 +6,8 @@ import java.util.concurrent.atomic.AtomicLong
 class FilterEngine(private val defaults: List<String>, private val strictRules: List<String> = emptyList()) {
     @Volatile var strict: Boolean = false
     @Volatile var enabled: Boolean = true
+    /** Only in-memory login flow; never persisted to a profile or filter export. */
+    @Volatile var loginBypass: Boolean = false
     @Volatile private var blocker: HostBlocker = HostBlocker(defaults)
     val blockedRequestCount = AtomicLong(0)
 
@@ -41,7 +43,7 @@ class FilterEngine(private val defaults: List<String>, private val strictRules: 
     }
 
     fun shouldBlock(url: String): Boolean {
-        if (!enabled) return false
+        if (!enabled || loginBypass) return false
         val matched = blocker.matchedBlockedDomain(url) ?: return false
         blockedRequestCount.incrementAndGet()
         synchronized(statsLock) {

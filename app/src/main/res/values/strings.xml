@@ -202,4 +202,11 @@
     <string name="voice_saved">Draft saved to the selected location.</string>
     <string name="voice_clear_confirm">Delete the current unsaved draft?</string>
     <string name="voice_permission_denied">Microphone permission denied; previous draft preserved.</string>
+
+    <string name="login_compatibility_button">Login compatibility (temporary)</string>
+    <string name="login_compatibility_info">Use if the Character.AI sign-in dialog stays blank while the shield is on. Long-press the shield indicator for quick access. The app temporarily allows site resources during sign-in; it restores filtering when you navigate to another page. For login popups without a URL change, tap again after signing in. This does not fix sign-in providers that refuse embedded browsers.</string>
+    <string name="login_compatibility_on">Login compatibility active: protection temporarily paused</string>
+    <string name="login_compatibility_off">Login compatibility off: protection restored</string>
+    <string name="login_compatibility_unavailable">Open Character.AI first to activate login compatibility</string>
+    <string name="shield_login">◇ LOGIN</string>
 </resources>

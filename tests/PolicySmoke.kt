@@ -1,3 +1,5 @@
+import dev.caicompanion.app.LoginCompatibilityPolicy
+import dev.caicompanion.app.LoginCompatibilitySession
 import dev.caicompanion.app.ExternalBrowserPolicy
 import dev.caicompanion.app.VoiceDraftPolicy
 import dev.caicompanion.app.VoiceRecognitionGuard
@@ -72,7 +74,51 @@ private fun verifyVoiceDraft() {
     check(!guard.finish(third))
 }
 
+fun verifyLoginCompatibility() {
+    val login = LoginCompatibilitySession()
+    check(LoginCompatibilityPolicy.isLoginPage("https://character.ai/login"))
+    check(LoginCompatibilityPolicy.isLoginPage("https://auth.character.ai/auth/authorize"))
+    check(LoginCompatibilityPolicy.isLoginPage("https://c.ai/signup?method=email"))
+    check(!LoginCompatibilityPolicy.isLoginPage("https://character.ai/chat/login-story"))
+    check(!LoginCompatibilityPolicy.isLoginPage("https://example.com/login"))
+    check(!LoginCompatibilityPolicy.isLoginPage("https://character.ai.evil.com/login"))
+    check(!LoginCompatibilityPolicy.isLoginPage("http://character.ai/login"))
+    check(!LoginCompatibilityPolicy.isLoginPage("https://user@character.ai/login"))
+    check(!LoginCompatibilityPolicy.isLoginPage("https://character.ai:8443/login"))
+    check(!LoginCompatibilityPolicy.isLoginPage("https://character.ai/?next=/login"))
+    check(!login.bypass)
+    check(login.observePage("https://character.ai/login"))
+    check(login.bypass)
+    check(!login.manual)
+    check(!login.observePage("https://character.ai/chat/abc"))
+    check(!login.bypass)
+    check(!login.toggleManual("https://evil.example/login"))
+    check(login.toggleManual("https://character.ai/"))
+    check(login.bypass && login.manual)
+    check(login.observePage("https://character.ai/?modal=login"))
+    check(login.bypass)
+    check(!login.observePage("https://character.ai/chat/abc"))
+    check(!login.bypass && !login.manual)
+    check(login.toggleManual("https://character.ai/"))
+    check(!login.toggleManual("https://character.ai/"))
+    check(!login.bypass)
+    check(login.observePage("https://character.ai/signin"))
+    check(!login.observePage("https://accounts.google.com/"))
+    login.reset()
+    check(!login.bypass)
+    val filter = FilterEngine(listOf("doubleclick.net", "statsigapi.net"))
+    check(filter.shouldBlock("https://doubleclick.net/ad"))
+    val before = filter.blockedRequestCount.get()
+    filter.loginBypass = true
+    check(!filter.shouldBlock("https://doubleclick.net/ad"))
+    check(!filter.shouldBlock("https://statsigapi.net/auth"))
+    check(filter.blockedRequestCount.get() == before)
+    filter.loginBypass = false
+    check(filter.shouldBlock("https://statsigapi.net/event"))
+}
+
 fun main() {
+    verifyLoginCompatibility()
     verifyVoiceDraft()
     // A pending SAF operation may finish only for its original HTTPS page.
     check(GeckoTransferOriginPolicy.isSamePage("https://character.ai/chat/abc", "https://character.ai/chat/abc"))

@@ -1,3 +1,10 @@
+## v0.42.0-source — 2026-11-24
+
+- Temporary first-party Character.AI login compatibility; restore filtering after auth route changes. Manual fallback for login modals without URL navigation.
+- WebView includes both main frame + ServiceWorker interception; GeckoView uses its own per-session tracking-protection switch. No persistent exemptions or new permissions.
+- Localized RU/EN native controls, visible shield state and quick long-press shortcut.
+- Pure Kotlin auth-state policy tests and offline structural regression guards. No verified APK or on-device login tests.
+
 ## v0.41.0-source — 2026-11-24
 
 - Android 0.32.0-rc1: Android dictation now inserts speech at the current caret or replaces highlighted text instead of always appending. New bounded pure Kotlin editing policy returns the new caret and avoids splitting emoji/supplementary Unicode. The previous append-at-end behavior is preserved.

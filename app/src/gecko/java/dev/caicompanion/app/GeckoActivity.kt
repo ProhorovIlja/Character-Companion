@@ -51,6 +51,7 @@ class GeckoActivity : Activity() {
     }
 
     private lateinit var settings: SettingsStore
+    private val loginProtection = LoginCompatibilitySession()
     private lateinit var session: GeckoSession
     private lateinit var surface: GeckoView
     private lateinit var root: LinearLayout
@@ -135,8 +136,11 @@ class GeckoActivity : Activity() {
         val actions = actionsRow
         privacyButton = button(getString(R.string.filter)) {
             settings.blocking = !settings.blocking
-            session.settings.setUseTrackingProtection(settings.blocking)
-            updatePrivacy()
+            refreshTrackingProtection()
+        }
+        privacyButton.setOnLongClickListener {
+            toggleLoginProtection()
+            true
         }
         actions.addView(privacyButton, LinearLayout.LayoutParams(0, dp(48), 1f))
         actions.addView(button(getString(R.string.share)) { shareSafeUrl() }, LinearLayout.LayoutParams(0, dp(48), 1f))
@@ -164,7 +168,9 @@ class GeckoActivity : Activity() {
             val shared = sharedLink(intent)
             if (intent?.action == Intent.ACTION_SEND) setIntent(Intent(Intent.ACTION_MAIN))
             activeUrl = shared ?: if (settings.resumePage) settings.lastVisited.ifBlank { HOME } else HOME
-            session.loadUri(NativeWorkspaceNavigation.safeDestination(activeUrl))
+            val destination = NativeWorkspaceNavigation.safeDestination(activeUrl)
+            observeLoginPage(destination)
+            session.loadUri(destination)
         } catch (_: RuntimeException) {
             AlertDialog.Builder(this).setTitle(R.string.error_title)
                 .setMessage(R.string.gecko_error)
@@ -296,8 +302,16 @@ class GeckoActivity : Activity() {
         options.addView(settingCheckbox(R.string.toggle_filter, settings.blocking) {
             settings.blocking = it
             if (::session.isInitialized && session.isOpen)
-                session.settings.setUseTrackingProtection(it)
+                session.settings.setUseTrackingProtection(it && !loginProtection.bypass)
             updatePrivacy()
+        })
+        options.addView(button(getString(R.string.login_compatibility_button)) {
+            toggleLoginProtection()
+        })
+        options.addView(TextView(this).apply {
+            text = getString(R.string.login_compatibility_info)
+            setTextColor(fg)
+            setPadding(dp(8), dp(6), dp(8), dp(10))
         })
         options.addView(settingCheckbox(R.string.toggle_media, settings.mediaAllowed) {
             settings.mediaAllowed = it
@@ -379,6 +393,7 @@ class GeckoActivity : Activity() {
             canGoBack = false
             canGoForward = false
             updateNavigation()
+            observeLoginPage(safeUrl)
             session.loadUri(safeUrl)
         } catch (_: RuntimeException) {
             needsRecovery = true
@@ -663,7 +678,10 @@ class GeckoActivity : Activity() {
         ): GeckoResult<AllowOrDeny>? {
             val newWindow = request.target == GeckoSession.NavigationDelegate.TARGET_WINDOW_NEW
             return when (GeckoNavigationPolicy.decide(request.uri, request.hasUserGesture, newWindow)) {
-                GeckoNavigationPolicy.Decision.ALLOW -> null
+                GeckoNavigationPolicy.Decision.ALLOW -> {
+                    observeLoginPage(request.uri)
+                    null
+                }
                 GeckoNavigationPolicy.Decision.BLOCK -> GeckoResult.fromValue(AllowOrDeny.DENY)
                 GeckoNavigationPolicy.Decision.CONFIRM_EXTERNAL -> {
                     confirmBrowser(request.uri)
@@ -696,6 +714,7 @@ class GeckoActivity : Activity() {
                 !UrlPolicy.sameTrustedMediaOrigin(mediaPromptPage, url))
                 revokeMediaPermissions()
             activeUrl = url ?: HOME
+            observeLoginPage(url)
             // Only store public content paths, never credentials, tokens or fragments.
             UrlPolicy.sanitizeBookmark(url)?.let { if (settings.resumePage) settings.lastVisited = it }
             val safe = UrlPolicy.safeShareUrl(url)
@@ -718,6 +737,7 @@ class GeckoActivity : Activity() {
             // including reloads that keep the same URL.
             if (pendingFileResult != null) finishFilePrompt(emptyList())
             if (pendingDownload != null) abandonDownload()
+            observeLoginPage(url)
             locationLabel.alpha = 0.6f
         }
         override fun onPageStop(session: GeckoSession, success: Boolean) {
@@ -812,9 +832,40 @@ class GeckoActivity : Activity() {
         forwardButton.alpha = if (canGoForward) 1f else 0.4f
     }
 
+    private fun refreshTrackingProtection() {
+        if (::session.isInitialized && session.isOpen)
+            session.settings.setUseTrackingProtection(settings.blocking && !loginProtection.bypass)
+        updatePrivacy()
+    }
+
+    private fun observeLoginPage(url: String?) {
+        loginProtection.observePage(url)
+        refreshTrackingProtection()
+    }
+
+    private fun toggleLoginProtection() {
+        val manual = loginProtection.toggleManual(activeUrl)
+        if (!manual && !loginProtection.bypass &&
+            LoginCompatibilityPolicy.pageKey(activeUrl) == null) {
+            Toast.makeText(this, R.string.login_compatibility_unavailable, Toast.LENGTH_SHORT).show()
+            return
+        }
+        refreshTrackingProtection()
+        Toast.makeText(this, if (loginProtection.bypass) R.string.login_compatibility_on
+            else R.string.login_compatibility_off, Toast.LENGTH_SHORT).show()
+        if (::session.isInitialized && session.isOpen) session.reload()
+    }
+
     private fun updatePrivacy() {
         if (::privacyButton.isInitialized)
-            privacyButton.text = getString(R.string.filter) + if (settings.blocking) " ✓" else " ×"
+            privacyButton.text = getString(R.string.filter) + when {
+                !settings.blocking -> " ×"
+                loginProtection.bypass -> " ◇"
+                else -> " ✓"
+            }
+        if (::privacyButton.isInitialized) privacyButton.contentDescription =
+            if (settings.blocking && loginProtection.bypass) getString(R.string.login_compatibility_on)
+            else getString(R.string.filter)
     }
 
     private fun configureMedia() {
