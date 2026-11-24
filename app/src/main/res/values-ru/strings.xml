@@ -291,4 +291,6 @@
     <string name="engine_use_gecko">Перейти на GeckoView</string>
     <string name="engine_switch_warning">Смена движка закрывает текущую сессию. Несохранённый текст может быть потерян. Сессии входа раздельные; cookies не переносятся.</string>
     <string name="engine_switch_failed">Не удалось переключить движок браузера.</string>
+    <string name="release_combined_migration">Это обновление заменяет сборку только с WebView на единое приложение ARM64. Оба движка будут доступны. Для установки требуется та же подпись.</string>
+    <string name="release_debug_migration">Это отладочная сборка. Установка подписанного релиза через этот механизм недоступна. Перед сменой ключа подписи проверьте страницу релиза и экспортируйте настройки.</string>
 </resources>

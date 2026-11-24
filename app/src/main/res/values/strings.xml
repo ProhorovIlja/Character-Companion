@@ -291,4 +291,6 @@
     <string name="engine_use_gecko">Switch to GeckoView</string>
     <string name="engine_switch_warning">Switching engines closes this browser session. Unsaved page text may be lost. Sign-in sessions are separate; cookies are not transferred.</string>
     <string name="engine_switch_failed">Could not switch browser engine.</string>
+    <string name="release_combined_migration">This update replaces the WebView-only build with the combined ARM64 application. Both embedded engines will be available. Installation requires the same signing identity.</string>
+    <string name="release_debug_migration">This is a debug build. A signed production release cannot be installed through this updater. Review the release page and export settings before changing signing keys.</string>
 </resources>

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import org.json.JSONObject
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
@@ -45,6 +46,7 @@ object ReleaseCenter {
             .setNegativeButton(R.string.cancel, null).create()
         ForegroundUpdateUi.show(activity, dialog) { cancelled.set(true) }
         if (!dialog.isShowing) return
+        val arm64 = "arm64-v8a" in Build.SUPPORTED_ABIS
         val startedAt = android.os.SystemClock.elapsedRealtime()
         fun expired(): Boolean = cancelled.get() ||
             android.os.SystemClock.elapsedRealtime() - startedAt >= 15_000L
@@ -84,9 +86,9 @@ object ReleaseCenter {
                                         }
                                     } else emptyList()
                                     tag = remote.takeIf { ReleasePolicy.version(it) != null }
-                                    candidate = ReleasePolicy.selectAsset(remote, BuildConfig.FLAVOR, assets)
+                                    candidate = ReleasePolicy.selectAsset(remote, BuildConfig.FLAVOR, assets, arm64)
                                     result = when (ReleasePolicy.status(BuildConfig.VERSION_NAME,
-                                        remote, BuildConfig.FLAVOR, assets)) {
+                                        remote, BuildConfig.FLAVOR, assets, arm64)) {
                                         ReleasePolicy.Status.CURRENT -> R.string.release_current_match
                                         ReleasePolicy.Status.OLDER -> R.string.release_older
                                         ReleasePolicy.Status.NEWER_NO_APK -> R.string.release_no_compatible
@@ -112,15 +114,22 @@ object ReleaseCenter {
                 if (cancelled.get() || activity.isFinishing || activity.isDestroyed || !dialog.isShowing)
                     return@runOnUiThread
                 dialog.dismiss()
+                val message = if (result in setOf(R.string.release_current_match, R.string.release_older,
+                    R.string.release_no_compatible, R.string.release_update_candidate))
+                    activity.getString(result, tag.orEmpty()) else activity.getString(result)
+                val note = when {
+                    result != R.string.release_update_candidate -> ""
+                    BuildConfig.DEBUG -> "\n\n" + activity.getString(R.string.release_debug_migration)
+                    BuildConfig.FLAVOR == "legacy" -> "\n\n" + activity.getString(R.string.release_combined_migration)
+                    else -> ""
+                }
                 val details = AlertDialog.Builder(activity).setTitle(R.string.release_center)
-                    .setMessage(if (result in setOf(R.string.release_current_match, R.string.release_older,
-                        R.string.release_no_compatible, R.string.release_update_candidate))
-                        activity.getString(result, tag.orEmpty()) else activity.getString(result))
+                    .setMessage(message + note)
                     .setPositiveButton(R.string.release_open) { _, _ -> open(activity) }
                     .setNegativeButton(R.string.close, null)
                 val selected = candidate
                 val selectedTag = tag
-                if (result == R.string.release_update_candidate && selected != null && selectedTag != null) {
+                if (!BuildConfig.DEBUG && result == R.string.release_update_candidate && selected != null && selectedTag != null) {
                     details.setNeutralButton(R.string.release_download) { _, _ ->
                         UpdateDownload.start(activity, selectedTag, selected)
                     }

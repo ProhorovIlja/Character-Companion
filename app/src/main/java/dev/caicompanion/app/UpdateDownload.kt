@@ -7,6 +7,7 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import java.io.File
@@ -21,8 +22,9 @@ object UpdateDownload {
     private const val MIME = "application/vnd.android.package-archive"
 
     fun start(activity: Activity, tag: String, asset: ReleasePolicy.Asset) {
-        if (activity.isFinishing || activity.isDestroyed ||
-            ReleasePolicy.status(BuildConfig.VERSION_NAME, tag, BuildConfig.FLAVOR, listOf(asset)) !=
+        val arm64 = "arm64-v8a" in Build.SUPPORTED_ABIS
+        if (activity.isFinishing || activity.isDestroyed || BuildConfig.DEBUG ||
+            ReleasePolicy.status(BuildConfig.VERSION_NAME, tag, BuildConfig.FLAVOR, listOf(asset), arm64) !=
                 ReleasePolicy.Status.NEWER || !busy.compareAndSet(false, true)) return
         val cancelled = AtomicBoolean(false)
         val progress = AlertDialog.Builder(activity).setTitle(R.string.release_center)
@@ -120,16 +122,19 @@ object UpdateDownload {
         val flags = PackageManager.GET_SIGNING_CERTIFICATES or PackageManager.GET_META_DATA
         val installed = pm.getPackageInfo(activity.packageName, flags)
         val archive = pm.getPackageArchiveInfo(file.absolutePath, flags) ?: return false
-        val info = archive.applicationInfo ?: return false
-        fun signers(pkg: PackageInfo) = pkg.signingInfo?.apkContentsSigners?.map { it.toCharsString() }?.toSet()
-        val currentSigners = signers(installed) ?: return false
-        // Conservative same-signer policy; key rotation requires separate manual release review.
-        return archive.packageName == activity.packageName &&
-            archive.longVersionCode > installed.longVersionCode &&
-            ReleasePolicy.version(archive.versionName.orEmpty()) == ReleasePolicy.version(tag) &&
-            info.flags and ApplicationInfo.FLAG_DEBUGGABLE == 0 &&
-            info.metaData?.getString(RENDERER) == BuildConfig.FLAVOR &&
-            currentSigners.isNotEmpty() && signers(archive) == currentSigners
+        fun identity(pkg: PackageInfo): ReleasePolicy.ArchiveIdentity? {
+            val info = pkg.applicationInfo ?: return null
+            return ReleasePolicy.ArchiveIdentity(pkg.packageName, pkg.longVersionCode,
+                pkg.versionName.orEmpty(), info.metaData?.getString(RENDERER),
+                info.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0,
+                pkg.signingInfo?.apkContentsSigners?.map { it.toCharsString() }?.toSet())
+        }
+        val current = identity(installed) ?: return false
+        val candidate = identity(archive) ?: return false
+        // Same signer only, including the migration from the internal legacy build.
+        return current.packageName == activity.packageName &&
+            ReleasePolicy.acceptsArchive(BuildConfig.FLAVOR, "arm64-v8a" in Build.SUPPORTED_ABIS,
+                current, tag, candidate)
     }
 
     private fun install(activity: Activity, file: File, expectedSize: Long): Boolean {

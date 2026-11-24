@@ -25,4 +25,15 @@ class UpdateLifecycle(unittest.TestCase):
         install = source.split('private fun install(',1)[1]
         self.assertNotIn('verifyPackage(', install)
         self.assertIn('file.length() != expectedSize', install)
+    def test_single_apk_migration_and_debug_gate(self):
+        center = (JAVA/'ReleaseCenter.kt').read_text()
+        download = (JAVA/'UpdateDownload.kt').read_text()
+        for source in (center, download):
+            self.assertIn('"arm64-v8a" in Build.SUPPORTED_ABIS', source)
+            self.assertIn('BuildConfig.DEBUG', source)
+        self.assertIn('ReleasePolicy.selectAsset(remote, BuildConfig.FLAVOR, assets, arm64)', center)
+        self.assertIn('ReleasePolicy.acceptsArchive(BuildConfig.FLAVOR', download)
+        self.assertIn('GET_SIGNING_CERTIFICATES', download)
+        self.assertIn('FLAG_DEBUGGABLE', download)
+        self.assertIn('apkContentsSigners', download)
 if __name__ == '__main__': unittest.main()
