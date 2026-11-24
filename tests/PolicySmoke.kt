@@ -396,7 +396,30 @@ fun main() {
     check(RuleListParser.parse("0.0.0.0 localhost") == null)
     check(RuleListParser.parse("0.0.0.0\tspam.example")!!.blocked == setOf("spam.example"))
     check(RuleListParser.parse("::1\tspam2.example")!!.blocked == setOf("spam2.example"))
-    check(RuleListParser.parse("0.0.0.0 spam.example another.example") == null)
+    check(RuleListParser.parse("0.0.0.0 spam.example another.example # comment")!!.blocked ==
+        setOf("spam.example", "another.example"))
+    check(RuleListParser.parse("127.0.0.1\tspam.example # comment")!!.blocked == setOf("spam.example"))
+    check(RuleListParser.parse("::1 spam.example character.ai")!!.let {
+        it.blocked == setOf("spam.example") && it.unsupported == 1
+    })
+    check(RuleListParser.parse("0.0.0.0 good.example *bad.example") == null)
+    check(RuleListParser.parse("192.168.1.2 ads.example # comment") == null)
+    val mutableDefaults = mutableListOf("base.example")
+    val mutableRules = mutableSetOf("initial.example")
+    val snapshotFilter = FilterEngine(mutableDefaults)
+    val snapshotRules = RuleListParser.Rules(blocked = mutableRules)
+    snapshotFilter.replace("", "", snapshotRules)
+    mutableRules.add("next.example")
+    mutableDefaults.add("unwanted.example")
+    check(!snapshotFilter.shouldBlock("https://next.example/"))
+    snapshotFilter.replace("", "", snapshotRules)
+    check(snapshotFilter.shouldBlock("https://next.example/"))
+    check(!snapshotFilter.shouldBlock("https://unwanted.example/"))
+    snapshotFilter.loginBypass = true
+    check(!snapshotFilter.shouldBlock("https://next.example/"))
+    snapshotFilter.loginBypass = false
+    check(snapshotFilter.shouldBlock("https://base.example/"))
+    check(!snapshotFilter.shouldBlock("https://character.ai/"))
     check(RuleListParser.parse("@@||accounts.google.com^") == null)
     check(RuleListParser.parse("||character.ai^") == null)
     check(RuleListParser.parse("||c.ai^") == null)
