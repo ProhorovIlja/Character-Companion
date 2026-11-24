@@ -17,7 +17,20 @@ internal static class Program
     [STAThread]
     public static int Main()
     {
+        // Use the framework's own Fluent resources rather than an additional UI package.
+        AppContext.SetSwitch("Switch.System.Windows.Appearance.DisableFluentThemeWindowBackdrop", true);
         var app = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };
+        try
+        {
+            app.Resources.MergedDictionaries.Add(new ResourceDictionary
+            {
+                Source = new Uri("pack://application:,,,/PresentationFramework.Fluent;component/Themes/Fluent.Dark.xaml")
+            });
+        }
+        catch (Exception ex) when (ex is IOException or System.Windows.Markup.XamlParseException)
+        {
+            // Keep the stock WPF theme if the framework resource is unavailable.
+        }
         var window = new ChatWindow();
         app.MainWindow = window;
         return app.Run(window);
@@ -45,6 +58,7 @@ internal sealed class ChatWindow : Window
     private readonly Button send = new() { Content = "Send", IsEnabled = false };
     private readonly Button stop = new() { Content = "Stop", IsEnabled = false };
     private readonly Button refresh = new() { Content = "Refresh", IsEnabled = false };
+    private sealed record MessageRow(string Author, string Text, bool IsUser);
     private Workspace? workspace;
     private LocalHistory.Event? pending;
     private CancellationTokenSource? operation;
@@ -55,8 +69,18 @@ internal sealed class ChatWindow : Window
         Title = "Mandy AI — Native Windows preview";
         Width = 920; Height = 800; MinWidth = 640; MinHeight = 590;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
-        Background = new SolidColorBrush(Color.FromRgb(17, 19, 23));
-        Foreground = Brushes.WhiteSmoke;
+        UseLayoutRounding = true;
+        FontSize = 15;
+        if (SystemParameters.HighContrast)
+        {
+            SetResourceReference(BackgroundProperty, SystemColors.WindowBrushKey);
+            SetResourceReference(ForegroundProperty, SystemColors.WindowTextBrushKey);
+        }
+        else if (Application.Current.Resources.MergedDictionaries.Count > 0)
+        {
+            Background = Brushes.Black;
+            Foreground = Brushes.WhiteSmoke;
+        }
         var layout = new DockPanel { Margin = new Thickness(18), LastChildFill = true };
         var header = new DockPanel { Margin = new Thickness(0,0,0,10), LastChildFill = true };
         DockPanel.SetDock(header, Dock.Top);
@@ -83,6 +107,8 @@ internal sealed class ChatWindow : Window
         DockPanel.SetDock(composer, Dock.Bottom);
         layout.Children.Add(composer);
         composer.Children.Add(liveReply);
+        draft.Padding = new Thickness(12,8,12,8);
+        draft.FontSize = 16;
         composer.Children.Add(draft);
         var composerActions = new DockPanel { LastChildFill = false };
         var primaryActions = Buttons(send, stop);
@@ -94,20 +120,38 @@ internal sealed class ChatWindow : Window
         composerActions.Children.Add(mediaActions);
         composer.Children.Add(composerActions);
         composer.Children.Add(status);
-        history.Background = new SolidColorBrush(Color.FromRgb(29,32,38));
-        history.Foreground = Brushes.WhiteSmoke;
+        history.Background = Brushes.Transparent;
+        history.BorderThickness = new Thickness(0);
+        history.FontSize = 16;
         VirtualizingPanel.SetIsVirtualizing(history, true);
         VirtualizingPanel.SetVirtualizationMode(history, VirtualizationMode.Recycling);
         ScrollViewer.SetCanContentScroll(history, true);
         ScrollViewer.SetHorizontalScrollBarVisibility(history, ScrollBarVisibility.Disabled);
-        // Only the latest 50 messages are loaded. A wrapping text template avoids wide rows.
-        var template = new DataTemplate();
+        // Preserve virtualization: bounded data, native text layout, no embedded browser.
+        var template = new DataTemplate(typeof(MessageRow));
+        var stack = new FrameworkElementFactory(typeof(StackPanel));
+        stack.SetValue(FrameworkElement.MarginProperty, new Thickness(8, 12, 8, 12));
+        stack.SetValue(FrameworkElement.MaxWidthProperty, 760d);
+        var author = new FrameworkElementFactory(typeof(TextBlock));
+        author.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding(nameof(MessageRow.Author)));
+        author.SetValue(TextBlock.FontSizeProperty, 13d);
+        author.SetValue(TextBlock.FontWeightProperty, FontWeights.SemiBold);
+        author.SetValue(FrameworkElement.MarginProperty, new Thickness(0,0,0,6));
+        stack.AppendChild(author);
         var text = new FrameworkElementFactory(typeof(TextBlock));
-        text.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding());
+        text.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding(nameof(MessageRow.Text)));
         text.SetValue(TextBlock.TextWrappingProperty, TextWrapping.Wrap);
-        text.SetValue(TextBlock.MarginProperty, new Thickness(8));
-        template.VisualTree = text;
+        text.SetValue(TextBlock.LineHeightProperty, 24d);
+        stack.AppendChild(text);
+        template.VisualTree = stack;
         history.ItemTemplate = template;
+        var items = new Style(typeof(ListBoxItem));
+        items.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
+        var user = new DataTrigger { Binding = new System.Windows.Data.Binding(nameof(MessageRow.IsUser)), Value = true };
+        user.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Right));
+        user.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(56,0,0,0)));
+        items.Triggers.Add(user);
+        history.ItemContainerStyle = items;
         layout.Children.Add(history);
         Content = layout;
         AutomationProperties.SetName(draft, "Message draft");
@@ -206,7 +250,7 @@ internal sealed class ChatWindow : Window
         var w = workspace ?? throw new InvalidOperationException();
         pending = rows.FirstOrDefault() is { Role: "user" } user ? user : null;
         history.ItemsSource = rows.AsEnumerable().Reverse().Select(e =>
-            (e.Role == "user" ? "You" : w.Character.Name) + "\n" + e.Text).ToArray();
+            new MessageRow(e.Role == "user" ? "You" : w.Character.Name, e.Text, e.Role == "user")).ToArray();
         if (history.Items.Count > 0) history.ScrollIntoView(history.Items[history.Items.Count - 1]);
         historyValid = true;
         if (pending != null) draft.Text = pending.Text;
