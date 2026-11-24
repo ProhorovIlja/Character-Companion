@@ -27,19 +27,20 @@ class CharacterDraftActivity : Activity() {
     private var savedId: String? = null
     private var savedDraft: CharacterDraftPolicy.Draft? = null
     private var picking = false
+    private var pendingExport: ByteArray? = null
     private var busy = false
     private val closed = AtomicBoolean(false)
     private lateinit var status: TextView
     private lateinit var summary: TextView
     private val fieldButtons = mutableMapOf<CharacterDraftPolicy.Field, Button>()
     private data class Retained(val draft: CharacterDraftPolicy.Draft, val picking: Boolean,
-                                val savedId: String?, val savedDraft: CharacterDraftPolicy.Draft?)
+                                val savedId: String?, val savedDraft: CharacterDraftPolicy.Draft?, val export: ByteArray?)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ShellAppearance.apply(this)
         super.onCreate(savedInstanceState)
         if (SettingsStore(this).protectScreen) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        (lastNonConfigurationInstance as? Retained)?.let { draft = it.draft; picking = it.picking; savedId = it.savedId; savedDraft = it.savedDraft }
+        (lastNonConfigurationInstance as? Retained)?.let { draft = it.draft; picking = it.picking; savedId = it.savedId; savedDraft = it.savedDraft; pendingExport = it.export }
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(12), dp(16), dp(12))
@@ -62,6 +63,7 @@ class CharacterDraftActivity : Activity() {
         button(R.string.character_draft_library) { showLibrary() }
         button(R.string.character_draft_save) { saveLocal(false) }
         button(R.string.character_draft_save_copy) { saveLocal(true) }
+        button(R.string.character_draft_export_backup) { confirmExportBackup() }
         button(R.string.character_draft_import) { replace { openCard() } }
         button(R.string.character_draft_paste) { replace { pasteCard() } }
         button(R.string.character_draft_new) { replace { draft = CharacterDraftPolicy.Draft(); savedId = null; savedDraft = null; refresh() } }
@@ -200,13 +202,13 @@ class CharacterDraftActivity : Activity() {
             status.setText(R.string.character_draft_invalid); return
         }
         val snapshot = text.toString()
-        importWork { snapshot }
+        importWork { snapshot.let(CharacterCardJson::parse) }
     }
 
-    private fun importWork(read: () -> String?) {
+    private fun importWork(read: () -> CharacterDraftPolicy.Draft?) {
         busy = true; refresh(); status.setText(R.string.lorebook_processing)
         Thread({
-            val result = runCatching { read()?.let(CharacterCardJson::parse) }.getOrNull()
+            val result = runCatching { read() }.getOrNull()
             runOnUiThread {
                 if (closed.get() || isFinishing || isDestroyed) return@runOnUiThread
                 busy = false
@@ -220,21 +222,34 @@ class CharacterDraftActivity : Activity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != 851 || !picking) return
+        if (requestCode !in setOf(851, 852) || !picking) return
+        if ((requestCode == 852) != (pendingExport != null)) return
+        val export = pendingExport
+        pendingExport = null
         picking = false; refresh()
         if (resultCode != RESULT_OK) return
         val uri = data?.data
         if (uri == null || uri.scheme != "content" || uri.authority.isNullOrBlank()) {
             status.setText(R.string.character_draft_invalid); return
         }
+        if (requestCode == 852) {
+            if (export == null) return
+            libraryWork({
+                val output = contentResolver.openOutputStream(uri, "w") ?: error("Missing output")
+                output.buffered().use { it.write(export) }
+            }) { status.setText(R.string.character_draft_backup_exported) }
+            return
+        }
         importWork {
             contentResolver.openInputStream(uri)?.buffered()?.use { input ->
-                if (CharxCard.isZip(input)) CharxCard.extract(input) { closed.get() }
+                if (CharacterDraftBackup.isBackup(input)) return@use CharacterDraftBackup.decode(input)
+                val cardText = if (CharxCard.isZip(input)) CharxCard.extract(input) { closed.get() }
                 else if (PngLorebookCard.isPng(input)) PngLorebookCard.extract(input) { closed.get() }
                 else InputStreamReader(input, Charsets.UTF_8.newDecoder()
                     .onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT)).use { reader ->
                     BoundedText.read(reader, LorebookPolicy.MAX_CHARS) { closed.get() }
                 }
+                cardText?.let(CharacterCardJson::parse)
             }
         }
     }
@@ -253,6 +268,29 @@ class CharacterDraftActivity : Activity() {
                 result.fold(done, { status.setText(R.string.character_draft_library_failed) })
             }
         }, "manual-character-library").start()
+    }
+
+    private fun confirmExportBackup() {
+        val snapshot = draft
+        AlertDialog.Builder(this).setMessage(R.string.character_draft_backup_warning)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.confirm) { _, _ ->
+                libraryWork({ CharacterDraftBackup.encode(snapshot) }) { bytes ->
+                    pendingExport = bytes
+                    picking = true
+                    refresh()
+                    try {
+                        startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "application/octet-stream"
+                            putExtra(Intent.EXTRA_TITLE, "character-draft.ccbk")
+                        }, 852)
+                    } catch (_: RuntimeException) {
+                        pendingExport = null; picking = false; refresh()
+                        status.setText(R.string.character_draft_library_failed)
+                    }
+                }
+            }.show()
     }
 
     private fun saveLocal(copy: Boolean) {
@@ -310,6 +348,7 @@ class CharacterDraftActivity : Activity() {
     }
 
     private fun confirmClose() {
+        if (busy || picking) { status.setText(R.string.lorebook_processing); return }
         if (draft == (savedDraft ?: CharacterDraftPolicy.Draft()) && !busy && !picking) finish()
         else AlertDialog.Builder(this).setMessage(R.string.character_draft_close)
             .setPositiveButton(R.string.confirm) { _, _ -> finish() }
@@ -318,6 +357,6 @@ class CharacterDraftActivity : Activity() {
 
     @Deprecated("Legacy Android back navigation")
     override fun onBackPressed() { confirmClose() }
-    override fun onRetainNonConfigurationInstance(): Any = Retained(draft, picking, savedId, savedDraft)
+    override fun onRetainNonConfigurationInstance(): Any = Retained(draft, picking, savedId, savedDraft, pendingExport)
     override fun onDestroy() { closed.set(true); super.onDestroy() }
 }

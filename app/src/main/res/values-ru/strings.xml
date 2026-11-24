@@ -395,4 +395,7 @@
     <string name="character_draft_library_delete">Удалить сохранённый черновик</string>
     <string name="character_draft_library_delete_confirm">Удалить сохранённый черновик? Открытый черновик останется в редакторе.</string>
     <string name="character_draft_library_deleted">Сохранённый черновик удалён</string>
+    <string name="character_draft_export_backup">Экспорт резервной копии</string>
+    <string name="character_draft_backup_warning">Копия содержит личный текст без шифрования. Выберите доверенное место хранения.</string>
+    <string name="character_draft_backup_exported">Резервная копия экспортирована</string>
 </resources>

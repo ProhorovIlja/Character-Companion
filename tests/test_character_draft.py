@@ -44,6 +44,16 @@ class CharacterDraftTests(unittest.TestCase):
         for token in ('CodingErrorAction.REPORT', 'MAX_CHARS', 'read() == -1'):
             self.assertIn(token, codec)
 
+    def test_portable_backup(self):
+        activity = (JAVA/'CharacterDraftActivity.kt').read_text()
+        backup = (JAVA/'CharacterDraftBackup.kt').read_text()
+        for token in ('CharacterDraftBackup.isBackup(input)', 'CharacterDraftBackup.decode(input)',
+                      'CharacterDraftBackup.encode(snapshot)', 'Intent.ACTION_CREATE_DOCUMENT',
+                      'pendingExport = null', 'character-draft.ccbk'):
+            self.assertIn(token, activity)
+        for token in ('SHA-256', 'MessageDigest.isEqual', 'MAX_FILE_BYTES', 'stream.read() == -1'):
+            self.assertIn(token, backup)
+
     def test_localization(self):
         def names(locale):
             root = ET.parse(ROOT/f'app/src/main/res/{locale}/strings.xml').getroot()

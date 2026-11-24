@@ -395,4 +395,7 @@
     <string name="character_draft_library_delete">Delete saved draft</string>
     <string name="character_draft_library_delete_confirm">Delete this saved draft? Any open draft remains in the editor.</string>
     <string name="character_draft_library_deleted">Saved draft deleted</string>
+    <string name="character_draft_export_backup">Export draft backup</string>
+    <string name="character_draft_backup_warning">This backup contains private text without encryption. Choose a trusted storage location.</string>
+    <string name="character_draft_backup_exported">Draft backup exported</string>
 </resources>
