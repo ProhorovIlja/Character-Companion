@@ -585,5 +585,52 @@ fun main() {
     check(ExternalBrowserPolicy.target("https://example.org:8443/path") == null)
     check(ExternalBrowserPolicy.target("https://example.org/\u202Eunsafe") == null)
     check(ExternalBrowserPolicy.target("https://example.org/" + "x".repeat(9000)) == null)
+    // Voice typing edits at the active caret instead of always appending text.
+    check(VoiceDraftPolicy.insert("Hello world", "brave", 6, 6)?.text == "Hello brave world")
+    check(VoiceDraftPolicy.insert("Hello world", "hunter", 6, 11)?.text == "Hello hunter")
+    check(VoiceDraftPolicy.insert("Hello", "world", 5, 5)?.text == "Hello\nworld")
+    check(VoiceDraftPolicy.insert("before", "  after  ", 0, 0)?.text == "after before")
+    check(VoiceDraftPolicy.insert("Hello, world", "quiet", 5, 5)?.text == "Hello quiet, world")
+    check(VoiceDraftPolicy.insert("(world)", "new", 1, 1)?.text == "(new world)")
+    val selectionEdit = VoiceDraftPolicy.insert("first last", "new", 6, 6)!!
+    check(selectionEdit.text == "first new last")
+    check(selectionEdit.caret == 9)
+    check(VoiceDraftPolicy.insert("one", " ", 1, 1) == null)
+    check(VoiceDraftPolicy.insert("one", "anything", -1, 2) == null)
+    check(VoiceDraftPolicy.insert("one", "anything", 0, 4) == null)
+    check(VoiceDraftPolicy.insert("x".repeat(VoiceDraftPolicy.MAX_CHARS), "y", 0, 0) == null)
+    check(VoiceDraftPolicy.insert("x".repeat(VoiceDraftPolicy.MAX_CHARS), "y", 0, 2)?.text?.length == VoiceDraftPolicy.MAX_CHARS)
+    check(VoiceDraftPolicy.append("hello", "world") == "hello\nworld")
+    check(VoiceDraftPolicy.append("hello\n", "world") == "hello\nworld")
+    // Android stores cursor positions in UTF-16; never split a surrogate pair.
+    val emojiText = "a😀z"
+    check(VoiceDraftPolicy.selection(emojiText, 2, 2) == 1..3)
+    val emojiEdit = VoiceDraftPolicy.insert(emojiText, "hi", 2, 2)!!
+    check(emojiEdit.text == "a hi z")
+    check(emojiEdit.caret == 4)
+    check(VoiceDraftPolicy.selection("abc", -1, 9) == 0..3)
+    // Check all possible selected UTF-16 ranges for several valid Unicode samples.
+    fun wellFormedUtf16(value: String): Boolean {
+        var i = 0
+        while (i < value.length) {
+            when {
+                Character.isHighSurrogate(value[i]) -> {
+                    if (i + 1 >= value.length || !Character.isLowSurrogate(value[i + 1])) return false
+                    i += 2
+                }
+                Character.isLowSurrogate(value[i]) -> return false
+                else -> i++
+            }
+        }
+        return true
+    }
+    for (original in listOf("abc", "🧪👍", "a😀z", "Привет, мир", "東京。", "(hi!)")) {
+        for (start in 0..original.length) for (end in 0..original.length) {
+            val changed = VoiceDraftPolicy.insert(original, "вставка", start, end)!!
+            check(wellFormedUtf16(changed.text))
+            check(changed.caret in 0..changed.text.length)
+            check(changed.text.contains("вставка"))
+        }
+    }
     println("PolicySmoke: browser policy, concurrency, URL safety and local statistics assertions passed")
 }

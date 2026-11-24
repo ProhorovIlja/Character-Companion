@@ -30,7 +30,7 @@ class VoiceDraft(unittest.TestCase):
         self.assertNotIn('httpURLConnection', ACTIVITY)
 
     def test_draft_does_not_automatically_send_or_persist(self):
-        self.assertIn('VoiceDraftPolicy.append(editor.text.toString(), candidate)', ACTIVITY)
+        self.assertIn('VoiceDraftPolicy.insert(original, candidate, start, end)', ACTIVITY)
         self.assertIn('Intent.ACTION_CREATE_DOCUMENT', ACTIVITY)
         self.assertIn('ClipData.newPlainText', ACTIVITY)
         self.assertIn('override fun onPause()', ACTIVITY)
@@ -60,7 +60,7 @@ class VoiceDraft(unittest.TestCase):
     def test_language_choice_is_retained_only_in_memory(self):
         self.assertIn('val languageIndex: Int', ACTIVITY)
         self.assertIn('languageSpinner.setSelection(VoiceDraftPolicy.languageIndex(retained.languageIndex))', ACTIVITY)
-        self.assertIn('RetainedDraft(editor.text.toString(), pendingSaveText, languageSpinner.selectedItemPosition)', ACTIVITY)
+        self.assertIn('RetainedDraft(editor.text.toString(), pendingSaveText, languageSpinner.selectedItemPosition,', ACTIVITY)
         self.assertNotIn('onSaveInstanceState', ACTIVITY)
         self.assertNotIn('SharedPreferences', ACTIVITY)
 
@@ -99,6 +99,28 @@ class VoiceDraft(unittest.TestCase):
             strings = ET.parse(ROOT/f'app/src/main/res/{rel}/strings.xml').getroot()
             names = {e.attrib['name'] for e in strings.findall('string')}
             self.assertTrue({'voice_copy_return', 'voice_copy_empty', 'voice_copy_failed'} <= names)
+
+
+    def test_native_voice_screen_remains_scrollable_with_ime_and_large_fonts(self):
+        self.assertIn('val scroll = ScrollView(this).apply {', ACTIVITY)
+        self.assertIn('isFillViewport = true', ACTIVITY)
+        self.assertIn('setContentView(scroll)', ACTIVITY)
+        self.assertIn('FrameLayout.LayoutParams(', ACTIVITY)
+        self.assertIn('ViewGroup.LayoutParams.MATCH_PARENT, dp(196)', ACTIVITY)
+        self.assertIn('EditorInfo.IME_FLAG_NO_EXTRACT_UI', ACTIVITY)
+        self.assertIn('View.ACCESSIBILITY_LIVE_REGION_POLITE', ACTIVITY)
+        self.assertNotIn('ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f', ACTIVITY)
+
+    def test_speech_inserts_at_caret_and_restores_edit_selection_volatile_only(self):
+        policy=(ROOT/'app/src/main/java/dev/caicompanion/app/VoiceDraftPolicy.kt').read_text()
+        self.assertIn('fun insert(current: String, candidate: String?, start: Int, end: Int): Edit?', policy)
+        self.assertIn('val bounds = selection(current, start, end)', policy)
+        self.assertIn('Character.isHighSurrogate', policy)
+        self.assertIn('editor.selectionStart.takeIf { it >= 0 } ?: original.length', ACTIVITY)
+        self.assertIn('editor.setSelection(edit.caret)', ACTIVITY)
+        self.assertIn('val selectionStart: Int, val selectionEnd: Int', ACTIVITY)
+        self.assertIn('editor.setSelection(restored.first, restored.last)', ACTIVITY)
+        self.assertNotIn('onSaveInstanceState', ACTIVITY)
 
     def test_locales_expose_same_strings(self):
         en = ET.parse(ROOT/'app/src/main/res/values/strings.xml').getroot()

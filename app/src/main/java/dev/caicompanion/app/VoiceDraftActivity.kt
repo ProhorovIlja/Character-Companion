@@ -18,13 +18,17 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.view.Gravity
+import android.view.View
+import android.view.inputmethod.EditorInfo
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
@@ -47,13 +51,25 @@ class VoiceDraftActivity : Activity() {
     private val recognitionGuard = VoiceRecognitionGuard()
     // Only an explicit save action creates a document. Never save a transcript to Bundle.
     private var pendingSaveText: String? = null
-    private data class RetainedDraft(val text: String, val pendingSave: String?, val languageIndex: Int)
+    private data class RetainedDraft(
+        val text: String, val pendingSave: String?, val languageIndex: Int,
+        val selectionStart: Int, val selectionEnd: Int
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Never place the unsent dictation in a saved instance-state Bundle.
         if (SettingsStore(this).protectScreen) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        // Weighted EditText in a fixed vertical layout used to hide the action buttons
+        // when the IME, landscape mode or large accessibility fonts reduced height.
+        // Scroll the whole workspace instead; speech actions remain reachable.
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            isVerticalScrollBarEnabled = true
+            clipToPadding = false
+            descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+        }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.rgb(17, 18, 25))
@@ -67,7 +83,9 @@ class VoiceDraftActivity : Activity() {
                 insets
             }
         }
-        setContentView(root)
+        scroll.addView(root, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        setContentView(scroll)
         root.requestApplyInsets()
         root.addView(TextView(this).apply {
             text = getString(R.string.voice_title)
@@ -96,19 +114,28 @@ class VoiceDraftActivity : Activity() {
                 android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
             minLines = 5
             maxLines = 16
+            // Prevent landscape IMEs from replacing the editor with a full-screen form.
+            imeOptions = imeOptions or EditorInfo.IME_FLAG_NO_EXTRACT_UI
             filters = arrayOf(android.text.InputFilter.LengthFilter(VoiceDraftPolicy.MAX_CHARS))
         }
         // Only retain the draft in the Activity's in-memory non-configuration instance.
         // Process death still clears it, rather than writing private words into OS state.
         (lastNonConfigurationInstance as? RetainedDraft)?.let { retained ->
             editor.setText(retained.text)
-            editor.setSelection(editor.text.length)
+            val restored = VoiceDraftPolicy.selection(
+                editor.text.toString(), retained.selectionStart, retained.selectionEnd)
+            editor.setSelection(restored.first, restored.last)
             pendingSaveText = retained.pendingSave
             languageSpinner.setSelection(VoiceDraftPolicy.languageIndex(retained.languageIndex))
         }
+        // A fixed minimum editor viewport permits natural outer scrolling even under
+        // a small/landscape window. The editor itself scrolls for longer transcripts.
         root.addView(editor, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
-        status = TextView(this).apply { setTextColor(Color.rgb(200, 195, 190)) }
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(196)))
+        status = TextView(this).apply {
+            setTextColor(Color.rgb(200, 195, 190))
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
         status.setText(R.string.voice_idle)
         root.addView(status)
         listenButton = Button(this).apply {
@@ -249,11 +276,16 @@ class VoiceDraftActivity : Activity() {
     }
 
     private fun acceptRecognition(candidate: String?) {
-        val merged = VoiceDraftPolicy.append(editor.text.toString(), candidate)
-        if (merged == null) status.setText(R.string.voice_empty_or_full)
+        // An unfocused EditText may report -1 for selection; in that case append
+        // rather than discarding the user's recognized words without explanation.
+        val original = editor.text.toString()
+        val start = editor.selectionStart.takeIf { it >= 0 } ?: original.length
+        val end = editor.selectionEnd.takeIf { it >= 0 } ?: start
+        val edit = VoiceDraftPolicy.insert(original, candidate, start, end)
+        if (edit == null) status.setText(R.string.voice_empty_or_full)
         else {
-            editor.setText(merged)
-            editor.setSelection(merged.length)
+            editor.setText(edit.text)
+            editor.setSelection(edit.caret)
             status.setText(R.string.voice_ready)
         }
     }
@@ -356,7 +388,8 @@ class VoiceDraftActivity : Activity() {
 
     @Deprecated("Keep transient private draft in memory only across configuration changes")
     override fun onRetainNonConfigurationInstance(): Any =
-        RetainedDraft(editor.text.toString(), pendingSaveText, languageSpinner.selectedItemPosition)
+        RetainedDraft(editor.text.toString(), pendingSaveText, languageSpinner.selectedItemPosition,
+            editor.selectionStart, editor.selectionEnd)
 
     override fun onPause() {
         // No listening while another Activity, the home screen or app switcher has focus.

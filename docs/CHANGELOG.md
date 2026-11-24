@@ -1,3 +1,9 @@
+## v0.41.0-source — 2026-11-24
+
+- Android 0.32.0-rc1: Android dictation now inserts speech at the current caret or replaces highlighted text instead of always appending. New bounded pure Kotlin editing policy returns the new caret and avoids splitting emoji/supplementary Unicode. The previous append-at-end behavior is preserved.
+- Make the native voice screen scrollable under keyboard/landscape/large fonts; keep cursor selection volatile across rotation, prevent fullscreen IME extraction and provide polite accessibility announcements for speech status.
+- Extend offline Kotlin tests across all selection ranges of six Unicode samples; structural Python suite now contains 99 cases. No Android APK or Windows EXE built; Gradle/Android SDK unavailable. See [release notes](RELEASE_NOTES_v0.41.0-source.md). No CI or automations.
+
 ## v0.40.0-source — 2026-11-24
 
 - Android 0.31.0-rc1: explicit user-driven **Copy and return** from voice draft to browser; no auto-injection, auto-paste or sending. Empty draft and clipboard failure keep the editor open. Mark copied text as sensitive in Android 13+ clipboard previews (does not isolate clipboard data).

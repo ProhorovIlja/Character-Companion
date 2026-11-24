@@ -90,8 +90,8 @@ class GeckoTransferTests(unittest.TestCase):
             self.assertIn('gecko_download_saved',keys)
 
     def test_application_version_moves_forward_without_platform_mixup(self):
-        self.assertIn('versionCode = 31', BUILD)
-        self.assertIn('versionName = "0.31.0-rc1"', BUILD)
+        self.assertIn('versionCode = 32', BUILD)
+        self.assertIn('versionName = "0.32.0-rc1"', BUILD)
         self.assertIn('create("gecko")',BUILD)
         self.assertIn('create("legacy")',BUILD)
         self.assertFalse((ROOT/'.github/workflows').exists())
