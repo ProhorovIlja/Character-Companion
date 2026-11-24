@@ -56,8 +56,8 @@ class Structure(unittest.TestCase):
         self.assertIn('else openFirstPartyPage(lastUrl)', activity)
         self.assertIn('if (intent.action == Intent.ACTION_SEND && ::container.isInitialized)', activity)
         self.assertIn('if (::webView.isInitialized) webView.onPause()', activity)
-        self.assertIn('if (::webView.isInitialized) CookieManager.getInstance().flush()', activity)
-        self.assertIn('if (::webView.isInitialized) {\n            container.removeView(webView)', activity)
+        self.assertIn('if (::webView.isInitialized && !rendererDisposed) CookieManager.getInstance().flush()', activity)
+        self.assertIn('if (::webView.isInitialized && !rendererDisposed) {\n            container.removeView(webView)', activity)
         self.assertIn('header.visibility = View.GONE\n        updateFooterVisibility()', activity)
         startup = activity.split('override fun onCreate', 1)[1].split('private fun configureWebView', 1)[0]
         self.assertNotIn('webView = findViewById', startup)
@@ -112,14 +112,15 @@ class Structure(unittest.TestCase):
 
     def test_android_resource_references(self):
         # Catch unresolved string and ID names before a full Android SDK build.
-        sources = '\n'.join(p.read_text() for p in (ROOT/'app/src/main/java').rglob('*.kt'))
+        sources = '\n'.join(p.read_text() for source_set in ('main', 'gecko')
+                            for p in (ROOT/'app/src'/source_set/'java').rglob('*.kt'))
         strings_xml = ET.parse(ROOT/'app/src/main/res/values/strings.xml').getroot()
         defined_strings = {node.attrib['name'] for node in strings_xml.findall('string')}
-        missing_strings = set(re.findall(r'R\.string\.([A-Za-z0-9_]+)', sources)) - defined_strings
+        missing_strings = set(re.findall(r'(?<![\w.])R\.string\.([A-Za-z0-9_]+)', sources)) - defined_strings
         self.assertEqual(missing_strings, set())
         layout = (ROOT/'app/src/main/res/layout/activity_main.xml').read_text()
         defined_ids = set(re.findall(r'@\+id/([A-Za-z0-9_]+)', layout))
-        missing_ids = set(re.findall(r'R\.id\.([A-Za-z0-9_]+)', sources)) - defined_ids
+        missing_ids = set(re.findall(r'(?<![\w.])R\.id\.([A-Za-z0-9_]+)', sources)) - defined_ids
         self.assertEqual(missing_ids, set())
 
     def test_privacy_defaults(self):
@@ -199,7 +200,7 @@ class Structure(unittest.TestCase):
         activity=(ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
         store=(ROOT/'app/src/main/java/dev/caicompanion/app/SettingsStore.kt').read_text()
         backup=(ROOT/'app/src/main/java/dev/caicompanion/app/SettingsBackup.kt').read_text()
-        self.assertIn('BoundedText.read(it, MAX_CHARS)', backup)
+        self.assertIn('BoundedText.read(it, MAX_CHARS) { closed.get() }', backup)
         self.assertNotIn('it.readText().take(200_001)', activity)
         self.assertIn('prefs.edit()\n            .putBoolean("blocking"', store)
         self.assertIn('OfflineBookmarkEditor.normalize(obj.optString("title"), u)', store)
@@ -338,7 +339,7 @@ class Structure(unittest.TestCase):
         self.assertIn('NativeWorkspaceNavigation.shouldResumeRenderer(activityResumed, nativeHub != null)', activity)
         self.assertIn('if (loadIfBlank && !rendererNeedsNavigation && NativeWorkspaceNavigation.needsInitialLoad(webView.url))', activity)
         self.assertIn('else openFirstPartyPage(safe)', activity)
-        self.assertIn('showNativeBookmarkActions(title, url)', activity)
+        self.assertIn('showNativeBookmarkActions(title, url) { refreshNativeBookmarks() }', activity)
         self.assertIn('R.string.hub_bookmark_confirm_delete', activity)
         self.assertIn('if (::webView.isInitialized) webView.onPause()\n        container.addView(panel', activity)
         backup=(ROOT/'app/src/main/java/dev/caicompanion/app/SettingsBackup.kt').read_text()
@@ -455,7 +456,9 @@ class Structure(unittest.TestCase):
 
     def test_release_kit_cannot_publish_unsigned_apk(self):
         script=(ROOT/'scripts/prepare-release.sh').read_text()
-        self.assertIn('$APKSIGNER verify', script)
+        self.assertIn('"$APKSIGNER" verify', script)
+        self.assertIn('scripts/check_release_signoff.py', script)
+        self.assertIn('qa=manual_signoff_bound_to_apk_and_commit', script)
         self.assertIn('assembleRelease', (ROOT/'docs/RELEASE_PROCESS.md').read_text())
         self.assertIn('No APK has been produced', (ROOT/'docs/RELEASE_NOTES_v0.11.0-rc1.md').read_text())
         self.assertEqual(manual_workflow_issues(ROOT), [])

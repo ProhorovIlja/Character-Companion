@@ -1,4 +1,4 @@
-# Character Companion v0.16.0-rc1 — Android release notes
+# Character Companion — Android release notes
 
 **Unofficial Character.AI browser companion. Not affiliated with Character.AI.**
 
@@ -22,4 +22,4 @@
 - Source ZIP and source tar.gz
 - SHA256SUMS.txt and BUILD_PROVENANCE.txt
 
-Install only after manually reviewing the device signoff, certificate identity and these notes.
+Before publication, replace the historical feature summary above with the actual release changes and review the exact tested APK digest, signer digest, version and commit recorded in BUILD_PROVENANCE.txt. Install only after manually reviewing the release evidence.

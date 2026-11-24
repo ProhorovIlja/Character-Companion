@@ -4,7 +4,7 @@ For a local, foreground-only Android debug build from a complete GitHub checkout
 
 # Android release process — manual-only, no automations
 
-This repository has no GitHub Actions, schedules, upload hooks, services or automated release jobs. A GitHub Release is **not** available until a real APK has been assembled, tested and signed.
+This repository has one explicitly approved manual GitHub Actions build, with no automatic triggers, schedules, upload hooks, services or automated release jobs. A GitHub Release is **not** available until a real APK has been assembled, tested and signed.
 
 ## Local requirements
 
@@ -19,7 +19,7 @@ This repository has no GitHub Actions, schedules, upload hooks, services or auto
 bash scripts/test-offline.sh
 bash scripts/doctor.sh
 ./gradlew --no-daemon --offline :app:assembleGeckoRelease  # or :app:assembleLegacyRelease; signed only after real QA
-# Verify on devices, then write a separate device-signoff.txt with DEVICE_TESTS_PASSED=YES and RENDERER_FLAVOR=gecko (or legacy).
+# Verify the exact signed APK on devices, then complete the signoff fields below.
 bash scripts/prepare-release.sh /absolute/path/to/app-gecko-release-signed.apk /absolute/path/to/device-signoff.txt gecko
 ```
 
@@ -75,3 +75,18 @@ The normal manual build publishes one combined debug APK, `CharacterCompanion-An
 
 ## Combined-release migration
 The only production asset remains `CharacterCompanion-Android-$VERSION-gecko.apk` for compatibility with previously shipped updater metadata. The updated internal WebView-only build can select that same combined asset on an ARM64 device; legacy-only assets are no longer selected. Migration requires strictly newer stable versionName and versionCode, the same package and current signer set, a non-debug installed build and candidate, and the signed combined renderer marker. Android's installer remains the final authority. Debug builds show an explicit production signing warning rather than downloading an incompatible update. No silent install, key rotation, or unattended release checks. References: https://developer.android.com/reference/android/content/pm/PackageInfo and https://github.com/ImranR98/Obtainium/releases . Android compile and on-device signed migration test required.
+
+## Exact APK and device QA signoff
+The manual packager now accepts only a UTF-8 signoff with these seven unique fields, filled in after testing the exact signed combined APK (not a debug APK or another commit):
+
+```text
+DEVICE_TESTS_PASSED=YES
+RENDERER_FLAVOR=gecko
+COMMIT=<40 lowercase hex characters from git rev-parse HEAD>
+VERSION_NAME=<exact Gradle versionName>
+VERSION_CODE=<exact Gradle versionCode>
+APK_SHA256=<64 lowercase hex characters from sha256sum of tested APK>
+SIGNER_SHA256=<64 lowercase hex characters from apksigner verify --print-certs>
+```
+
+Do not copy placeholders into an actual signoff. A signed release with a single signer is required. The script validates the exact APK bytes and signer, captures the commit used for the source archives, verifies the copied APK checksum and records both digests in provenance. This is a manual QA declaration, not independent cryptographic proof that a device test occurred. No device identifiers or signing secrets are requested. References: https://developer.android.com/tools/apksigner and https://docs.github.com/en/actions/concepts/security/artifact-attestations . The script does not create a release or launch a build.

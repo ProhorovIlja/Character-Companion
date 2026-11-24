@@ -21,16 +21,8 @@ if [[ -z "$APK" || -z "$SIGNOFF" || ! -s "$APK" ]]; then
   echo 'No APK or device signoff: release preparation intentionally refused.' >&2
   exit 2
 fi
-if [[ "$(basename "$APK")" != *"$FLAVOR"* ]]; then
-  echo 'APK filename must identify its tested renderer flavor.' >&2; exit 2
-fi
-if ! grep -Fxq "RENDERER_FLAVOR=$FLAVOR" "$SIGNOFF"; then
-  echo 'Device signoff does not match selected renderer flavor.' >&2; exit 2
-fi
-if ! grep -Fxq 'DEVICE_TESTS_PASSED=YES' "$SIGNOFF"; then
-  echo 'Device test gate NOT passed. Refusing to package a release.' >&2
-  exit 2
-fi
+# RENDERER_FLAVOR=$FLAVOR and DEVICE_TESTS_PASSED=YES are validated together
+# with APK digest, signer, commit and versions by the strict signoff gate.
 if [[ "$(basename "$APK")" == *debug* ]]; then
   echo 'Debug APK must never be published as a production release.' >&2
   exit 2
@@ -39,6 +31,7 @@ if ! command -v git >/dev/null || ! git diff --quiet || ! git diff --cached --qu
   echo 'Requires a clean, committed Git checkout.' >&2
   exit 2
 fi
+COMMIT="$(git rev-parse HEAD)"
 SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-${HOME}/Android/Sdk}}"
 APKSIGNER="$(find "$SDK/build-tools" -maxdepth 2 -name apksigner -type f 2>/dev/null | sort -V | tail -1 || true)"
 AAPT="$(find "$SDK/build-tools" -maxdepth 2 -name aapt -type f 2>/dev/null | sort -V | tail -1 || true)"
@@ -46,16 +39,16 @@ if [[ -z "$APKSIGNER" || ! -x "$APKSIGNER" || -z "$AAPT" || ! -x "$AAPT" ]]; the
   echo 'Android build-tools apksigner and aapt (dump badging) required.' >&2
   exit 2
 fi
-SIGNATURE="$($APKSIGNER verify --verbose --print-certs "$APK" 2>&1)" || {
+SIGNATURE="$("$APKSIGNER" verify --verbose --print-certs "$APK" 2>&1)" || {
   echo 'APK signature verification failed.' >&2; exit 2;
 }
 if grep -Eiq 'Android Debug|CN=Android Debug' <<< "$SIGNATURE"; then
   echo 'APK is signed with an Android debug certificate.' >&2; exit 2
 fi
-BADGING="$($AAPT dump badging "$APK" 2>&1)" || {
+BADGING="$("$AAPT" dump badging "$APK" 2>&1)" || {
   echo 'APK manifest inspection failed.' >&2; exit 2;
 }
-if ! grep -Eq "^package: name='$PKG' versionCode='$VERSION_CODE' versionName='$VERSION'" <<< "$BADGING"; then
+if ! grep -Fq "package: name='$PKG' versionCode='$VERSION_CODE' versionName='$VERSION'" <<< "$BADGING"; then
   echo 'Package ID/version mismatch. Refusing to label APK as this version.' >&2; exit 2
 fi
 if grep -Fxq 'application-debuggable' <<< "$BADGING"; then
@@ -78,24 +71,34 @@ fi
 if [[ ! -f docs/RELEASE_TEMPLATE.md ]]; then
   echo 'Missing checked-in release notes template.' >&2; exit 2
 fi
+SIGNOFF_RESULT="$(printf '%s\n' "$SIGNATURE" | python3 scripts/check_release_signoff.py "$SIGNOFF" "$APK" "$COMMIT" "$VERSION" "$VERSION_CODE" "$FLAVOR")"
+read -r APK_SHA256 SIGNER_SHA256 <<< "$SIGNOFF_RESULT"
 OUTPUT="${RELEASE_OUTPUT_DIR:-$(pwd)/out/release-$VERSION-$FLAVOR}"
 mkdir -p "$OUTPUT"
-cp -- "$APK" "$OUTPUT/CharacterCompanion-Android-$VERSION-$FLAVOR.apk"
-git archive --format=zip --output="$OUTPUT/CharacterCompanion-Android-$VERSION-$FLAVOR-source.zip" HEAD
-git archive --format=tar HEAD | gzip -n -9 > "$OUTPUT/CharacterCompanion-Android-$VERSION-$FLAVOR-source.tar.gz"
+PACKAGE_APK="$OUTPUT/CharacterCompanion-Android-$VERSION-$FLAVOR.apk"
+cp -- "$APK" "$PACKAGE_APK"
+if ! printf '%s  %s\n' "$APK_SHA256" "$PACKAGE_APK" | sha256sum -c --status; then
+  rm -f -- "$PACKAGE_APK"
+  echo 'Copied APK differs from tested APK.' >&2; exit 2
+fi
+git archive --format=zip --output="$OUTPUT/CharacterCompanion-Android-$VERSION-$FLAVOR-source.zip" "$COMMIT"
+git archive --format=tar "$COMMIT" | gzip -n -9 > "$OUTPUT/CharacterCompanion-Android-$VERSION-$FLAVOR-source.tar.gz"
 cp -- docs/RELEASE_TEMPLATE.md "$OUTPUT/RELEASE_NOTES.md"
 (cd "$OUTPUT" && sha256sum ./*.apk ./*.zip ./*.tar.gz > SHA256SUMS.txt)
 cat > "$OUTPUT/BUILD_PROVENANCE.txt" <<INFO
 version=$VERSION
 renderer_flavor=$FLAVOR
-commit=$(git rev-parse HEAD)
+commit=$COMMIT
+version_code=$VERSION_CODE
+apk_sha256=$APK_SHA256
+signer_sha256=$SIGNER_SHA256
 package_id=$PKG
 apk_signature=verified_by_apksigner
 manifest=verified_by_aapt
 renderer_manifest=verified_by_aapt_xmltree
 native_elf_audit=passed_or_no_native_libraries
 zip_alignment_16k=verified_by_zipalign
-qa=provided_manual_device_signoff
+qa=manual_signoff_bound_to_apk_and_commit
 release_upload=NOT_PERFORMED
 INFO
 printf 'RELEASE_KIT_READY=%s\n' "$OUTPUT"
