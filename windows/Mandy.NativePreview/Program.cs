@@ -59,6 +59,8 @@ internal sealed class ChatWindow : Window
     private readonly Button send = new() { Content = "Send", IsEnabled = false };
     private readonly Button stop = new() { Content = "Stop", IsEnabled = false };
     private readonly Button refresh = new() { Content = "Refresh", IsEnabled = false };
+    private readonly Button saveDraft = new() { Content = "Save draft", IsEnabled = false };
+    private string lastSavedDraft = "";
     private readonly Button earlier = new() { Content = "Earlier messages", IsEnabled = false, Visibility = Visibility.Collapsed };
     private readonly Button dictate = new() { IsEnabled = false };
     private readonly Button keepSpeech = new() { Content = "Stop · keep draft" };
@@ -121,7 +123,8 @@ internal sealed class ChatWindow : Window
         settings.Children.Add(Labeled("Trusted local server model alias", alias));
         settings.Children.Add(Labeled("Loopback port", port));
         settings.Children.Add(Labeled("Local server API key (not saved)", key));
-        settings.Children.Add(Buttons(refresh));
+        settings.Children.Add(Buttons(refresh, saveDraft));
+        saveDraft.Click += async (_, _) => await SaveCurrentDraftAsync();
         settings.Children.Add(Labeled("Local speech executable", whisperExe));
         settings.Children.Add(Labeled("Local speech model", whisperModel));
         settings.Children.Add(Labeled("Dictation language", speechLanguage));
@@ -316,7 +319,12 @@ internal sealed class ChatWindow : Window
         draft.TextChanged += (_, _) => UpdateSendAvailability();
         draft.PreviewKeyDown += async (_, e) =>
         {
-            if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control && send.IsEnabled)
+            if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control && saveDraft.IsEnabled)
+            {
+                e.Handled = true;
+                await SaveCurrentDraftAsync();
+            }
+            else if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control && send.IsEnabled)
             {
                 e.Handled = true;
                 await SendAsync();
@@ -354,6 +362,11 @@ internal sealed class ChatWindow : Window
                     Dispatcher.InvokeAsync(async () => await EndDictationAsync(false, true));
                 status.Text = "Finishing the active operation before closing…";
                 return;
+            }
+            if (workspace != null && pending == null && draft.Text != lastSavedDraft &&
+                MessageBox.Show(this, "Close without saving changes to this draft?", "Unsaved draft", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            {
+                e.Cancel = true; closeRequested = false; return;
             }
             workspace?.Dispose();
         };
@@ -636,6 +649,7 @@ internal sealed class ChatWindow : Window
         if (AutomationProperties.GetName(send) != action)
             SetActionIcon(send, pending != null ? "retry" : "send", action);
         refresh.IsEnabled = workspace != null && !busy;
+        saveDraft.IsEnabled = ready && pending == null;
         earlier.IsEnabled = ready;
         bool recording = recorder != null;
         chooseSpeechExe.IsEnabled = chooseSpeechModel.IsEnabled = speechLanguage.IsEnabled = !busy;
@@ -777,7 +791,10 @@ internal sealed class ChatWindow : Window
         {
             workspace = await Task.Run(() => Workspace.Open(path, isNew, characterName, characterIdentity));
             name.Text = workspace.Character.Name; identity.Text = workspace.Character.Identity;
-            ShowRows(await Task.Run(workspace.Recent));
+            var opened = workspace;
+            ShowRows(await Task.Run(opened.Recent));
+            lastSavedDraft = await Task.Run(opened.ReadDraft);
+            if (pending == null) draft.Text = lastSavedDraft;
             configuration.Visibility = Visibility.Collapsed;
             characterTitle.Text = workspace.Character.Name;
             status.Text = pending == null ? "Local workspace ready." : "A saved user message is awaiting a reply.";
@@ -789,6 +806,22 @@ internal sealed class ChatWindow : Window
         }
         finally { Finish(); }
     }
+    private async Task SaveCurrentDraftAsync()
+    {
+        var w = workspace;
+        if (busy || w == null || !historyValid || pending != null || closeRequested) return;
+        string text = draft.Text;
+        busy = true; UpdateControls();
+        try
+        {
+            await Task.Run(() => w.SaveDraft(text));
+            lastSavedDraft = text;
+            status.Text = "Draft saved locally.";
+        }
+        catch (Exception) { status.Text = "Draft could not be saved. Text remains in the composer."; }
+        finally { Finish(); }
+    }
+
     private async Task RefreshAsync()
     {
         var w = workspace;
@@ -893,8 +926,12 @@ internal sealed class ChatWindow : Window
                 { status.Text = "Transcript rejected: size or invalid text. Draft preserved."; return; }
                 draft.Text = next;
                 draft.Select(before.Length + insert.Length, 0);
+                // Keep is an explicit save request. Persist before considering Send.
+                await Task.Run(() => workspace!.SaveDraft(next));
+                lastSavedDraft = next;
+                token.ThrowIfCancellationRequested();
                 sendRequested = sendAfter;
-                status.Text = "Dictation ready to review.";
+                status.Text = "Dictation saved and ready to review.";
             }
         }
         catch (OperationCanceledException) { status.Text = "Dictation cancelled. Draft preserved."; }
@@ -958,6 +995,11 @@ internal sealed class ChatWindow : Window
         bool saved = false;
         try
         {
+            if (pending == null)
+            {
+                await Task.Run(() => w.SaveDraft(text));
+                lastSavedDraft = text;
+            }
             await turn.SendAsync(request, preview: OnFragment, cancellationToken: token);
             saved = true;
             draft.Clear();
@@ -970,6 +1012,7 @@ internal sealed class ChatWindow : Window
             try
             {
                 ShowRows(await Task.Run(w.Recent));
+                lastSavedDraft = await Task.Run(w.ReadDraft);
                 if (!saved && pending == null) draft.Text = text;
             }
             catch (Exception)
