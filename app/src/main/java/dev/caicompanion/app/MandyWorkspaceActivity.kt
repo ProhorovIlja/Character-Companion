@@ -151,6 +151,9 @@ class MandyWorkspaceActivity : Activity() {
     private fun render(s: Snapshot) {
         panel.removeAllViews()
         editor = null
+        panel.addView(button("AI models") { if (editor != null && editor?.text?.toString() != current?.draft?.draft) {
+                status.text = "Save the current draft before opening models."
+            } else startActivity(android.content.Intent(this, MandyModelActivity::class.java)) })
         panel.addView(button("Create character") { editProfile(null) })
         if (s.profiles.isNotEmpty()) panel.addView(button("Characters & conversations") { choose(s) })
         val ticket = s.ticket ?: return
