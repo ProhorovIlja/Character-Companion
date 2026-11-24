@@ -59,6 +59,15 @@ class ModuleCenterActivity : Activity() {
             ViewCompat.setAccessibilityHeading(this, true)
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         root.addView(header)
+        root.addView(Button(this).apply {
+            text = "Mandy AI · Offline workspace"
+            isAllCaps = false
+            setOnClickListener {
+                if (!opening && !isFinishing && !isDestroyed && hasWindowFocus()) {
+                    startActivity(android.content.Intent(this@ModuleCenterActivity, MandyWorkspaceActivity::class.java))
+                }
+            }
+        })
         search = EditText(this).apply {
             setSingleLine(true)
             setHint(R.string.module_center_search)
