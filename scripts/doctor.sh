@@ -50,7 +50,7 @@ else
   echo 'GRADLE_FOUND=NO'; fail=1
 fi
 sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-${HOME}/Android/Sdk}}"
-if [[ -f "${sdk}/platforms/android-37/android.jar" ]]; then
+if [[ -f "${sdk}/platforms/android-37.0/android.jar" ]]; then
   echo 'SDK_37_FOUND=YES'
 else
   echo 'SDK_37_FOUND=NO'; fail=1

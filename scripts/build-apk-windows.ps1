@@ -59,8 +59,8 @@ if (-not (Get-Command $javaExe -ErrorAction SilentlyContinue)) {
 $sdk = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else {
     Join-Path $env:LOCALAPPDATA 'Android\Sdk'
 }
-if (-not (Test-Path -LiteralPath (Join-Path $sdk 'platforms\android-37\android.jar') -PathType Leaf)) {
-    Fail "Android SDK platform 37 not found at '$sdk'. Install that platform first. Android 17 runtime testing is still required."
+if (-not (Test-Path -LiteralPath (Join-Path $sdk 'platforms\android-37.0\android.jar') -PathType Leaf)) {
+    Fail "Android SDK platform 37.0 not found at '$sdk'. Install that platform first. Android 17 runtime testing is still required."
 }
 $task = if ($Flavor -eq 'gecko') { ':app:assembleGeckoDebug' } else { ':app:assembleLegacyDebug' }
 $apk = Join-Path $root "app\build\outputs\apk\$Flavor\debug\app-$Flavor-debug.apk"

@@ -4,7 +4,13 @@ plugins {
 
 android {
     namespace = "dev.caicompanion.app"
-    compileSdk = 37
+    // Android 17 SDK installs under platforms/android-37.0, not android-37.
+    // Pin minor API level 0 to avoid resolving another installed 37.x release.
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 0
+        }
+    }
     defaultConfig {
         applicationId = "dev.caicompanion.app"
         minSdk = 29

@@ -21,8 +21,8 @@ class ManualBuildKit(unittest.TestCase):
         shutil.copyfile(ROOT/'gradle/wrapper/gradle-wrapper.properties',
                         self.root/'gradle/wrapper/gradle-wrapper.properties')
         sdk = self.root/'local-android-sdk'
-        (sdk/'platforms/android-37').mkdir(parents=True)
-        (sdk/'platforms/android-37/android.jar').write_bytes(b'fixture_not_a_real_sdk')
+        (sdk/'platforms/android-37.0').mkdir(parents=True)
+        (sdk/'platforms/android-37.0/android.jar').write_bytes(b'fixture_not_a_real_sdk')
         bin_dir = self.root/'fake-bin'
         bin_dir.mkdir()
         self.gradle = bin_dir/'gradle'

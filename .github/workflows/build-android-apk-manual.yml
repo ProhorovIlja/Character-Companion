@@ -31,18 +31,9 @@ jobs:
           packages: 'platform-tools'
           log-accepted-android-sdk-licenses: 'false'
 
-      - name: Install Android 37 platform and build tools
+      - name: Install Android 37.0 platform and build tools
         shell: bash
-        run: |
-          set -euo pipefail
-          sdkmanager --install 'platforms;android-37' 'build-tools;36.0.0'
-          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
-          if [[ -z "$sdk_root" || ! -s "$sdk_root/platforms/android-37/android.jar" ]]; then
-            echo 'Android SDK platform 37 was not installed correctly.' >&2
-            exit 1
-          fi
-          test -x "$sdk_root/build-tools/36.0.0/apksigner"
-          test -x "$sdk_root/build-tools/36.0.0/aapt"
+        run: bash scripts/install-android37-sdk.sh
 
       - name: Verify pinned Gradle wrapper and build prerequisites
         shell: bash

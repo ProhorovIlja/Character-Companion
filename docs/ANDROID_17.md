@@ -7,7 +7,7 @@
 ## SDK/toolchain compatibility
 
 - Android 17 = **API 37**. Android 17 was publicly released in June 2026. [Android official release](https://developer.android.com/blog/posts/android-17-is-here).
-- After the manual GitHub build #2 failure, this project uses `compileSdk = 37` with AGP 9.1.1 and retains `targetSdk = 36` pending device QA. An Android 17 runtime can normally install apps targeting earlier APIs; running is **not yet tested**.
+- After the manual GitHub build #2 failure, this project uses `compileSdk { version = release(37) { minorApiLevel = 0 } }` with AGP 9.1.1 and retains `targetSdk = 36` pending device QA. An Android 17 runtime can normally install apps targeting earlier APIs; running is **not yet tested**.
 - The build toolchain has been migrated to **AGP 9.1.1**, **Gradle 9.3.1**, and Android SDK Platform 37 after actual GitHub Actions AAR metadata errors. These versions support SDK 37 according to [AGP 9.1 release notes](https://developer.android.com/build/releases/agp-9-1-0-release-notes); actual compilation and physical Android 17 compatibility remain unverified.
 - Android 17 adds changes to audio focus/background playback and, when targeting API 37, certificate transparency and mandatory large-screen resizability. This app does not start a background audio service. Validate Character.AI's browser-controlled audio/voice features while foregrounded. [All apps](https://developer.android.com/about/versions/17/behavior-changes-all), [Target API 37](https://developer.android.com/about/versions/17/behavior-changes-17).
 - Manifest marks the Activity as resizeable and does not lock orientation; device rotation, IME insets, split screen, and edge-to-edge padding require on-device tests.
@@ -48,3 +48,11 @@ The native library can create and rename sanitized first-party bookmarks without
 ## v0.16 lazy WebView, pending Android 17 device test
 
 Native library cold start now avoids WebView inflation and cookie-manager initialization. Compare first frame, Java/native memory and return-to-browser behavior against v0.15 on LineageOS Android 17. Validate with both a functional WebView provider and a test environment with an unavailable provider. No device results or Play Protect outcomes are claimed.
+
+**SDK Manager package naming (manual build #3):** Android 17's API 37.0 platform is
+`platforms;android-37.0`, installed at `platforms/android-37.0/android.jar`.
+The unsuffixed `platforms;android-37` identifier does not exist in the SDK package index.
+With AGP 9.1.1 this project explicitly pins `release(37) { minorApiLevel = 0 }`
+to match that SDK. The repository's manual workflow installs 37.0; users can
+run `sdkmanager --install 'platforms;android-37.0' 'build-tools;36.0.0'`.
+Do not rename platform directories or copy `android.jar` from another platform.
