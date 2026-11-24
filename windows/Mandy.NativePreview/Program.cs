@@ -9,6 +9,7 @@ using System.Windows.Input;
 using System.Windows.Automation;
 using Microsoft.Win32;
 using CharacterCompanion.Windows.Intelligence;
+using CharacterCompanion.Windows.Speech;
 
 namespace Mandy.NativePreview;
 
@@ -58,6 +59,22 @@ internal sealed class ChatWindow : Window
     private readonly Button send = new() { Content = "Send", IsEnabled = false };
     private readonly Button stop = new() { Content = "Stop", IsEnabled = false };
     private readonly Button refresh = new() { Content = "Refresh", IsEnabled = false };
+    private readonly Button dictate = new() { IsEnabled = false };
+    private readonly Button keepSpeech = new() { Content = "Stop · keep draft" };
+    private readonly Button sendSpeech = new() { Content = "Stop · send" };
+    private readonly Button cancelSpeech = new() { Content = "Cancel" };
+    private readonly TextBox whisperExe = new() { IsReadOnly = true };
+    private readonly TextBox whisperModel = new() { IsReadOnly = true };
+    private readonly ComboBox speechLanguage = new() { ItemsSource = new[] { "auto", "en", "ru" }, SelectedIndex = 0 };
+    private readonly Button chooseSpeechExe = new() { Content = "Choose whisper-cli.exe" };
+    private readonly Button chooseSpeechModel = new() { Content = "Choose speech model" };
+    private FrameworkElement? speechActions;
+    private FrameworkElement? normalMedia;
+    private MicrophoneRecorder? recorder;
+    private bool speechFinishing;
+    private string recordingDraft = "";
+    private int recordingStart, recordingLength;
+    private string speechExePath = "", speechModelPath = "", recordingLanguage = "auto";
     private sealed record MessageRow(string Author, string Text, bool IsUser);
     private Workspace? workspace;
     private LocalHistory.Event? pending;
@@ -104,6 +121,12 @@ internal sealed class ChatWindow : Window
         settings.Children.Add(Labeled("Loopback port", port));
         settings.Children.Add(Labeled("Local server API key (not saved)", key));
         settings.Children.Add(Buttons(refresh));
+        settings.Children.Add(Labeled("Local speech executable", whisperExe));
+        settings.Children.Add(Labeled("Local speech model", whisperModel));
+        settings.Children.Add(Labeled("Dictation language", speechLanguage));
+        settings.Children.Add(Buttons(chooseSpeechExe, chooseSpeechModel));
+        chooseSpeechExe.Click += (_, _) => PickSpeechFile(true);
+        chooseSpeechModel.Click += (_, _) => PickSpeechFile(false);
         var composer = new StackPanel { Margin = new Thickness(0,8,0,0), MaxWidth = 800 };
         DockPanel.SetDock(composer, Dock.Bottom);
         layout.Children.Add(composer);
@@ -174,8 +197,20 @@ internal sealed class ChatWindow : Window
         var primaryActions = Buttons(send, stop);
         DockPanel.SetDock(primaryActions, Dock.Right);
         composerActions.Children.Add(primaryActions);
-        var mediaActions = Buttons(Unavailable("attach", "Attach", "Multimodal attachments are not implemented in this preview."),
-            Unavailable("mic", "Dictate", "Native speech recognition is not connected to this workspace yet."));
+        SetActionIcon(dictate, "mic", "Dictate");
+        var mediaActions = Buttons(Unavailable("attach", "Attach", "Multimodal attachments are not implemented in this preview."), dictate);
+        normalMedia = mediaActions;
+        speechActions = Buttons(cancelSpeech, keepSpeech, sendSpeech);
+        speechActions.Visibility = Visibility.Collapsed;
+        composerContent.Children.Add(speechActions);
+        dictate.Click += (_, _) => StartDictation();
+        keepSpeech.Click += async (_, _) => await EndDictationAsync(false, false);
+        sendSpeech.Click += async (_, _) => await EndDictationAsync(true, false);
+        cancelSpeech.Click += async (_, _) =>
+        {
+            if (speechFinishing) { operation?.Cancel(); cancelSpeech.IsEnabled = false; }
+            else await EndDictationAsync(false, true);
+        };
         DockPanel.SetDock(mediaActions, Dock.Left);
         composerActions.Children.Add(mediaActions);
         composerContent.Children.Add(composerActions);
@@ -264,7 +299,12 @@ internal sealed class ChatWindow : Window
         };
         PreviewKeyDown += (_, e) =>
         {
-            if (e.Key == Key.Escape && stop.IsEnabled)
+            if (e.Key == Key.Escape && recorder != null && cancelSpeech.IsEnabled)
+            {
+                e.Handled = true;
+                cancelSpeech.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            }
+            else if (e.Key == Key.Escape && stop.IsEnabled)
             {
                 e.Handled = true;
                 stop.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -285,6 +325,7 @@ internal sealed class ChatWindow : Window
             if (busy)
             {
                 e.Cancel = true; closeRequested = true; operation?.Cancel();
+                if (recorder != null && !speechFinishing) _ = EndDictationAsync(false, true);
                 status.Text = "Finishing the active operation before closing…";
                 return;
             }
@@ -569,9 +610,16 @@ internal sealed class ChatWindow : Window
         if (AutomationProperties.GetName(send) != action)
             SetActionIcon(send, pending != null ? "retry" : "send", action);
         refresh.IsEnabled = workspace != null && !busy;
-        stop.IsEnabled = busy && operation != null && !operation.IsCancellationRequested;
-        stop.Visibility = busy && operation != null ? Visibility.Visible : Visibility.Collapsed;
-        send.Visibility = busy && operation != null ? Visibility.Collapsed : Visibility.Visible;
+        bool recording = recorder != null;
+        chooseSpeechExe.IsEnabled = chooseSpeechModel.IsEnabled = speechLanguage.IsEnabled = !busy;
+        dictate.IsEnabled = ready && pending == null;
+        if (normalMedia != null) normalMedia.Visibility = recording ? Visibility.Collapsed : Visibility.Visible;
+        if (speechActions != null) speechActions.Visibility = recording ? Visibility.Visible : Visibility.Collapsed;
+        keepSpeech.IsEnabled = sendSpeech.IsEnabled = recording && !speechFinishing;
+        cancelSpeech.IsEnabled = recording && operation?.IsCancellationRequested != true;
+        stop.IsEnabled = !recording && busy && operation != null && !operation.IsCancellationRequested;
+        stop.Visibility = !recording && busy && operation != null ? Visibility.Visible : Visibility.Collapsed;
+        send.Visibility = recording || (busy && operation != null) ? Visibility.Collapsed : Visibility.Visible;
     }
     private void UpdateSendAvailability() => send.IsEnabled = workspace != null && historyValid && !busy &&
         (pending != null || !string.IsNullOrWhiteSpace(draft.Text));
@@ -626,7 +674,116 @@ internal sealed class ChatWindow : Window
         catch (Exception) { historyValid = false; status.Text = "History unavailable. Sending disabled until refresh succeeds."; }
         finally { Finish(); }
     }
-    private async Task SendAsync()
+    private void PickSpeechFile(bool executable)
+    {
+        if (busy) return;
+        var picker = new OpenFileDialog
+        {
+            Filter = executable ? "Whisper CLI (whisper-cli.exe)|whisper-cli.exe" : "Whisper GGML model (*.bin)|*.bin",
+            CheckFileExists = true,
+            Title = executable ? "Choose trusted local whisper.cpp executable" : "Choose trusted multilingual speech model"
+        };
+        if (picker.ShowDialog(this) != true) return;
+        if (executable)
+        {
+            if (!Path.GetFileName(picker.FileName).Equals("whisper-cli.exe", StringComparison.OrdinalIgnoreCase)) return;
+            if (MessageBox.Show(this, "This executable will run with your Windows permissions. Only select a verified trusted whisper.cpp release. Use this executable for local dictation?", "Mandy AI", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
+            whisperExe.Text = picker.FileName;
+        }
+        else whisperModel.Text = picker.FileName;
+    }
+
+    private void StartDictation()
+    {
+        if (busy || workspace == null || !historyValid || pending != null || closeRequested) return;
+        if (!File.Exists(whisperExe.Text) || !File.Exists(whisperModel.Text))
+        {
+            configuration.Visibility = Visibility.Visible;
+            status.Text = "Choose a trusted whisper-cli.exe and multilingual GGML model in Settings.";
+            return;
+        }
+        var capture = new MicrophoneRecorder();
+        try
+        {
+            recordingDraft = draft.Text;
+            recordingStart = draft.SelectionStart;
+            recordingLength = draft.SelectionLength;
+            speechExePath = whisperExe.Text;
+            speechModelPath = whisperModel.Text;
+            recordingLanguage = speechLanguage.SelectedItem as string ?? "auto";
+            capture.Start();
+            recorder = capture;
+            busy = true;
+            operation = new CancellationTokenSource();
+            speechFinishing = false;
+            configuration.Visibility = Visibility.Collapsed;
+            UpdateControls();
+            status.Text = "Recording locally · maximum 3 minutes";
+        }
+        catch (Exception)
+        {
+            capture.Dispose();
+            MicrophoneRecorder.EraseTemporaryRecording(capture.FilePath);
+            recorder = null;
+            Finish();
+            status.Text = "Microphone could not start. Draft preserved.";
+        }
+    }
+
+    private async Task EndDictationAsync(bool sendAfter, bool discard)
+    {
+        var capture = recorder;
+        if (capture == null || speechFinishing) return;
+        speechFinishing = true;
+        var token = operation?.Token ?? CancellationToken.None;
+        UpdateControls();
+        string? wav = null;
+        bool sendRequested = false;
+        try
+        {
+            if (discard)
+            {
+                await capture.CancelAsync();
+                status.Text = "Recording cancelled. Draft preserved.";
+            }
+            else
+            {
+                status.Text = "Transcribing locally…";
+                wav = await capture.StopAsync();
+                token.ThrowIfCancellationRequested();
+                var transcript = await WhisperCliTranscriber.TranscribeAsync(speechExePath, speechModelPath, wav, recordingLanguage, token);
+                token.ThrowIfCancellationRequested();
+                if (closeRequested || draft.Text != recordingDraft || workspace == null || pending != null) return;
+                var before = recordingDraft[..recordingStart];
+                var after = recordingDraft[(recordingStart + recordingLength)..];
+                string insert = (before.Length > 0 && !char.IsWhiteSpace(before[^1]) ? " " : "") +
+                    transcript + (after.Length > 0 && !char.IsWhiteSpace(after[0]) ? " " : "");
+                string next = before + insert + after;
+                if (next.Length > draft.MaxLength || string.IsNullOrWhiteSpace(next) ||
+                    next.Any(c => char.IsControl(c) && c != '\\r' && c != '\\n' && c != '\\t'))
+                { status.Text = "Transcript rejected: size or invalid text. Draft preserved."; return; }
+                draft.Text = next;
+                draft.Select(before.Length + insert.Length, 0);
+                sendRequested = sendAfter;
+                status.Text = "Dictation ready to review.";
+            }
+        }
+        catch (OperationCanceledException) { status.Text = "Dictation cancelled. Draft preserved."; }
+        catch (Exception) { status.Text = "Local transcription failed. Draft preserved."; }
+        finally
+        {
+            capture.Dispose();
+            MicrophoneRecorder.EraseTemporaryRecording(wav ?? capture.FilePath);
+            recorder = null;
+            speechFinishing = false;
+            recordingDraft = speechExePath = speechModelPath = "";
+            Finish();
+        }
+        if (sendRequested && !closeRequested && !token.IsCancellationRequested)
+            await SendAsync("dictation");
+    }
+
+    private async Task SendAsync(string mode = "text")
     {
         var w = workspace;
         if (busy || !historyValid || w == null) return;
@@ -639,7 +796,7 @@ internal sealed class ChatWindow : Window
         var text = pending?.Text ?? draft.Text;
         if (string.IsNullOrWhiteSpace(text)) { status.Text = "Enter a message."; return; }
         var request = new LocalChatTurn.Request(p.Account,p.Device,p.Character,p.Chat,
-            pending?.Id ?? Guid.NewGuid().ToString(),text,p.Identity,pending?.Mode ?? "text");
+            pending?.Id ?? Guid.NewGuid().ToString(),text,p.Identity,pending?.Mode ?? mode);
         var turn = new LocalChatTurn(w.Database, client);
         busy = true; operation = new CancellationTokenSource(); UpdateControls();
         status.Text = "Generating locally…";
