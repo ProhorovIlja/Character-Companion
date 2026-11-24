@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PlatformTarget>x64</PlatformTarget>
+    <StartupObject>Mandy.NativePreview.Program</StartupObject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.15" />
+    <Compile Include="../CharacterCompanion.Windows/Intelligence/LocalHistory.cs" Link="LocalHistory.cs" />
+    <Compile Include="../CharacterCompanion.Windows/Intelligence/LocalInferenceClient.cs" Link="LocalInferenceClient.cs" />
+    <Compile Include="../CharacterCompanion.Windows/Intelligence/LocalChatTurn.cs" Link="LocalChatTurn.cs" />
+  </ItemGroup>
+</Project>
