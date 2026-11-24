@@ -614,8 +614,18 @@ class MainActivity : Activity() {
     }
 
     private fun showPageMenu(anchor: View) {
-        val ready = ::webView.isInitialized && !destroyed && !rendererNeedsNavigation
+        val ready = ::webView.isInitialized && !destroyed && !rendererDisposed && !rendererNeedsNavigation
+        val viewAtMenu = if (ready) webView else null
+        val chatAtMenu = VoiceComposerPolicy.chatPage(viewAtMenu?.url)
         ShellMenu.show(this, anchor, listOf(
+            ShellMenu.Action(if (chatAtMenu != null) R.string.refresh_current_chat else R.string.reload,
+                ready && nativeHub == null) {
+                if (viewAtMenu != null && !destroyed && !rendererDisposed && !rendererNeedsNavigation &&
+                    activityResumed && nativeHub == null && viewAtMenu === webView &&
+                    (chatAtMenu == null || chatAtMenu == VoiceComposerPolicy.chatPage(viewAtMenu.url))) {
+                    viewAtMenu.reload()
+                }
+            },
             ShellMenu.Action(R.string.settings) { showSettings() },
             ShellMenu.Action(R.string.release_center) { ReleaseCenter.show(this) },
             ShellMenu.Action(R.string.free_experience_title) { FreeExperienceHelp.show(this) },
@@ -623,7 +633,6 @@ class MainActivity : Activity() {
             ShellMenu.Action(R.string.character_draft_title) { startActivity(Intent(this, CharacterDraftActivity::class.java)) },
             ShellMenu.Action(R.string.engine_use_gecko, BuildConfig.FLAVOR == "gecko") { returnToGecko() },
             ShellMenu.Action(R.string.forward, ready && webView.canGoForward()) { webView.goForward() },
-            ShellMenu.Action(R.string.reload, ready) { webView.reload() },
             ShellMenu.Action(R.string.shell_refresh_cache, ready) {
                 webView.clearCache(true); webView.reload(); showToast(getString(R.string.cache_refreshed))
             },

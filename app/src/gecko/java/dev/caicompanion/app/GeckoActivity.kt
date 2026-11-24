@@ -229,7 +229,15 @@ class GeckoActivity : Activity() {
 
     private fun showPageMenu(anchor: View) {
         val ready = sessionReady()
+        val sessionAtMenu = if (ready) session else null
+        val chatAtMenu = if (ready) VoiceComposerPolicy.chatPage(activeUrl) else null
         ShellMenu.show(this, anchor, listOf(
+            ShellMenu.Action(if (chatAtMenu != null) R.string.refresh_current_chat else R.string.reload, ready) {
+                if (sessionAtMenu != null && started && sessionReady() && sessionAtMenu === session &&
+                    (chatAtMenu == null || chatAtMenu == VoiceComposerPolicy.chatPage(activeUrl))) {
+                    sessionAtMenu.reload()
+                }
+            },
             ShellMenu.Action(R.string.settings) { showGeckoSettings() },
             ShellMenu.Action(R.string.release_center) { ReleaseCenter.show(this) },
             ShellMenu.Action(R.string.free_experience_title) { FreeExperienceHelp.show(this) },
@@ -239,7 +247,6 @@ class GeckoActivity : Activity() {
             ShellMenu.Action(R.string.gecko_legacy) { confirmWebViewSwitch() },
             ShellMenu.Action(R.string.device_compat_title) { DeviceRuntimeProbe.show(this, "gecko") },
             ShellMenu.Action(R.string.forward, ready && canGoForward) { session.goForward() },
-            ShellMenu.Action(R.string.reload, ready) { session.reload() },
             ShellMenu.Action(R.string.bookmark_add, ready) { saveCurrentBookmark() },
             ShellMenu.Action(R.string.share, ready) { shareSafeUrl() },
             ShellMenu.Action(if (settings.blocking) R.string.shell_disable_shield else R.string.shell_enable_shield) {
