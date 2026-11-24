@@ -23,6 +23,10 @@ fun main() {
             val fragments = StringBuilder()
             verify(it.generate(messages("normal"), onText = { part -> fragments.append(part) }) == "Hello 🌙" && fragments.toString() == "Hello 🌙")
             verify(it.generate(messages("unicode-input", "Мэнди 🌙"), onText = {}) == "Hello 🌙")
+            verify(it.generate(messages("profile-low"), contextTokens = 2048, outputTokens = 256, threads = 2, onText = {}) == "Hello 🌙")
+            verify(it.generate(messages("profile-quality"), contextTokens = 6144, outputTokens = 768, threads = 6, onText = {}) == "Hello 🌙")
+            bad { it.generate(messages("normal"), threads = 0, onText = {}) }
+            bad { it.generate(messages("normal"), threads = 9, onText = {}) }
             val history = messages("earlier") + listOf(NativeConversation.Message("assistant", "reply"), NativeConversation.Message("user", "history"))
             verify(it.generate(history, onText = {}) == "Hello 🌙")
             for (input in listOf("bad-template", "overflow", "decode-error", "bad-utf8", "empty")) {

@@ -59,7 +59,7 @@ fun main() {
         verify(w.state(t.key).draft == "new draft" && w.state(t.key).pending == null)
         val bt = w.select(NativeChatWorkspace.Key(b.id, b.chats.single().id))
         verify(runCatching { send() }.isFailure)
-        w.edit(bt, "normal")
+        w.edit(bt, "profile-quality")
         val third = w.prepare(bt)
         verify(runCatching { send(bt, "0".repeat(64)) }.isFailure)
         verify(w.state(bt.key).pending == third && h.find(NativeConversation.replyId(third.id)) == null)
@@ -70,7 +70,7 @@ fun main() {
         verify(denied is ModelAdmission.Denied && admitted == 1)
         verify(w.state(bt.key).pending == third && h.find(third.id) != null && h.find(NativeConversation.replyId(third.id)) == null)
         verify(EmbeddedChatTurn.sendWithMemory(w, bt, chars, h, models, m.sha256, memory,
-            admit = { model -> check(model == m); admitted++ }, onText = { _, _ -> }).character == b.id)
+            admit = { model -> check(model == m); admitted++ }, preset = InferencePreset.QUALITY, onText = { _, _ -> }).character == b.id)
         verify(admitted == 2)
         verify(h.recent(a.id, t.key.chat, 20).size == 4 && h.recent(b.id, bt.key.chat, 20).size == 2)
         w.edit(bt, "normal")

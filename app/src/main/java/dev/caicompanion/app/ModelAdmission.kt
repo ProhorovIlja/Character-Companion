@@ -13,11 +13,12 @@ object ModelAdmission {
         val allowed: Boolean get() = reason == Reason.ALLOWED
     }
     class Denied(val decision: Decision) : IOException("Local model load refused: " + decision.reason.name)
-    fun evaluate(modelBytes: Long, memory: Memory): Decision {
-        if (modelBytes <= 0 || memory.total <= 0 || memory.available !in 0..memory.total || memory.threshold !in 0..memory.total)
+    fun evaluate(modelBytes: Long, memory: Memory, contextTokens: Int = 4096): Decision {
+        if (contextTokens !in 512..8192 || modelBytes <= 0 || memory.total <= 0 || memory.available !in 0..memory.total || memory.threshold !in 0..memory.total)
             return Decision(Reason.INVALID_METRICS, 0, memory.available)
         val reserve = maxOf(MIN_SYSTEM_RESERVE, memory.threshold)
-        val required = try { Math.addExact(Math.addExact(modelBytes, WORKSPACE_ALLOWANCE), reserve) }
+        val workspace = WORKSPACE_ALLOWANCE * maxOf(4096, contextTokens) / 4096
+        val required = try { Math.addExact(Math.addExact(modelBytes, workspace), reserve) }
             catch (_: ArithmeticException) { return Decision(Reason.INSUFFICIENT_HEADROOM, Long.MAX_VALUE, memory.available) }
         val reason = when {
             memory.low || memory.available <= memory.threshold -> Reason.LOW_MEMORY
@@ -26,8 +27,8 @@ object ModelAdmission {
         }
         return Decision(reason, required, memory.available)
     }
-    fun requireAllowed(modelBytes: Long, memory: Memory) {
-        val decision = evaluate(modelBytes, memory)
+    fun requireAllowed(modelBytes: Long, memory: Memory, contextTokens: Int = 4096) {
+        val decision = evaluate(modelBytes, memory, contextTokens)
         if (!decision.allowed) throw Denied(decision)
     }
 }

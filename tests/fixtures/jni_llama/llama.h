@@ -16,6 +16,7 @@ struct llama_context_params { uint32_t n_ctx, n_batch, n_ubatch, n_seq_max; int 
 struct llama_chat_message { const char * role; const char * content; };
 struct llama_batch { llama_token * tokens; int count; };
 inline int live_contexts = 0, live_samplers = 0;
+inline int expected_context = 0, expected_threads = 0;
 inline void llama_log_set(void (*)(ggml_log_level, const char *, void *), void *) {}
 inline void llama_backend_init() {}
 inline llama_model_params llama_model_default_params() { return {}; }
@@ -36,13 +37,15 @@ inline int llama_chat_apply_template(const char *, const llama_chat_message * ch
 inline const llama_vocab * llama_model_get_vocab(const llama_model * p) { return &p->vocab; }
 inline int llama_tokenize(const llama_vocab *, const char * text, int n, llama_token * out, int capacity, bool, bool) {
     std::string s(text, n);
+    expected_context = s == "profile-low" ? 2048 : s == "profile-quality" ? 6144 : 0;
+    expected_threads = s == "profile-low" ? 2 : s == "profile-quality" ? 6 : 0;
     if (s == "overflow") return -capacity - 1;
     out[0] = s == "decode-error" ? 91 : s == "limit" ? 92 : s == "bad-utf8" ? 93 : s == "empty" ? 94 : s == "large-piece" ? 95 : 90;
     return 1;
 }
 inline int llama_model_n_ctx_train(const llama_model *) { return 8192; }
 inline llama_context_params llama_context_default_params() { return {}; }
-inline llama_context * llama_init_from_model(llama_model *, llama_context_params p) { assert(live_contexts == 0); ++live_contexts; return new llama_context{p.n_ctx}; }
+inline llama_context * llama_init_from_model(llama_model *, llama_context_params p) { assert(live_contexts == 0); assert(p.n_threads >= 1 && p.n_threads <= 8 && p.n_threads == p.n_threads_batch); if (expected_context) assert(p.n_ctx == static_cast<uint32_t>(expected_context) && p.n_threads == expected_threads); ++live_contexts; return new llama_context{p.n_ctx}; }
 inline void llama_free(llama_context * p) { --live_contexts; delete p; }
 inline uint32_t llama_n_ctx(const llama_context * p) { return p->n; }
 inline llama_batch llama_batch_get_one(llama_token * p, int n) { return {p, n}; }

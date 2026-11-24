@@ -95,11 +95,11 @@ Java_dev_caicompanion_app_EmbeddedLlama_nativeClose(JNIEnv *, jobject, jlong han
     if (handle) llama_model_free(reinterpret_cast<llama_model *>(static_cast<intptr_t>(handle)));
 }
 extern "C" JNIEXPORT void JNICALL
-Java_dev_caicompanion_app_EmbeddedLlama_nativeGenerate(JNIEnv * env, jobject, jlong handle,
-        jobjectArray roles, jobjectArray contents, jint context_tokens, jint output_tokens, jint seed, jobject sink) {
+Java_dev_caicompanion_app_EmbeddedLlama_nativeGenerateV2(JNIEnv * env, jobject, jlong handle,
+        jobjectArray roles, jobjectArray contents, jint context_tokens, jint output_tokens, jint seed, jint threads, jobject sink) {
     try {
         auto * model = reinterpret_cast<llama_model *>(static_cast<intptr_t>(handle));
-        require(model && roles && contents && context_tokens >= 512 && context_tokens <= 8192 &&
+        require(model && roles && contents && threads >= 1 && threads <= 8 && context_tokens >= 512 && context_tokens <= 8192 &&
                 output_tokens > 0 && output_tokens <= 1024 && output_tokens < context_tokens);
         Callbacks cb(env, sink);
         cb.check();
@@ -135,8 +135,8 @@ Java_dev_caicompanion_app_EmbeddedLlama_nativeGenerate(JNIEnv * env, jobject, jl
         params.n_batch = 256;
         params.n_ubatch = 128;
         params.n_seq_max = 1;
-        params.n_threads = 4;
-        params.n_threads_batch = 4;
+        params.n_threads = threads;
+        params.n_threads_batch = threads;
         params.offload_kqv = false;
         params.op_offload = false;
         Context ctx(llama_init_from_model(model, params), llama_free);

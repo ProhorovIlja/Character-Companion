@@ -58,12 +58,12 @@ class MandyWorkspaceActivity : Activity() {
     private lateinit var sendSpeech: Button
     private var resumed = false
     /** Sample system memory only during explicitly requested local inference. */
-    private fun admitModel(model: NativeModelLibrary.Model) {
+    private fun admitModel(model: NativeModelLibrary.Model, contextTokens: Int) {
         val manager = applicationContext.getSystemService(android.app.ActivityManager::class.java)
             ?: throw ModelAdmission.Denied(ModelAdmission.Decision(ModelAdmission.Reason.INVALID_METRICS, 0, 0))
         val info = android.app.ActivityManager.MemoryInfo()
         manager.getMemoryInfo(info)
-        ModelAdmission.requireAllowed(model.bytes, ModelAdmission.Memory(info.availMem, info.totalMem, info.threshold, info.lowMemory))
+        ModelAdmission.requireAllowed(model.bytes, ModelAdmission.Memory(info.availMem, info.totalMem, info.threshold, info.lowMemory), contextTokens)
     }
     private fun admissionMessage(error: ModelAdmission.Denied): String {
         val decision = error.decision
@@ -73,6 +73,20 @@ class MandyWorkspaceActivity : Activity() {
             else -> "Conservative memory check refused model. Available " + decision.available / ModelAdmission.MIB +
                 " MiB; estimated minimum " + decision.required / ModelAdmission.MIB + " MiB."
         }
+    }
+    private fun performancePrefs() = getSharedPreferences("mandy_performance_v1", MODE_PRIVATE)
+    private fun performancePreset() = InferencePreset.fromKey(runCatching {
+        performancePrefs().getString("preset", null)
+    }.getOrNull())
+    private fun choosePerformancePreset() {
+        val presets = InferencePreset.entries
+        val labels = presets.map { it.label + " · " + it.contextTokens + " context / " +
+            it.outputTokens + " output · " + it.threads + " CPU threads" }.toTypedArray()
+        AlertDialog.Builder(this).setTitle("Local inference preset (experimental)")
+            .setSingleChoiceItems(labels, presets.indexOf(performancePreset())) { dialog, index ->
+                dialog.dismiss()
+                saveAnd { check(performancePrefs().edit().putString("preset", presets[index].key).commit()) }
+            }.setNegativeButton(android.R.string.cancel, null).show()
     }
     private fun modelLibrary() = NativeModelLibrary(applicationContext.noBackupFilesDir.toPath().resolve("mandy-models-v1"))
     private fun dp(n: Int) = (n * resources.displayMetrics.density + .5f).toInt()
@@ -217,6 +231,7 @@ class MandyWorkspaceActivity : Activity() {
         panel.addView(button("AI models") { if (editor != null && editor?.text?.toString() != current?.draft?.draft) {
                 status.text = "Save the current draft before opening models."
             } else startActivity(android.content.Intent(this, MandyModelActivity::class.java)) })
+        if (BuildConfig.MANDY_EMBEDDED_PREVIEW) panel.addView(button("Performance · " + performancePreset().label) { choosePerformancePreset() })
         panel.addView(button("Create character") { editProfile(null) })
         if (s.profiles.isNotEmpty()) panel.addView(button("Characters & conversations") { choose(s) })
         val ticket = s.ticket ?: return
@@ -259,16 +274,17 @@ class MandyWorkspaceActivity : Activity() {
         val ticket = s.ticket ?: return
         val draft = editor?.text?.toString() ?: return
         if (s.draft.pending == null && draft.isBlank()) { editor?.error = "Enter a message"; return }
+        val preset = performancePreset()
         val labels = s.models.map { it.sha256 + "\nBytes: " + it.bytes }.toTypedArray()
         AlertDialog.Builder(this).setTitle("Choose a trusted local model").setItems(labels) { _, index ->
             val model = s.models[index]
             AlertDialog.Builder(this).setTitle("Experimental inference")
-                .setMessage("Only continue if you trust the publisher of this file. Real model compatibility is not yet verified. This may be slow or fail. No network fallback.\nSHA-256: " + model.sha256)
+                .setMessage("Only continue if you trust the publisher of this file. Real model compatibility is not yet verified. This may be slow or fail. No network fallback.\nPreset: " + preset.label + "\nSHA-256: " + model.sha256)
                 .setNegativeButton(android.R.string.cancel, null)
-                .setPositiveButton("Generate locally") { _, _ -> generate(ticket, draft, model.sha256, s.draft.pending != null, mode) }.show()
+                .setPositiveButton("Generate locally") { _, _ -> generate(ticket, draft, model.sha256, s.draft.pending != null, mode, preset) }.show()
         }.setNegativeButton(android.R.string.cancel, null).show()
     }
-    private fun generate(ticket: NativeChatWorkspace.Ticket, draft: String, sha: String, retry: Boolean, mode: String) {
+    private fun generate(ticket: NativeChatWorkspace.Ticket, draft: String, sha: String, retry: Boolean, mode: String, preset: InferencePreset) {
         if (busy || !alive() || !BuildConfig.MANDY_EMBEDDED_PREVIEW || current?.ticket != ticket) return
         busy = true
         stopped.set(false)
@@ -288,7 +304,7 @@ class MandyWorkspaceActivity : Activity() {
                 saved = true
                 if (!retry) workspace.prepare(ticket, mode)
                 AndroidConversationStore(applicationContext, account).use { history ->
-                    EmbeddedChatTurn.sendWithMemory(workspace, ticket, library, history, modelLibrary(), sha, memory, stopped::get, admit = ::admitModel) { origin, part ->
+                    EmbeddedChatTurn.sendWithMemory(workspace, ticket, library, history, modelLibrary(), sha, memory, stopped::get, admit = { admitModel(it, preset.contextTokens) }, preset = preset) { origin, part ->
                         text.append(part)
                         val now = System.nanoTime()
                         if (now - lastUpdate >= 100_000_000L) {
@@ -500,6 +516,7 @@ class MandyWorkspaceActivity : Activity() {
         suspendInputs(panel, states)
         cancelGeneration.visibility = View.VISIBLE
         cancelGeneration.isEnabled = true
+        val preset = performancePreset()
         status.text = "Assessing latest completed dialogue…"
         disk.execute {
             val result = runCatching {
@@ -507,8 +524,9 @@ class MandyWorkspaceActivity : Activity() {
                 AndroidConversationStore(applicationContext, account).use { history ->
                     val state = memory.get(ticket.key.character)
                     val generate: (List<NativeConversation.Message>, () -> Boolean) -> String = { messages, stop ->
-                        EmbeddedLlama.open(modelLibrary(), sha, stop, admit = ::admitModel).use { engine ->
-                            engine.generate(messages, outputTokens = 384, cancelled = stop, onText = {})
+                        EmbeddedLlama.open(modelLibrary(), sha, stop, admit = { admitModel(it, preset.contextTokens) }).use { engine ->
+                            engine.generate(messages, contextTokens = preset.contextTokens, outputTokens = minOf(384, preset.outputTokens),
+                                cancelled = stop, threads = preset.threads, onText = {})
                         }
                     }
                     if (forMemory) {

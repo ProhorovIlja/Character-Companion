@@ -8,8 +8,8 @@ class EmbeddedLlama private constructor() : Closeable {
     private var handle = 0L
     private var generating = false
     private external fun nativeLoad(path: ByteArray): Long
-    private external fun nativeGenerate(handle: Long, roles: Array<ByteArray>, contents: Array<ByteArray>,
-                                        contextTokens: Int, outputTokens: Int, seed: Int, sink: EmbeddedTextSink)
+    private external fun nativeGenerateV2(handle: Long, roles: Array<ByteArray>, contents: Array<ByteArray>,
+                                        contextTokens: Int, outputTokens: Int, seed: Int, threads: Int, sink: EmbeddedTextSink)
     private external fun nativeClose(handle: Long)
 
     companion object {
@@ -32,8 +32,9 @@ class EmbeddedLlama private constructor() : Closeable {
     }
     @Synchronized fun generate(messages: List<NativeConversation.Message>, contextTokens: Int = 4096,
                               outputTokens: Int = 512, seed: Int = -1,
-                              cancelled: () -> Boolean = { false }, onText: (String) -> Unit): String {
+                              cancelled: () -> Boolean = { false }, threads: Int = 4, onText: (String) -> Unit): String {
         check(handle != 0L && !generating)
+        require(threads in 1..8)
         require(contextTokens in 512..8192 && outputTokens in 1..1024 && outputTokens < contextTokens)
         require(messages.size in 2..201 && messages.first().role == "system" && messages.last().role == "user")
         require(messages.drop(1).all { it.role == "user" || it.role == "assistant" })
@@ -43,8 +44,8 @@ class EmbeddedLlama private constructor() : Closeable {
         if (sink.isCancelled()) throw IOException("Generation cancelled")
         generating = true
         try {
-            nativeGenerate(handle, messages.map { it.role.toByteArray(Charsets.UTF_8) }.toTypedArray(),
-                messages.map { it.content.toByteArray(Charsets.UTF_8) }.toTypedArray(), contextTokens, outputTokens, seed, sink)
+            nativeGenerateV2(handle, messages.map { it.role.toByteArray(Charsets.UTF_8) }.toTypedArray(),
+                messages.map { it.content.toByteArray(Charsets.UTF_8) }.toTypedArray(), contextTokens, outputTokens, seed, threads, sink)
             return sink.finish()
         } finally { generating = false }
     }

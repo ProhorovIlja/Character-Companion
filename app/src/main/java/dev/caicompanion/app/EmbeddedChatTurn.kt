@@ -12,6 +12,7 @@ object EmbeddedChatTurn {
                        characters: NativeCharacterLibrary, history: NativeConversation.History,
                        models: NativeModelLibrary, trustedSha: String, memory: NativeCharacterMemory?,
                        cancelled: () -> Boolean = { false }, admit: (NativeModelLibrary.Model) -> Unit = {},
+                       preset: InferencePreset = InferencePreset.BALANCED,
                        onText: (NativeChatWorkspace.Ticket, String) -> Unit): NativeConversation.Event {
         require(trustedSha.matches(Regex("[0-9a-f]{64}")))
         val profile = characters.resolve(ticket.key)
@@ -21,7 +22,8 @@ object EmbeddedChatTurn {
         return workspace.sendPending(ticket, history, identity, cancelled, onText) { messages, stop, emit ->
             // Open only if inference is needed. A completed retry needs no model load.
             EmbeddedLlama.open(models, trustedSha, stop, admit).use { engine ->
-                engine.generate(messages, cancelled = stop, onText = emit)
+                engine.generate(messages, contextTokens = preset.contextTokens, outputTokens = preset.outputTokens,
+                    cancelled = stop, threads = preset.threads, onText = emit)
             }
         }
     }
