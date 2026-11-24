@@ -11,4 +11,13 @@ object BrowserSessionPolicy {
 
     /** Always hand off a clean first-party link, not a token, login or identity URL. */
     fun safeTabUrl(current: String?): String = UrlPolicy.sanitizeBookmark(current) ?: HOME
+
+    data class Launch(val destination: String, val openTab: Boolean)
+
+    /** Restored activities ignore stale launch extras, including a previous open-now request. */
+    fun resolveLaunch(restoring: Boolean, supplied: String?, saved: String?, retained: String?,
+                      current: String?, requestedOpen: Boolean): Launch {
+        val candidate = if (restoring) saved ?: retained ?: current else supplied ?: current
+        return Launch(safeTabUrl(candidate), !restoring && requestedOpen)
+    }
 }

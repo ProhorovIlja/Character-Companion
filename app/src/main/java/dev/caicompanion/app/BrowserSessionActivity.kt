@@ -25,10 +25,12 @@ class BrowserSessionActivity : Activity() {
     companion object {
         private const val EXTRA_PAGE = "safe_page"
         private const val EXTRA_OPEN = "open_now"
+        private const val STATE_PAGE = "restored_safe_page"
 
         fun enter(activity: Activity, page: String?, openNow: Boolean): Boolean {
             if (activity.isFinishing || activity.isDestroyed) return false
             val store = SettingsStore(activity)
+            val previousPreference = store.browserSessionPreferred
             store.browserSessionPreferred = true
             return try {
                 activity.startActivity(Intent(activity, BrowserSessionActivity::class.java).apply {
@@ -39,7 +41,7 @@ class BrowserSessionActivity : Activity() {
                 activity.finish()
                 true
             } catch (_: RuntimeException) {
-                store.browserSessionPreferred = false
+                store.browserSessionPreferred = previousPreference
                 Toast.makeText(activity, R.string.browser_mode_open_failed, Toast.LENGTH_LONG).show()
                 false
             }
@@ -108,7 +110,8 @@ class BrowserSessionActivity : Activity() {
                 .setPositiveButton(R.string.close, null).show()
         })
         // A restored Activity must not relaunch a browser or claim that sign-in succeeded.
-        consumeLaunch(intent, allowOpen = savedInstanceState == null)
+        consumeLaunch(intent, allowOpen = savedInstanceState == null,
+            restoredPage = savedInstanceState?.getString(STATE_PAGE))
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -116,13 +119,19 @@ class BrowserSessionActivity : Activity() {
         consumeLaunch(intent, allowOpen = true)
     }
 
-    private fun consumeLaunch(incoming: Intent?, allowOpen: Boolean) {
-        val supplied = incoming?.getStringExtra(EXTRA_PAGE)
-        destination = BrowserSessionPolicy.safeTabUrl(supplied ?: if (!allowOpen)
-            lastNonConfigurationInstance as? String ?: destination else destination)
-        val openNow = allowOpen && incoming?.getBooleanExtra(EXTRA_OPEN, false) == true
+    private fun consumeLaunch(incoming: Intent?, allowOpen: Boolean, restoredPage: String? = null) {
+        val launch = BrowserSessionPolicy.resolveLaunch(restoring = !allowOpen,
+            supplied = incoming?.getStringExtra(EXTRA_PAGE), saved = restoredPage,
+            retained = lastNonConfigurationInstance as? String, current = destination,
+            requestedOpen = incoming?.getBooleanExtra(EXTRA_OPEN, false) == true)
+        destination = launch.destination
         setIntent(Intent(this, BrowserSessionActivity::class.java))
-        if (openNow) openTab()
+        if (launch.openTab) openTab()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(STATE_PAGE, BrowserSessionPolicy.safeTabUrl(destination))
     }
 
     @Deprecated("Retain only a sanitized public destination during configuration changes")
@@ -166,13 +175,14 @@ class BrowserSessionActivity : Activity() {
             Toast.makeText(this, R.string.browser_mode_switch_failed, Toast.LENGTH_LONG).show()
             return
         }
+        val previousPreference = store.browserSessionPreferred
         store.browserSessionPreferred = false
         try {
             startActivity(launcher.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
             finish()
         } catch (_: RuntimeException) {
             // Stay in this session if Android cannot launch the embedded Activity.
-            store.browserSessionPreferred = true
+            store.browserSessionPreferred = previousPreference
             Toast.makeText(this, R.string.browser_mode_switch_failed, Toast.LENGTH_LONG).show()
         }
     }
