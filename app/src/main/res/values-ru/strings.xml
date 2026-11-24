@@ -428,4 +428,12 @@
     <string name="roleplay_failed">Не удалось выполнить операцию</string>
     <string name="roleplay_damaged">Не удалось прочитать локальный черновик. Сброс удалит повреждённый файл.</string>
     <string name="roleplay_reset">Сбросить файл</string>
+    <string name="roleplay_context">Собрать контекст</string>
+    <string name="roleplay_web_search">Поиск в интернете</string>
+    <string name="roleplay_research_hint">Ссылка на источник и проверенные сведения</string>
+    <string name="roleplay_research_help">Вставьте необходимые сведения из внешних источников или оставьте пустым. Выбранные локальные поля будут включены в контекст. Не добавляйте секреты.</string>
+    <string name="roleplay_context_invalid">Контекст пуст, некорректен или превышает 16 000 символов. Сократите текст либо выберите меньше полей.</string>
+    <string name="roleplay_context_review">Проверьте и при необходимости измените текст перед копированием. Вставьте его в нужный чат вручную. Ответ зависит от модели.</string>
+    <string name="roleplay_query_hint">Введите поисковый запрос</string>
+    <string name="roleplay_search_privacy">Выбранный поисковый сервис получит только этот запрос. Локальные заметки не добавляются автоматически. Откройте результаты и скопируйте нужные сведения в контекст.</string>
 </resources>

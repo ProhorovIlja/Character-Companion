@@ -428,4 +428,12 @@
     <string name="roleplay_failed">Operation failed</string>
     <string name="roleplay_damaged">The local draft could not be read. Reset deletes the damaged file.</string>
     <string name="roleplay_reset">Reset file</string>
+    <string name="roleplay_context">Build context</string>
+    <string name="roleplay_web_search">Web search</string>
+    <string name="roleplay_research_hint">Source link and verified findings</string>
+    <string name="roleplay_research_help">Paste relevant findings from external sources, or leave blank. Selected local fields will be included in the context. Do not include secrets.</string>
+    <string name="roleplay_context_invalid">Context is empty, invalid or exceeds 16,000 characters. Shorten the text or select fewer fields.</string>
+    <string name="roleplay_context_review">Review and edit before copying. Paste into the intended chat manually. The response depends on the model.</string>
+    <string name="roleplay_query_hint">Enter a search query</string>
+    <string name="roleplay_search_privacy">The selected search provider receives only this query. Local notes are not automatically added. Open results and copy relevant findings into the context.</string>
 </resources>

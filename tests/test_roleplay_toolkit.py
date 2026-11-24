@@ -27,4 +27,4 @@ class RoleplayToolkitTests(unittest.TestCase):
             return {e.get('name') for e in ET.parse(ROOT / f'app/src/main/res/{locale}/strings.xml').getroot()
                     if e.get('name', '').startswith('roleplay_')}
         self.assertEqual(names('values'), names('values-ru'))
-        self.assertEqual(len(names('values')), 15)
+        self.assertEqual(len(names('values')), 23)
