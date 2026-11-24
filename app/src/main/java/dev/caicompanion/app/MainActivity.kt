@@ -896,12 +896,15 @@ class MainActivity : Activity() {
         layout.addView(sort)
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         layout.addView(list)
-        var index = NativeLibrarySearch.Index(store.listBookmarks())
+        var index = NativeLibrarySearch.Index(store.listBookmarks(), store.pinnedBookmarks())
         var rendered: List<Pair<String, String>>? = null
+        var renderedPins = emptySet<String>()
         fun refresh(query: String) {
             val saved = index.filter(query, order = store.libraryOrder)
-            if (saved == rendered) return
+            val pins = saved.map { it.second }.filter(index::isPinned).toSet()
+            if (saved == rendered && pins == renderedPins) return
             rendered = saved
+            renderedPins = pins
             list.removeAllViews()
             if (saved.isEmpty()) {
                 list.addView(infoLabel(getString(R.string.hub_empty)))
@@ -909,7 +912,7 @@ class MainActivity : Activity() {
             }
             for ((title, url) in saved) {
                 val item = Button(this).apply {
-                    text = title
+                    text = if (url in pins) getString(R.string.library_pinned_title, title) else title
                     isAllCaps = false
                     textSize = 14f
                     setTextColor(TEXT)
@@ -918,7 +921,7 @@ class MainActivity : Activity() {
                     setPadding(dp(14), dp(10), dp(14), dp(10))
                     minHeight = dp(52)
                     setOnClickListener { openFirstPartyPage(url) }
-                    contentDescription = getString(R.string.hub_bookmark_options_hint, title)
+                    contentDescription = getString(R.string.hub_bookmark_options_hint, text)
                     setOnLongClickListener {
                         showNativeBookmarkActions(title, url) { refreshNativeBookmarks() }
                         true
@@ -951,7 +954,7 @@ class MainActivity : Activity() {
                 }.setNegativeButton(R.string.cancel, null).show()
         }
         refreshNativeBookmarks = {
-            index = NativeLibrarySearch.Index(store.listBookmarks())
+            index = NativeLibrarySearch.Index(store.listBookmarks(), store.pinnedBookmarks())
             refresh(search.text.toString())
         }
         refresh("")
@@ -1021,9 +1024,11 @@ class MainActivity : Activity() {
     }
 
     private fun showNativeBookmarkActions(title: String, url: String, onChanged: () -> Unit) {
+        val pinned = url in store.pinnedBookmarks()
         val options = arrayOf(getString(R.string.hub_bookmark_open),
             getString(R.string.hub_bookmark_browser), getString(R.string.hub_bookmark_rename),
-            getString(R.string.hub_bookmark_delete))
+            getString(R.string.hub_bookmark_delete),
+            getString(if (pinned) R.string.library_unpin else R.string.library_pin))
         AlertDialog.Builder(this).setTitle(title).setItems(options) { _, selected ->
             when (selected) {
                 0 -> openFirstPartyPage(url)
@@ -1054,6 +1059,7 @@ class MainActivity : Activity() {
                         onChanged()
                         showToast(getString(R.string.bookmark_removed))
                     }.show()
+                4 -> if (store.setBookmarkPinned(url, !pinned)) onChanged()
             }
         }.setNegativeButton(R.string.cancel, null).show()
     }

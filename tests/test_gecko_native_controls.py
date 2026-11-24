@@ -13,7 +13,7 @@ class GeckoNativeControlsTests(unittest.TestCase):
         self.assertIn('private fun showBookmarks()', ACTIVITY)
         self.assertIn('UrlPolicy.sanitizeBookmark(activeUrl)', ACTIVITY)
         self.assertIn('settings.addBookmark(title.text.toString(), url)', ACTIVITY)
-        self.assertIn('NativeLibrarySearch.Index(settings.listBookmarks())', ACTIVITY)
+        self.assertIn('NativeLibrarySearch.Index(settings.listBookmarks(), settings.pinnedBookmarks())', ACTIVITY)
         self.assertIn('val next = index.filter(search.text.toString(), order = settings.libraryOrder)', ACTIVITY)
         self.assertIn('override fun afterTextChanged(s: Editable?) = searchOnly()', ACTIVITY)
         self.assertIn('settings.removeBookmark(bookmark.second)', ACTIVITY)

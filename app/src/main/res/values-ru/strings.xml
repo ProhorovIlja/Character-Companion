@@ -283,4 +283,7 @@
     <string name="library_order_saved">Порядок сохранения</string>
     <string name="library_order_newest">Недавно сохранённые</string>
     <string name="library_order_title">По названию</string>
+    <string name="library_pin">Закрепить сверху</string>
+    <string name="library_unpin">Открепить</string>
+    <string name="library_pinned_title">★ %1$s</string>
 </resources>

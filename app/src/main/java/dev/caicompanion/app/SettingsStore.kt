@@ -124,12 +124,30 @@ class SettingsStore(context: Context) {
             writeBookmarks(listBookmarks().filterNot { it.second == canonical })
         }
     }
+    private fun rawPins(): Set<String> = prefs.getStringSet("library_pins", emptySet()).orEmpty().toSet()
+
+    fun pinnedBookmarks(): Set<String> = synchronized(historyLock) {
+        NativeLibrarySearch.validPins(listBookmarks(), rawPins())
+    }
+
+    fun setBookmarkPinned(url: String, pinned: Boolean): Boolean = synchronized(historyLock) {
+        val canonical = UrlPolicy.sanitizeBookmark(url) ?: return@synchronized false
+        val items = listBookmarks()
+        if (items.none { it.second == canonical }) return@synchronized false
+        val pins = NativeLibrarySearch.validPins(items, rawPins()).toMutableSet()
+        if (pinned) pins.add(canonical) else pins.remove(canonical)
+        prefs.edit().putStringSet("library_pins", pins).apply()
+        true
+    }
+
     private fun writeBookmarks(items: List<Pair<String, String>>) {
         val array = JSONArray()
         items.takeLast(100).forEach { (title, url) ->
             array.put(JSONObject().put("title", title).put("url", url))
         }
-        prefs.edit().putString("bookmarks", array.toString()).apply()
+        prefs.edit().putString("bookmarks", array.toString())
+            .putStringSet("library_pins", NativeLibrarySearch.validPins(items.takeLast(100), rawPins()))
+            .apply()
     }
 
     private fun sanitizedBookmarkArray(): JSONArray = JSONArray().also { sanitized ->
@@ -159,6 +177,7 @@ class SettingsStore(context: Context) {
         put("excludeRules", excludeRules)
         put("libraryOrder", libraryOrder.name)
         put("bookmarks", sanitizedBookmarkArray())
+        put("libraryPins", JSONArray(pinnedBookmarks().sorted()))
     }.toString(2)
 
     fun importJson(contents: String): Boolean {
@@ -176,11 +195,15 @@ class SettingsStore(context: Context) {
         }
         // Publish one atomic preference transaction: a crash cannot leave a half-imported profile.
         val bookmarkArray = JSONArray()
-        saved.asReversed().distinctBy { it.second }.asReversed().takeLast(100).forEach { (title, url) ->
+        val unique = saved.asReversed().distinctBy { it.second }.asReversed().takeLast(100)
+        unique.forEach { (title, url) ->
             bookmarkArray.put(JSONObject().put("title", title).put("url", url))
         }
+        val pins = parsed.optJSONArray("libraryPins") ?: JSONArray()
+        val importedPins = (0 until minOf(pins.length(), 100)).map { pins.optString(it) }
         synchronized(historyLock) {
             prefs.edit()
+            .putStringSet("library_pins", NativeLibrarySearch.validPins(unique, importedPins))
             .remove("last_visited") // Settings backups contain no navigation history.
             .putBoolean("start_in_native_hub", parsed.optBoolean("startInHub", false))
             .putBoolean("blocking", parsed.optBoolean("blocking", true))

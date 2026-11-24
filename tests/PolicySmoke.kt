@@ -173,6 +173,14 @@ fun main() {
         "NOT SAFE" to "https://evil.example/chat/c",
         "Duplicate" to "https://character.ai/chat/a"
     )
+    val pinList = listOf("Zebra" to "https://character.ai/chat/a", "Alpha" to "https://character.ai/chat/b")
+    val pinnedLibrary = NativeLibrarySearch.Index(pinList, setOf("https://character.ai/chat/a", "https://example.com/"))
+    check(pinnedLibrary.isPinned("https://character.ai/chat/a"))
+    check(!pinnedLibrary.isPinned("https://example.com/"))
+    check(pinnedLibrary.filter("", order = NativeLibrarySearch.Order.TITLE).first().first == "Zebra")
+    check(pinnedLibrary.filter("", order = NativeLibrarySearch.Order.NEWEST).first().first == "Zebra")
+    check(pinnedLibrary.filter("Alpha").single().first == "Alpha")
+    check(NativeLibrarySearch.validPins(pinList, listOf("https://character.ai/chat/a", "https://character.ai/chat/c")) == setOf("https://character.ai/chat/a"))
     val orderedLibrary = NativeLibrarySearch.Index(listOf(
         "Zebra" to "https://character.ai/chat/a",
         "Alpha" to "https://character.ai/chat/b",

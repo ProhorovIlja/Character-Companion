@@ -313,14 +313,19 @@ class GeckoActivity : Activity() {
         layout.addView(list, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, dp(300)))
         var visible = emptyList<Pair<String, String>>()
-        var index = NativeLibrarySearch.Index(settings.listBookmarks())
+        var index = NativeLibrarySearch.Index(settings.listBookmarks(), settings.pinnedBookmarks())
+        var visiblePins = emptySet<String>()
         val searchOnly: () -> Unit = {
             val next = index.filter(search.text.toString(), order = settings.libraryOrder)
-            if (next != visible) {
+            val pins = next.map { it.second }.filter(index::isPinned).toSet()
+            if (next != visible || pins != visiblePins) {
                 visible = next
+                visiblePins = pins
                 adapter.setNotifyOnChange(false)
                 adapter.clear()
-                adapter.addAll(visible.map { (title, _) -> title.take(90) })
+                adapter.addAll(visible.map { (title, url) ->
+                    if (url in pins) getString(R.string.library_pinned_title, title) else title
+                })
                 adapter.notifyDataSetChanged()
             }
             empty.visibility = if (visible.isEmpty()) View.VISIBLE else View.GONE
@@ -339,7 +344,7 @@ class GeckoActivity : Activity() {
                 }.setNegativeButton(R.string.cancel, null).show()
         }
         val refresh: () -> Unit = {
-            index = NativeLibrarySearch.Index(settings.listBookmarks())
+            index = NativeLibrarySearch.Index(settings.listBookmarks(), settings.pinnedBookmarks())
             searchOnly()
         }
         val dialog = AlertDialog.Builder(this).setTitle(R.string.bookmarks)
@@ -358,8 +363,10 @@ class GeckoActivity : Activity() {
         list.setOnItemLongClickListener { _, _, position, _ ->
             val bookmark = visible.getOrNull(position)
             if (bookmark != null) {
+                val pinned = index.isPinned(bookmark.second)
                 val options = arrayOf(getString(R.string.hub_bookmark_rename),
-                    getString(R.string.hub_bookmark_browser), getString(R.string.hub_bookmark_delete))
+                    getString(R.string.hub_bookmark_browser), getString(R.string.hub_bookmark_delete),
+                    getString(if (pinned) R.string.library_unpin else R.string.library_pin))
                 AlertDialog.Builder(this).setTitle(bookmark.first).setItems(options) { _, choice ->
                     when (choice) {
                         0 -> editLibraryBookmark(bookmark.first, bookmark.second, refresh)
@@ -371,6 +378,7 @@ class GeckoActivity : Activity() {
                                 refresh()
                                 Toast.makeText(this, R.string.bookmark_removed, Toast.LENGTH_SHORT).show()
                             }.setNegativeButton(R.string.cancel, null).show()
+                        3 -> if (settings.setBookmarkPinned(bookmark.second, !pinned)) refresh()
                     }
                 }.setNegativeButton(R.string.cancel, null).show()
             }

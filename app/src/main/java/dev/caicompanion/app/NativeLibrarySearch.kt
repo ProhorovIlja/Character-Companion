@@ -13,7 +13,13 @@ object NativeLibrarySearch {
 
     fun order(value: String?): Order = Order.entries.firstOrNull { it.name == value } ?: Order.SAVED
 
-    class Index(bookmarks: List<Pair<String, String>>) {
+    /** Only canonical URLs belonging to the current library can be pinned. */
+    fun validPins(bookmarks: List<Pair<String, String>>, pins: Collection<String>): Set<String> {
+        val allowed = bookmarks.mapNotNull { UrlPolicy.sanitizeBookmark(it.second) }.toHashSet()
+        return pins.mapNotNull(UrlPolicy::sanitizeBookmark).filter { it in allowed }.toSet()
+    }
+
+    class Index(bookmarks: List<Pair<String, String>>, pins: Collection<String> = emptySet()) {
         private data class Entry(val title: String, val url: String, val searchable: String, val titleKey: String)
         private val entries = bookmarks.mapNotNull { (rawTitle, rawUrl) ->
             val url = UrlPolicy.sanitizeBookmark(rawUrl) ?: return@mapNotNull null
@@ -21,8 +27,15 @@ object NativeLibrarySearch {
             Entry(title, url, fold("$title $url"), fold(title))
         }
 
-        private val newest = entries.asReversed()
-        private val alphabetical = entries.sortedWith(compareBy<Entry> { it.titleKey }.thenBy { it.url })
+        private val pinned = validPins(bookmarks, pins)
+        fun isPinned(url: String): Boolean = url in pinned
+        private fun prioritize(list: List<Entry>): List<Entry> {
+            val (favorites, rest) = list.partition { it.url in pinned }
+            return favorites + rest
+        }
+        private val saved = prioritize(entries)
+        private val newest = prioritize(entries.asReversed())
+        private val alphabetical = prioritize(entries.sortedWith(compareBy<Entry> { it.titleKey }.thenBy { it.url }))
 
         fun filter(input: String, limit: Int = 100, order: Order = Order.SAVED): List<Pair<String, String>> {
             val cap = limit.coerceIn(0, 100)
@@ -32,7 +45,7 @@ object NativeLibrarySearch {
             val matched = ArrayList<Pair<String, String>>(minOf(entries.size, cap))
             val seen = HashSet<String>()
             val ordered = when (order) {
-                Order.SAVED -> entries
+                Order.SAVED -> saved
                 Order.NEWEST -> newest
                 Order.TITLE -> alphabetical
             }
