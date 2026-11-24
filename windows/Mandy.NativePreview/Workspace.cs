@@ -121,7 +121,7 @@ internal sealed class Workspace : IDisposable
                     if (chats.Any(c => c.Character == saved.Character && c.Chat == saved.Chat))
                         result.SelectConversation(saved.Character, saved.Chat);
                 }
-                catch (Exception ex) when (ex is IOException or JsonException or ArgumentException or InvalidOperationException) { }
+                catch (Exception ex) when (ex is IOException or InvalidDataException or JsonException or ArgumentException or InvalidOperationException or UnauthorizedAccessException) { }
             }
             return result;
         }
