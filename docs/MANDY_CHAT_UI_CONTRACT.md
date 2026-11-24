@@ -98,3 +98,31 @@ User requires individually configurable colors in addition to default Material A
 - Android 0c4e24b: explicit hex editor, reset fields, persistent custom preference, draft-safe recreation, custom chat surfaces/text/icons and preset native dialogs. 
 - Windows 4b194cb / 9a6a40b: hex editor and dynamic brush resources; versioned per-user registry value stores only theme colors and base preset; invalid stored settings fall back to AMOLED. System high-contrast/stock fallback retained at startup. No restart on theme changes. 
 - The scope is main chat surfaces and actions, not all dialogs, controls, or system bars. Color picker, named theme collection, theme file import/export and encrypted cross-device theme synchronization remain future work. No additional dependencies. Source readback verified, native compilation/device tests pending. Independent reference math checks of the two presets: minimum text contrast 8.98:1 / 6.44:1, minimum icon contrast 11.47:1 / 8.22:1; same-color example fails at 1:1. Not executed Android/WPF tests. Reopened saved development history for continuity; existing model/voice/Drive/performance requirements remain. Research: https://developer.android.com/codelabs/m3-design-theming ; https://github.com/material-foundation/material-color-utilities ; https://learn.microsoft.com/en-us/windows/apps/design/accessibility/high-contrast-themes . No unattended operations.
+
+## Portable appearance and visual asset selection — 2026-11-25
+Android 650d79e and Windows cced496: explicit Copy theme JSON / Import theme JSON inside custom color editor. Import fills fields only; Apply is a separate action, retains existing persistence and contrast checks. Up to 2048 characters, schema 1, name 1–80 characters (display metadata, currently exported as Custom), exactly eight opaque RGB color roles. No automatic clipboard reads, cloud transfers, credentials or chat data. Windows b9cdb7b fixes the action panel return type for resource traversal. Native compilation and real cross-device round-trip remain unverified; Android JSONObject parser and Windows JsonDocument differ in duplicate-member handling, so only unique-member canonical JSON is supported for interoperability. Not yet a named-theme library or encrypted Drive integration.
+
+Canonical sample:
+```json
+{
+  "schema": 1,
+  "name": "Material AMOLED",
+  "colors": {
+    "canvas": "#000000",
+    "composer": "#141414",
+    "bubble": "#232323",
+    "text": "#F2F2F2",
+    "muted": "#B5B5B5",
+    "accent": "#F2F2F2",
+    "outline": "#3D3D3D",
+    "icons": "#CCCCCC"
+  }
+}
+```
+
+Design asset candidates reviewed:
+- Native system typography remains default (Android sans-serif and Windows system font) to avoid bundled font cost. Evaluate Roboto Flex for optional consistent Latin/Cyrillic variable typography; OFL 1.1, metadata confirms Cyrillic subsets: https://github.com/google/fonts/blob/main/ofl/robotoflex/METADATA.pb and https://github.com/googlefonts/roboto-flex . Do not ship font until readability, fallback, footprint and licensing are checked.
+- Existing original vector icons remain; candidates Lucide (ISC and Feather-derived MIT portions; retain applicable notices) https://github.com/lucide-icons/lucide/blob/main/LICENSE and Material Symbols (Apache-2.0) https://github.com/google/material-design-icons . Include only used vectors, not whole icon libraries. Character images: user-selected, bounded local thumbnails, no mandatory image downloads or animated backgrounds.
+- Material color utilities HCT and semantic color roles https://github.com/material-foundation/material-color-utilities ; https://github.com/material-foundation/material-color-utilities/blob/main/concepts/dynamic_color_scheme.md . Evaluate small palette-generation subset for optional seed colors; no library imported here.
+- Additional native inference comparison candidate: https://github.com/tensai-app/llama.kt includes Mali CPU/Vulkan comparison on another device; does not establish Pixel 8a results or superiority to existing JNI. Keep previous hardware/model/voice gates, assess measured benefit before replacing runtime.
+- Reopened saved development history and continuity report plus existing unified architecture and UI contract; all prior requirements remain applicable. Scope of this pass: appearance portability and source correction; no new inference, media or live voice integration, no automation or scheduled tasks.
