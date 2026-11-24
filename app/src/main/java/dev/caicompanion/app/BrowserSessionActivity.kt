@@ -85,6 +85,7 @@ class BrowserSessionActivity : Activity() {
             startActivity(Intent(this, VoiceDraftActivity::class.java))
         })
         column.addView(action(R.string.browser_mode_embedded) { returnToEmbedded() })
+        column.addView(action(R.string.release_center) { ReleaseCenter.show(this) })
         column.addView(action(R.string.browser_mode_change_provider) {
             android.app.AlertDialog.Builder(this).setMessage(R.string.browser_mode_change_warning)
                 .setNegativeButton(R.string.cancel, null)

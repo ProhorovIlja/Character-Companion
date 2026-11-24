@@ -257,4 +257,14 @@
     <string name="voice_model_installed">Служба сообщает, что автономная модель языка установлена.</string>
     <string name="voice_model_pending">Служба сообщает об ожидающей установке модели языка.</string>
     <string name="voice_model_available">Служба поддерживает этот язык автономно, но модель не установлена. Откройте настройки Android или службы.</string>
+    <string name="release_center">Обновления</string>
+    <string name="release_current">Установленная версия: %1$s (%2$s)</string>
+    <string name="release_open">Открыть официальные релизы GitHub</string>
+    <string name="release_info">Устанавливайте только подписанный APK с тем же движком и пакетом. Android проверяет подпись. Отладочные артефакты не являются стабильными обновлениями.</string>
+    <string name="release_check">Проверить стабильный релиз</string>
+    <string name="release_checking">Проверка GitHub…</string>
+    <string name="release_none">На GitHub нет доступного публичного стабильного релиза.</string>
+    <string name="release_found">Опубликованный стабильный релиз: %1$s. Сравните с установленной версией и прочитайте примечания перед установкой.</string>
+    <string name="release_unavailable">Не удалось проверить сведения о релизе. Повторите попытку вручную.</string>
+    <string name="release_browser_error">Не удалось открыть официальную страницу релизов.</string>
 </resources>

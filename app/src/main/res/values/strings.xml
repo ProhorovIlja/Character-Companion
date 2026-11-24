@@ -257,4 +257,14 @@
     <string name="voice_model_installed">The provider reports that the offline language model is installed.</string>
     <string name="voice_model_pending">The provider reports a pending language model installation.</string>
     <string name="voice_model_available">The provider supports this offline language, but its model is not installed. Use Android or provider settings.</string>
+    <string name="release_center">Updates</string>
+    <string name="release_current">Installed version: %1$s (%2$s)</string>
+    <string name="release_open">Open official GitHub releases</string>
+    <string name="release_info">Only install a signed APK for the same renderer and package. Android verifies the signing identity. Debug build artifacts are not stable updates.</string>
+    <string name="release_check">Check published stable release</string>
+    <string name="release_checking">Checking GitHub…</string>
+    <string name="release_none">GitHub has no public stable release available.</string>
+    <string name="release_found">Published stable release: %1$s. Compare with the installed version and review release notes before installing.</string>
+    <string name="release_unavailable">Could not verify release metadata. Try again manually.</string>
+    <string name="release_browser_error">Could not open the official release page.</string>
 </resources>

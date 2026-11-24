@@ -586,6 +586,7 @@ class MainActivity : Activity() {
         val ready = ::webView.isInitialized && !destroyed
         ShellMenu.show(this, anchor, listOf(
             ShellMenu.Action(R.string.settings) { showSettings() },
+            ShellMenu.Action(R.string.release_center) { ReleaseCenter.show(this) },
             ShellMenu.Action(R.string.forward, ready && webView.canGoForward()) { webView.goForward() },
             ShellMenu.Action(R.string.reload, ready) { webView.reload() },
             ShellMenu.Action(R.string.shell_refresh_cache, ready) {
