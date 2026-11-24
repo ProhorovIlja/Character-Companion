@@ -1,11 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#334B587D">
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="?attr/shellRipple">
     <item>
-        <shape android:shape="rectangle">
-            <solid android:color="?attr/shellAction" />
-            <stroke android:width="1dp" android:color="?attr/shellOutline" />
-            <corners android:radius="13dp" />
-            <padding android:left="12dp" android:top="8dp" android:right="12dp" android:bottom="8dp" />
-        </shape>
+        <selector>
+            <item android:state_enabled="false">
+                <shape android:shape="rectangle">
+                    <solid android:color="?attr/shellDisabledAction" />
+                    <stroke android:width="1dp" android:color="?attr/shellOutline" />
+                    <corners android:radius="16dp" />
+                </shape>
+            </item>
+            <item android:state_focused="true">
+                <shape android:shape="rectangle">
+                    <solid android:color="?attr/shellAction" />
+                    <stroke android:width="2dp" android:color="?attr/shellAccent" />
+                    <corners android:radius="16dp" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="?attr/shellAction" />
+                    <stroke android:width="1dp" android:color="?attr/shellOutline" />
+                    <corners android:radius="16dp" />
+                </shape>
+            </item>
+        </selector>
     </item>
 </ripple>

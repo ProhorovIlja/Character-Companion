@@ -51,7 +51,7 @@ class BrowserSessionActivity : Activity() {
     private val settingsBackup = SettingsBackup(this)
     private lateinit var store: SettingsStore
     private var destination = BrowserSessionPolicy.HOME
-    private val fg = Color.rgb(228, 231, 240)
+    private val fg get() = ShellAppearance.color(this, R.attr.shellText)
     private val bg get() = ShellAppearance.color(this, R.attr.shellBackground)
 
     override fun onCreate(savedInstanceState: Bundle?) {

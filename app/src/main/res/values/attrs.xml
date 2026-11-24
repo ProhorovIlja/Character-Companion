@@ -5,4 +5,11 @@
     <attr name="shellPanel" format="color" />
     <attr name="shellAction" format="color" />
     <attr name="shellOutline" format="color" />
+    <attr name="shellText" format="color" />
+    <attr name="shellMuted" format="color" />
+    <attr name="shellAccent" format="color" />
+    <attr name="shellRipple" format="color" />
+    <attr name="shellDisabledText" format="color" />
+    <attr name="shellDisabledAction" format="color" />
+    <attr name="shellOnAccent" format="color" />
 </resources>

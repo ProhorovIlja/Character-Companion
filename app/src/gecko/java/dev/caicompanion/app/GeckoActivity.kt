@@ -84,8 +84,8 @@ class GeckoActivity : Activity() {
     private var downloadPickerOpen = false
     private var genericPromptDialog: AlertDialog? = null
     private var backCallback: OnBackInvokedCallback? = null
-    private val fg = Color.rgb(228, 231, 240)
-    private val accent = Color.rgb(168, 184, 255)
+    private val fg get() = ShellAppearance.color(this, R.attr.shellText)
+    private val accent get() = ShellAppearance.color(this, R.attr.shellAccent)
     private val settingsBackup = SettingsBackup(this)
     private val bg get() = ShellAppearance.color(this, R.attr.shellBackground)
 
@@ -121,14 +121,14 @@ class GeckoActivity : Activity() {
         root.requestApplyInsets()
         chromeHeader = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(ShellAppearance.color(this@GeckoActivity, R.attr.shellPanel))
+            setBackgroundColor(ShellAppearance.color(this@GeckoActivity, R.attr.shellChrome))
             setPadding(0, 0, dp(8), 0)
         }
         backButton = Button(this).apply {
             contentDescription = getString(R.string.back)
-            setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_shell_back, 0, 0, 0)
-            setPadding(dp(13), 0, 0, 0)
-            setBackgroundResource(android.R.drawable.list_selector_background)
+            setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_shell_back, 0, 0, 0)
+            setPaddingRelative(dp(12), 0, 0, 0)
+            setBackgroundResource(R.drawable.shell_nav_feedback)
             setOnClickListener { navigateBack() }
         }
         chromeHeader.addView(backButton, LinearLayout.LayoutParams(dp(48), dp(52)))
@@ -144,7 +144,7 @@ class GeckoActivity : Activity() {
             settings.blocking = !settings.blocking
             refreshTrackingProtection()
         }.apply {
-            setBackgroundResource(android.R.drawable.list_selector_background)
+            setBackgroundResource(R.drawable.shell_nav_feedback)
             setPadding(dp(4), 0, dp(4), 0)
         }
         privacyButton.setOnLongClickListener { toggleLoginProtection(); true }
@@ -155,7 +155,7 @@ class GeckoActivity : Activity() {
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         actionsRow = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(ShellAppearance.color(this@GeckoActivity, R.attr.shellPanel))
+            setBackgroundColor(ShellAppearance.color(this@GeckoActivity, R.attr.shellChrome))
         }
         actionsRow.addView(navAction(R.string.home, R.drawable.ic_shell_home) {
             if (sessionReady()) session.loadUri(HOME)
@@ -218,11 +218,12 @@ class GeckoActivity : Activity() {
     private fun sessionReady(): Boolean = ::session.isInitialized && session.isOpen && !needsRecovery
 
     private fun navAction(label: Int, icon: Int, run: () -> Unit): TextView = TextView(this).apply {
-        setText(label); textSize = 11f; setTextColor(fg); gravity = Gravity.CENTER
+        setText(label); textSize = 12f; setTextColor(getColorStateList(R.color.shell_control_text)); gravity = Gravity.CENTER
+        typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
         setPadding(dp(4), dp(7), dp(4), dp(6))
         setCompoundDrawablesWithIntrinsicBounds(0, icon, 0, 0)
         compoundDrawablePadding = dp(3)
-        setBackgroundResource(android.R.drawable.list_selector_background)
+        setBackgroundResource(R.drawable.shell_nav_feedback)
         isFocusable = true; contentDescription = getString(label)
         setOnClickListener { run() }
     }

@@ -11,16 +11,16 @@
         <TextView android:id="@+id/page_title" android:layout_width="0dp" android:layout_height="match_parent"
             android:layout_weight="1" android:gravity="center_vertical" android:singleLine="true"
             android:ellipsize="end" android:paddingEnd="8dp" android:text="Character.AI"
-            android:textColor="#E4E7F0" android:textSize="15sp" android:fontFamily="sans-serif-medium" />
+            android:textColor="?attr/shellText" android:textSize="15sp" android:fontFamily="sans-serif-medium" />
         <TextView android:id="@+id/status_badge" android:layout_width="wrap_content" android:layout_height="48dp"
             android:minWidth="48dp" android:maxWidth="100dp" android:gravity="center" android:singleLine="true"
             android:ellipsize="end" android:paddingStart="8dp" android:paddingEnd="8dp"
-            android:background="?android:attr/selectableItemBackground" android:text="◈"
-            android:textSize="12sp" android:textColor="#A8B8FF" android:contentDescription="@string/diagnostics" />
+            android:background="@drawable/shell_nav_feedback" android:text="◈"
+            android:textSize="12sp" android:textColor="?attr/shellAccent" android:contentDescription="@string/diagnostics" />
     </LinearLayout>
     <ProgressBar android:id="@+id/loading_progress"
         style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent"
-        android:layout_height="2dp" android:max="100" android:progressTint="#A8B8FF"
+        android:layout_height="2dp" android:max="100" android:progressTint="?attr/shellAccent"
         android:progressBackgroundTint="?attr/shellChrome" android:visibility="gone" />
     <FrameLayout android:id="@+id/web_container" android:layout_width="match_parent"
         android:layout_height="0dp" android:layout_weight="1" android:background="?attr/shellBackground">
@@ -28,14 +28,14 @@
             android:layout_height="match_parent" android:orientation="vertical" android:gravity="center"
             android:padding="24dp" android:background="?attr/shellPanel" android:visibility="gone">
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="◇" android:textSize="52sp" android:textColor="#A8B8FF" />
+                android:text="◇" android:textSize="52sp" android:textColor="?attr/shellAccent" />
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:text="@string/error_title" android:textSize="19sp" android:textStyle="bold"
-                android:textColor="#E4E7F0" />
+                android:textColor="?attr/shellText" />
             <TextView android:id="@+id/error_text" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:gravity="center"
                 android:padding="14dp" android:text="@string/error_loading"
-                android:textSize="13sp" android:textColor="#BAB9C3" />
+                android:textSize="13sp" android:textColor="?attr/shellMuted" />
             <Button android:id="@+id/error_retry" android:layout_width="wrap_content"
                 android:layout_height="wrap_content" android:text="@string/retry" />
             <Button android:id="@+id/error_open_browser" android:layout_width="wrap_content"
