@@ -230,11 +230,13 @@ class GeckoActivity : Activity() {
     private fun showPageMenu(anchor: View) {
         val ready = sessionReady()
         val sessionAtMenu = if (ready) session else null
-        val chatAtMenu = if (ready) VoiceComposerPolicy.chatPage(activeUrl) else null
+        val pageAtMenu = if (ready) activeUrl else null
+        val isChat = ChatRefreshPolicy.isChat(pageAtMenu)
         ShellMenu.show(this, anchor, listOf(
-            ShellMenu.Action(if (chatAtMenu != null) R.string.refresh_current_chat else R.string.reload, ready) {
+            ShellMenu.Action(if (isChat) R.string.refresh_current_chat else R.string.reload,
+                ready && ChatRefreshPolicy.samePage(pageAtMenu, pageAtMenu)) {
                 if (sessionAtMenu != null && started && sessionReady() && sessionAtMenu === session &&
-                    (chatAtMenu == null || chatAtMenu == VoiceComposerPolicy.chatPage(activeUrl))) {
+                    ChatRefreshPolicy.samePage(pageAtMenu, activeUrl)) {
                     sessionAtMenu.reload()
                 }
             },

@@ -147,6 +147,7 @@ fun main() {
     verifyCharacterExtras()
     verifyServiceLoad()
     verifyRoleplayToolkit()
+    verifyChatRefresh()
     verifyCharacterBackup()
     verifyCharx()
     // ASCII fast path must preserve label boundaries and allowlist precedence.

@@ -15,7 +15,8 @@ class ChatRefreshTests(unittest.TestCase):
             action = menu.split('ShellMenu.Action(', 2)[1]
             self.assertIn('R.string.refresh_current_chat else R.string.reload', action)
             self.assertIn(state, action)
-            self.assertIn('chatAtMenu == VoiceComposerPolicy.chatPage(', action)
+            self.assertIn('ChatRefreshPolicy.samePage(pageAtMenu,', action)
+            self.assertIn('ChatRefreshPolicy.isChat(pageAtMenu)', menu)
             self.assertEqual(action.count(renderer + '.reload()'), 1)
             for forbidden in ('clearCache(', 'loadUrl(', 'loadUri(', 'postDelayed(', 'evaluateJavascript('):
                 self.assertNotIn(forbidden, action)

@@ -616,13 +616,14 @@ class MainActivity : Activity() {
     private fun showPageMenu(anchor: View) {
         val ready = ::webView.isInitialized && !destroyed && !rendererDisposed && !rendererNeedsNavigation
         val viewAtMenu = if (ready) webView else null
-        val chatAtMenu = VoiceComposerPolicy.chatPage(viewAtMenu?.url)
+        val pageAtMenu = viewAtMenu?.url
+        val isChat = ChatRefreshPolicy.isChat(pageAtMenu)
         ShellMenu.show(this, anchor, listOf(
-            ShellMenu.Action(if (chatAtMenu != null) R.string.refresh_current_chat else R.string.reload,
-                ready && nativeHub == null) {
+            ShellMenu.Action(if (isChat) R.string.refresh_current_chat else R.string.reload,
+                ready && nativeHub == null && ChatRefreshPolicy.samePage(pageAtMenu, pageAtMenu)) {
                 if (viewAtMenu != null && !destroyed && !rendererDisposed && !rendererNeedsNavigation &&
                     activityResumed && nativeHub == null && viewAtMenu === webView &&
-                    (chatAtMenu == null || chatAtMenu == VoiceComposerPolicy.chatPage(viewAtMenu.url))) {
+                    ChatRefreshPolicy.samePage(pageAtMenu, viewAtMenu.url)) {
                     viewAtMenu.reload()
                 }
             },
