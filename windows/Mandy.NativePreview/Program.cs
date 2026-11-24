@@ -121,6 +121,22 @@ internal sealed class ChatWindow : Window
             composerSurface.BorderBrush = new SolidColorBrush(Color.FromRgb(66,66,66));
         }
         composer.Children.Add(composerSurface);
+        // Appearance is a session choice in the standalone preview. No settings file or restart.
+        var amoled = new CheckBox { Content = "Material AMOLED", IsChecked = true, Margin = new Thickness(0,8,0,8) };
+        AutomationProperties.SetName(amoled, "Material AMOLED appearance (off: graphite dark)");
+        amoled.IsEnabled = !SystemParameters.HighContrast && Application.Current.Resources.MergedDictionaries.Count > 0;
+        void ApplyAppearance()
+        {
+            if (!amoled.IsEnabled || SystemParameters.HighContrast) return;
+            bool black = amoled.IsChecked == true;
+            Background = black ? Brushes.Black : Palette(33,33,33);
+            composerSurface.Background = black ? Palette(20,20,20) : Palette(48,48,48);
+            composerSurface.BorderBrush = black ? Palette(61,61,61) : Palette(85,85,85);
+        }
+        amoled.Checked += (_, _) => ApplyAppearance();
+        amoled.Unchecked += (_, _) => ApplyAppearance();
+        settings.Children.Add(amoled);
+        ApplyAppearance();
         draft.Padding = new Thickness(12,8,12,8);
         draft.FontSize = 16;
         draft.Background = Brushes.Transparent;
@@ -143,6 +159,7 @@ internal sealed class ChatWindow : Window
         history.Background = Brushes.Transparent;
         history.BorderThickness = new Thickness(0);
         history.FontSize = 16;
+        history.MaxWidth = 800;
         VirtualizingPanel.SetIsVirtualizing(history, true);
         VirtualizingPanel.SetVirtualizationMode(history, VirtualizationMode.Recycling);
         ScrollViewer.SetCanContentScroll(history, true);
@@ -231,6 +248,13 @@ internal sealed class ChatWindow : Window
     }
 
     // Matching original line icons with native vector rendering and inherited theme color.
+    private static SolidColorBrush Palette(byte red, byte green, byte blue)
+    {
+        var brush = new SolidColorBrush(Color.FromRgb(red, green, blue));
+        brush.Freeze();
+        return brush;
+    }
+
     private static void SetActionIcon(Button button, string kind, string description)
     {
         var geometry = Geometry.Parse(kind switch
