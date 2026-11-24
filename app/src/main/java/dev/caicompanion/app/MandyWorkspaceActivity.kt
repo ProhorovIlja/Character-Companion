@@ -44,6 +44,8 @@ class MandyWorkspaceActivity : Activity() {
     private lateinit var memory: NativeCharacterMemory
     private lateinit var account: String
     private lateinit var panel: LinearLayout
+    private lateinit var messages: LinearLayout
+    private lateinit var historyScroll: ScrollView
     private lateinit var status: TextView
     private var current: Snapshot? = null
     private var editor: EditText? = null
@@ -117,8 +119,7 @@ class MandyWorkspaceActivity : Activity() {
             text = "Stop generation"; isAllCaps = false; visibility = View.GONE
             setOnClickListener { stopped.set(true); isEnabled = false; status.text = "Stopping…" }
         }
-        root.addView(cancelGeneration)
-        speechControls = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
+        speechControls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; visibility = View.GONE }
         stopSpeech = Button(this).apply {
             text = "Stop · keep draft"; isAllCaps = false
             setOnClickListener { finishSpeech(false) }
@@ -127,20 +128,20 @@ class MandyWorkspaceActivity : Activity() {
             text = "Stop · send"; isAllCaps = false
             setOnClickListener { finishSpeech(true) }
         }
-        speechControls.addView(stopSpeech)
-        speechControls.addView(sendSpeech)
+        speechControls.addView(stopSpeech, LinearLayout.LayoutParams(0, -2, 1f))
+        speechControls.addView(sendSpeech, LinearLayout.LayoutParams(0, -2, 1f))
         speechControls.addView(Button(this).apply {
-            text = "Cancel dictation"; isAllCaps = false
+            text = "Cancel"; isAllCaps = false
+            contentDescription = "Cancel dictation"
             setOnClickListener { cancelSpeech("Dictation cancelled") }
-        })
-        root.addView(speechControls)
-        val scroll = ScrollView(this).apply { isFillViewport = true }
+        }, LinearLayout.LayoutParams(0, -2, 1f))
         panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(8), dp(16), dp(16))
         }
-        scroll.addView(panel)
-        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        root.addView(panel, LinearLayout.LayoutParams(-1, 0, 1f))
+        root.addView(cancelGeneration)
+        root.addView(speechControls)
         setContentView(root)
         ViewCompat.requestApplyInsets(root)
         work {
@@ -232,55 +233,100 @@ class MandyWorkspaceActivity : Activity() {
     private fun render(s: Snapshot) {
         panel.removeAllViews()
         editor = null
-        panel.addView(button("AI models") { if (editor != null && editor?.text?.toString() != current?.draft?.draft) {
-                status.text = "Save the current draft before opening models."
-            } else startActivity(android.content.Intent(this, MandyModelActivity::class.java)) })
-        if (BuildConfig.MANDY_EMBEDDED_PREVIEW) {
-            panel.addView(button("Performance · " + performancePreset().label) { choosePerformancePreset() })
-            panel.addView(button("Release loaded model") { saveAnd { resident.close() } })
+        val ticket = s.ticket
+        val profile = ticket?.let { t -> s.profiles.first { it.id == t.key.character } }
+        val chat = ticket?.let { t -> profile?.chats?.first { it.id == t.key.chat } }
+        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
+        val libraryButton = button("Characters") {
+            if (s.profiles.isEmpty()) editProfile(null) else choose(s)
         }
-        panel.addView(button("Create character") { editProfile(null) })
-        if (s.profiles.isNotEmpty()) panel.addView(button("Characters & conversations") { choose(s) })
-        val ticket = s.ticket ?: return
-        val profile = s.profiles.first { it.id == ticket.key.character }
-        val chat = profile.chats.first { it.id == ticket.key.chat }
-        panel.addView(label(profile.name, 22f))
-        panel.addView(label(chat.title, 14f))
-        panel.addView(button("Edit character") { editProfile(profile) })
-        panel.addView(button("Memory & relationship") { editMemory(profile, s.memory) })
-        if (BuildConfig.MANDY_EMBEDDED_PREVIEW && s.models.isNotEmpty() && s.rows.lastOrNull()?.role == "character" && s.draft.pending == null) {
-            panel.addView(button("Review relationship from dialogue…") { chooseAssessmentModel(s) })
-            if (s.memory.memories.size < NativeCharacterMemory.MAX_MEMORIES) panel.addView(button("Review memory from dialogue…") { chooseAssessmentModel(s, forMemory = true) })
+        header.addView(libraryButton)
+        header.addView(label(profile?.name ?: "No character", 18f).apply {
+            maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        // Visible capability placeholders, never request permission or simulate a call.
+        header.addView(button("Call") {}.apply { isEnabled = false; contentDescription = "Voice call not available in this build" })
+        header.addView(button("Settings") { showWorkspaceSettings(s) })
+        panel.addView(header)
+        if (chat != null) panel.addView(label(chat.title, 14f))
+        historyScroll = ScrollView(this).apply { isFillViewport = true }
+        messages = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        historyScroll.addView(messages)
+        panel.addView(historyScroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        if (ticket == null || profile == null) {
+            messages.addView(label("Create or select a character to begin."))
+            messages.addView(button("Create character") { editProfile(null) })
+            return
         }
-        panel.addView(button("New conversation") { createChat(profile) })
-        if (s.rows.isNotEmpty()) panel.addView(button("Browse conversation history…") { browseHistory(s, profile.name) })
-        if (s.rows.isEmpty()) panel.addView(label("No messages yet."))
+        if (s.rows.isNotEmpty()) messages.addView(button("Earlier messages") { browseHistory(s, profile.name) })
+        if (s.rows.isEmpty()) messages.addView(label("No messages yet."))
         else s.rows.forEach {
-            val name = if (it.role == "user") "You" else profile.name
-            panel.addView(label(name + "\n" + it.text).apply { setTextIsSelectable(true) })
+            val author = if (it.role == "user") "You" else profile.name
+            messages.addView(label(author + "\n" + it.text).apply { setTextIsSelectable(true) })
         }
         if (s.draft.pending != null) {
-            panel.addView(label("Pending message • " + s.draft.pending.text))
-            panel.addView(button("Discard pending retry") {
+            messages.addView(label("Pending message • " + s.draft.pending.text))
+            messages.addView(button("Discard pending retry") {
                 AlertDialog.Builder(this).setMessage("Discard retry state? Already committed messages remain in history.")
                     .setNegativeButton(android.R.string.cancel, null)
                     .setPositiveButton("Discard") { _, _ -> saveAnd { workspace.discardPending(ticket, s.draft.pending.id) } }.show()
             })
         }
-        val field = input("Message " + profile.name, 16000, s.draft.draft)
+        val field = input("Message " + profile.name, 16000, s.draft.draft).apply { minLines = 1; maxLines = 4 }
         editor = field
         panel.addView(field)
-        panel.addView(button("Dictate on device…") { chooseSpeechLanguage(s) })
-        if (BuildConfig.MANDY_WHISPER_PREVIEW) {
-            if (s.speechModels.isNotEmpty()) panel.addView(button("Dictate with local Whisper…") { chooseOfflineSpeech(s) })
-            else panel.addView(label("Import a trusted multilingual Whisper model in AI models, then refresh."))
+        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        actions.addView(button("Attach") {}.apply {
+            isEnabled = false; contentDescription = "Attachments not available in this build"
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        actions.addView(button("Dictate") {
+            if (BuildConfig.MANDY_WHISPER_PREVIEW && s.speechModels.isNotEmpty()) {
+                AlertDialog.Builder(this).setTitle("Dictation")
+                    .setItems(arrayOf("On-device speech recognizer", "Local Whisper")) { _, i ->
+                        if (i == 0) chooseSpeechLanguage(s) else chooseOfflineSpeech(s)
+                    }.setNegativeButton(android.R.string.cancel, null).show()
+            } else chooseSpeechLanguage(s)
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        actions.addView(button(if (s.draft.pending == null) "Send" else "Retry") { chooseModel(s) }.apply {
+            isEnabled = BuildConfig.MANDY_EMBEDDED_PREVIEW && s.models.isNotEmpty()
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        panel.addView(actions)
+        if (!BuildConfig.MANDY_EMBEDDED_PREVIEW || s.models.isEmpty())
+            panel.addView(label("Local model required for Send", 12f))
+        // Scroll only when displaying a fresh snapshot, not on every token.
+        val scroll = historyScroll
+        scroll.post { if (alive() && historyScroll === scroll) scroll.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    private fun showWorkspaceSettings(s: Snapshot) {
+        val options = mutableListOf<Pair<String, () -> Unit>>()
+        options += "AI models" to {
+            if (editor != null && editor?.text?.toString() != current?.draft?.draft)
+                status.text = "Save the current draft before opening models."
+            else startActivity(Intent(this, MandyModelActivity::class.java))
         }
-        panel.addView(button("Save draft") { saveAnd {} })
         if (BuildConfig.MANDY_EMBEDDED_PREVIEW) {
-            panel.addView(button("Refresh model inventory") { saveAnd {} })
-            if (s.models.isNotEmpty()) panel.addView(button(if (s.draft.pending == null) "Experimental send…" else "Retry pending…") { chooseModel(s) })
-            else panel.addView(label("Import a trusted model in AI models, then refresh."))
-        } else panel.addView(Button(this).apply { text = "Send • embedded build unavailable"; isAllCaps = false; isEnabled = false })
+            options += ("Performance · " + performancePreset().label) to { choosePerformancePreset() }
+            options += "Release loaded model" to { saveAnd { resident.close() } }
+            options += "Refresh model inventory" to { saveAnd {} }
+        }
+        options += "Create character" to { editProfile(null) }
+        val profile = s.ticket?.let { t -> s.profiles.first { it.id == t.key.character } }
+        if (profile != null) {
+            options += "Edit character" to { editProfile(profile) }
+            options += "Memory & relationship" to { editMemory(profile, s.memory) }
+            options += "New conversation" to { createChat(profile) }
+            options += "Save draft" to { saveAnd {} }
+            if (BuildConfig.MANDY_EMBEDDED_PREVIEW && s.models.isNotEmpty() &&
+                s.rows.lastOrNull()?.role == "character" && s.draft.pending == null) {
+                options += "Review relationship from dialogue" to { chooseAssessmentModel(s) }
+                if (s.memory.memories.size < NativeCharacterMemory.MAX_MEMORIES)
+                    options += "Review memory from dialogue" to { chooseAssessmentModel(s, forMemory = true) }
+            }
+        }
+        AlertDialog.Builder(this).setTitle("Mandy AI settings")
+            .setItems(options.map { it.first }.toTypedArray()) { _, i -> if (!busy && alive()) options[i].second() }
+            .setNegativeButton(android.R.string.cancel, null).show()
     }
     /** Explicit, bounded history pages. Does not rebuild the main composer or change its draft. */
     private fun browseHistory(s: Snapshot, characterName: String) {
@@ -362,7 +408,7 @@ class MandyWorkspaceActivity : Activity() {
         val states = mutableMapOf<View, Boolean>()
         suspendInputs(panel, states)
         val preview = label("Verifying and loading model…")
-        panel.addView(preview)
+        messages.addView(preview)
         cancelGeneration.visibility = View.VISIBLE
         cancelGeneration.isEnabled = true
         status.text = "Experimental generation"
@@ -400,7 +446,7 @@ class MandyWorkspaceActivity : Activity() {
                     current = refreshed
                     render(refreshed)
                 } else {
-                    panel.removeView(preview)
+                    messages.removeView(preview)
                     if (!saved) states.forEach { (view, enabled) -> view.isEnabled = enabled }
                 }
                 status.text = when {
