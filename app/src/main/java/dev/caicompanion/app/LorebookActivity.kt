@@ -33,6 +33,8 @@ class LorebookActivity : Activity() {
         private const val COPY_LIMIT = 100_000
     }
     private var book: LorebookPolicy.Book? = null
+    private var savedId: String? = null
+    private var savedBook: LorebookPolicy.Book? = null
     private var pendingExport: String? = null
     private var picker = 0
     private var busy = false
@@ -48,7 +50,8 @@ class LorebookActivity : Activity() {
     private lateinit var exportText: Button
     private lateinit var copyText: Button
     private data class Retained(val book: LorebookPolicy.Book?, val picker: Int, val export: String?,
-                                val query: String, val reviewOnly: Boolean)
+                                val query: String, val reviewOnly: Boolean,
+                                val savedId: String?, val savedBook: LorebookPolicy.Book?)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ShellAppearance.apply(this)
@@ -56,6 +59,7 @@ class LorebookActivity : Activity() {
         if (SettingsStore(this).protectScreen) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         (lastNonConfigurationInstance as? Retained)?.let {
             book = it.book; picker = it.picker; pendingExport = it.export
+            savedId = it.savedId; savedBook = it.savedBook
         }
         val scroll = ScrollView(this).apply { isFillViewport = true }
         val column = LinearLayout(this).apply {
@@ -78,9 +82,14 @@ class LorebookActivity : Activity() {
         }
         column.addView(TextView(this).apply { setText(R.string.lorebook_title); textSize = 23f })
         column.addView(TextView(this).apply { setText(R.string.lorebook_help) })
+        button(R.string.lorebook_library) { showLibrary() }
+        button(R.string.lorebook_save_local) { saveLocal(false) }
+        button(R.string.lorebook_save_copy) { saveLocal(true) }
+        button(R.string.lorebook_creator_guide) { showCreatorGuide() }
         button(R.string.lorebook_open) { replace { open() } }
         button(R.string.lorebook_paste) { replace { paste() } }
         button(R.string.lorebook_new) { replace {
+            savedId = null; savedBook = null
             book = LorebookPolicy.Book("", "", listOf(LorebookPolicy.Entry("", emptyList(), "")))
             resetSearch()
             refresh()
@@ -124,7 +133,7 @@ class LorebookActivity : Activity() {
     override fun onBackPressed() { confirmClose() }
 
     private fun confirmClose() {
-        if (book == null && !busy) finish()
+        if ((book == null || book === savedBook) && !busy && picker == 0) finish()
         else AlertDialog.Builder(this).setMessage(R.string.lorebook_close_warning)
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.confirm) { _, _ -> finish() }.show()
@@ -233,7 +242,7 @@ class LorebookActivity : Activity() {
 
     private fun dp(value: Int) = (resources.displayMetrics.density * value + .5f).toInt()
     private fun replace(action: () -> Unit) {
-        if (book == null) action() else AlertDialog.Builder(this).setMessage(R.string.lorebook_replace)
+        if (book == null || book === savedBook) action() else AlertDialog.Builder(this).setMessage(R.string.lorebook_replace)
             .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.confirm) { _, _ -> action() }.show()
     }
 
@@ -242,7 +251,8 @@ class LorebookActivity : Activity() {
         summary.text = if (current == null) getString(R.string.lorebook_empty) else
             getString(R.string.lorebook_summary, current.name.ifBlank { getString(R.string.lorebook_untitled) },
                 current.entries.size, current.entries.count(LorebookEditor::review), current.skippedDisabled) +
-                if (current.conversionLoss) "\n" + getString(R.string.lorebook_loss) else ""
+                (if (current.conversionLoss) "\n" + getString(R.string.lorebook_loss) else "") +
+                "\n" + getString(if (current === savedBook) R.string.lorebook_local_saved else R.string.lorebook_local_unsaved)
         visibleIndices = current?.let { LorebookEditor.search(it, query, reviewOnly.isChecked) }.orEmpty()
         val labels = visibleIndices.map { i ->
             val entry = current!!.entries[i]
@@ -253,6 +263,84 @@ class LorebookActivity : Activity() {
         exportJson.isEnabled = current != null && !busy
         exportText.isEnabled = current != null && !busy
         copyText.isEnabled = current != null && !busy
+    }
+
+    /** Only explicit library actions touch disk; no autosave or background sync. */
+    private fun <T> libraryWork(work: () -> T, done: (T) -> Unit) {
+        if (busy || picker != 0 || closed.get()) return
+        busy = true
+        refresh()
+        status.setText(R.string.lorebook_processing)
+        Thread({
+            val result = runCatching { work() }
+            runOnUiThread {
+                if (closed.get() || isFinishing || isDestroyed) return@runOnUiThread
+                busy = false
+                refresh()
+                result.fold(done, { status.setText(R.string.lorebook_library_failed) })
+            }
+        }, "manual-lorebook-library").start()
+    }
+
+    private fun saveLocal(copy: Boolean) {
+        val snapshot = book ?: return
+        val id = if (copy) null else savedId
+        val context = applicationContext
+        libraryWork({ LorebookDraftStore.save(context, id, snapshot) }) { stored ->
+            savedId = stored
+            savedBook = snapshot
+            status.setText(R.string.lorebook_local_saved)
+            refresh()
+        }
+    }
+
+    private fun showLibrary() {
+        val context = applicationContext
+        libraryWork({ LorebookDraftStore.list(context) }) { items ->
+            if (items.isEmpty()) {
+                status.setText(R.string.lorebook_library_empty)
+                return@libraryWork
+            }
+            status.setText(R.string.lorebook_library)
+            val labels = items.map { item ->
+                val header = item.header
+                if (header == null) getString(R.string.lorebook_library_damaged, item.id.take(8))
+                else getString(R.string.lorebook_library_row,
+                    header.name.ifBlank { getString(R.string.lorebook_untitled) }, header.entries, item.id.take(8))
+            }
+            AlertDialog.Builder(this).setTitle(R.string.lorebook_library)
+                .setItems(labels.toTypedArray()) { _, index ->
+                    val item = items[index]
+                    AlertDialog.Builder(this).setTitle(labels[index])
+                        .setItems(arrayOf(getString(R.string.lorebook_library_load),
+                            getString(R.string.lorebook_library_delete))) { _, action ->
+                            if (action == 0) replace {
+                                libraryWork({ LorebookDraftStore.load(context, item.id) }) { loaded ->
+                                    book = loaded
+                                    savedId = item.id
+                                    savedBook = loaded
+                                    resetSearch()
+                                    status.setText(R.string.lorebook_loaded)
+                                    refresh()
+                                }
+                            } else AlertDialog.Builder(this).setMessage(R.string.lorebook_library_delete_confirm)
+                                .setNegativeButton(R.string.cancel, null)
+                                .setPositiveButton(R.string.confirm) { _, _ ->
+                                    libraryWork({ LorebookDraftStore.delete(context, item.id) }) {
+                                        if (savedId == item.id) { savedId = null; savedBook = null }
+                                        status.setText(R.string.lorebook_library_deleted)
+                                        refresh()
+                                    }
+                                }.show()
+                        }.setNegativeButton(R.string.cancel, null).show()
+                }.setNegativeButton(R.string.close, null).show()
+        }
+    }
+
+    private fun showCreatorGuide() {
+        AlertDialog.Builder(this).setTitle(R.string.lorebook_creator_guide)
+            .setMessage(R.string.lorebook_creator_tips)
+            .setPositiveButton(R.string.close, null).show()
     }
 
     private fun open() {
@@ -289,7 +377,7 @@ class LorebookActivity : Activity() {
                 if (closed.get() || isFinishing || isDestroyed) return@runOnUiThread
                 busy = false
                 if (parsed != null) book = parsed
-                if (parsed != null) resetSearch()
+                if (parsed != null) { savedId = null; savedBook = null; resetSearch() }
                 status.setText(if (parsed != null) R.string.lorebook_loaded else R.string.lorebook_failed)
                 refresh()
             }
@@ -388,7 +476,7 @@ class LorebookActivity : Activity() {
         }
     }
 
-    override fun onRetainNonConfigurationInstance(): Any = Retained(book, picker, pendingExport, query, reviewOnly.isChecked)
+    override fun onRetainNonConfigurationInstance(): Any = Retained(book, picker, pendingExport, query, reviewOnly.isChecked, savedId, savedBook)
     override fun onDestroy() {
         closed.set(true)
         super.onDestroy()

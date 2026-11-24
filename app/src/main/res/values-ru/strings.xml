@@ -309,7 +309,7 @@
     <string name="lorebook_untitled">Без названия</string>
     <string name="lorebook_summary">%1$s\nЗаписи: %2$d · Требуют проверки: %3$d · Пропущено отключённых: %4$d</string>
     <string name="lorebook_loss">Некоторые поля или правила активации не поддерживаются целевым форматом. Исходный файл не изменён.</string>
-    <string name="lorebook_replace">Заменить текущий локальный просмотр? Сначала экспортируйте его, если хотите сохранить.</string>
+    <string name="lorebook_replace">Заменить текущий несохранённый черновик? Сначала сохраните локальную копию или экспортируйте его.</string>
     <string name="lorebook_processing">Локальная обработка…</string>
     <string name="lorebook_failed">Не удалось импортировать файл. Проверьте кодировку UTF-8, формат и размер. Текущий просмотр сохранён.</string>
     <string name="lorebook_loaded">Загружено локально. Нажмите на запись для просмотра.</string>
@@ -339,5 +339,20 @@
     <string name="lorebook_delete_confirm">Удалить эту запись из локального черновика?</string>
     <string name="lorebook_delete_last">Оставьте хотя бы одну запись. Чтобы заменить черновик, создайте новый лорбук.</string>
     <string name="lorebook_edit_limit">Не удалось сохранить изменение в пределах локальных ограничений. Черновик сохранён.</string>
-    <string name="lorebook_close_warning">Закрыть редактор? Локальные изменения не сохраняются без явного экспорта.</string>
+    <string name="lorebook_close_warning">Закрыть редактор? Несохранённые изменения будут потеряны, если не сохранить черновик или не экспортировать файл.</string>
+    <string name="lorebook_library">Сохранённые лорбуки</string>
+    <string name="lorebook_save_local">Сохранить локальный черновик</string>
+    <string name="lorebook_save_copy">Сохранить как новую локальную копию</string>
+    <string name="lorebook_local_saved">Сохранено на этом устройстве.</string>
+    <string name="lorebook_local_unsaved">Локальные изменения не сохранены.</string>
+    <string name="lorebook_library_empty">Локальных лорбуков пока нет.</string>
+    <string name="lorebook_library_failed">Операция с локальной библиотекой не удалась. Проверьте свободное место, целостность файла и лимит в 16 лорбуков. Текущий черновик сохранён.</string>
+    <string name="lorebook_library_row">%1$s · Записей: %2$d · %3$s</string>
+    <string name="lorebook_library_damaged">Не читается сохранённый черновик · %1$s</string>
+    <string name="lorebook_library_load">Открыть сохранённый черновик</string>
+    <string name="lorebook_library_delete">Удалить сохранённую копию</string>
+    <string name="lorebook_library_delete_confirm">Удалить эту локальную сохранённую копию? Открытый черновик и экспортированные файлы не будут удалены.</string>
+    <string name="lorebook_library_deleted">Локальная сохранённая копия удалена.</string>
+    <string name="lorebook_creator_guide">Руководство автора</string>
+    <string name="lorebook_creator_tips">Храните личность, характер и постоянные правила поведения в Character Definition. Используйте лорбуки для фактов, нужных в определённом контексте.\n\nТипы записей: второстепенный персонаж, локация, предмет, событие, фракция, система или правило, культура или религия, вид. Объясняйте, как факт должен влиять на ответ. Выбирайте конкретные имена и фразы, а не частые слова. Используйте не более восьми ключей. {{user}} обозначает текущую персону, {{char}} — связанного персонажа. Называйте конкретного персонажа, если правило не относится ко всем связанным персонажам.\n\nПроверяйте записи в официальном редакторе и чате до публикации. Локальное сохранение не привязывает и не публикует лорбук.</string>
 </resources>

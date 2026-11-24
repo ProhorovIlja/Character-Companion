@@ -309,7 +309,7 @@
     <string name="lorebook_untitled">Untitled</string>
     <string name="lorebook_summary">%1$s\nEntries: %2$d · Need review: %3$d · Disabled skipped: %4$d</string>
     <string name="lorebook_loss">Some source fields or trigger rules are not supported by the target format. The original file is unchanged.</string>
-    <string name="lorebook_replace">Replace the current local preview? Export it first if you want to keep it.</string>
+    <string name="lorebook_replace">Replace the current unsaved draft? Save a local copy or export it first if you want to keep it.</string>
     <string name="lorebook_processing">Processing locally…</string>
     <string name="lorebook_failed">Could not import this file. Check UTF-8 encoding, supported format and size limits. Existing preview was kept.</string>
     <string name="lorebook_loaded">Loaded locally. Tap an entry to review it.</string>
@@ -339,5 +339,20 @@
     <string name="lorebook_delete_confirm">Delete this entry from the local draft?</string>
     <string name="lorebook_delete_last">Keep at least one entry. Create a new lorebook to replace the draft.</string>
     <string name="lorebook_edit_limit">Cannot save this edit within the local size limits. Existing draft kept.</string>
-    <string name="lorebook_close_warning">Close this workspace? Local changes are not retained unless you explicitly export them.</string>
+    <string name="lorebook_close_warning">Close this workspace? Unsaved changes will be lost unless you save a local draft or export a file.</string>
+    <string name="lorebook_library">Saved lorebooks</string>
+    <string name="lorebook_save_local">Save local draft</string>
+    <string name="lorebook_save_copy">Save as a new local copy</string>
+    <string name="lorebook_local_saved">Saved privately on this device.</string>
+    <string name="lorebook_local_unsaved">Unsaved local changes.</string>
+    <string name="lorebook_library_empty">No locally saved lorebooks yet.</string>
+    <string name="lorebook_library_failed">Local library operation failed. Check free space, file validity and the 16-book limit. Existing draft was kept.</string>
+    <string name="lorebook_library_row">%1$s · %2$d entries · %3$s</string>
+    <string name="lorebook_library_damaged">Unreadable saved draft · %1$s</string>
+    <string name="lorebook_library_load">Open saved draft</string>
+    <string name="lorebook_library_delete">Delete saved copy</string>
+    <string name="lorebook_library_delete_confirm">Permanently delete this local saved copy? The currently open draft and exported files will not be deleted.</string>
+    <string name="lorebook_library_deleted">Local saved copy deleted.</string>
+    <string name="lorebook_creator_guide">Creator guide</string>
+    <string name="lorebook_creator_tips">Keep identity, core personality and always-needed behavior in the Character Definition. Use lorebooks for facts needed only in context.\n\nEntry ideas: side character, location, item, event, faction, system or rule, culture or religion, species. A useful entry explains how the fact should affect a reply. Choose specific names and phrases, not common words. Use at most eight activation keywords. {{user}} refers to the current Persona; {{char}} refers to the linked Character. Name a particular character directly if a shared rule is not true of every linked character.\n\nTest in the official editor and in chat before publishing. Local saving does not link or publish a lorebook.</string>
 </resources>

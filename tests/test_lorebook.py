@@ -41,6 +41,23 @@ class LorebookTests(unittest.TestCase):
                       'if (keys.text.toString() == originalKeys) entry.keys'):
             self.assertIn(token, a)
 
+    def test_explicit_private_drafts(self):
+        a = (JAVA/'LorebookActivity.kt').read_text()
+        store = (JAVA/'LorebookDraftStore.kt').read_text()
+        for token in ('LorebookDraftStore.save(context, id, snapshot)',
+                      'LorebookDraftStore.list(context)', 'LorebookDraftStore.load(context, item.id)',
+                      'LorebookDraftStore.delete(context, item.id)', 'book === savedBook',
+                      'savedId = stored', 'savedBook = snapshot',
+                      'R.string.lorebook_library_delete_confirm', 'R.string.lorebook_creator_tips'):
+            self.assertIn(token, a)
+        for token in ('MAX_BOOKS = 16', 'context.filesDir', 'AtomicFile', 'UUID.randomUUID()',
+                      'idPattern.matches(id)', '@Synchronized fun save',
+                      'target.finishWrite(stream)', 'target.failWrite(stream)',
+                      'read(target, LorebookDraftCodec::read) == book'):
+            self.assertIn(token, store)
+        self.assertNotIn('WorkManager', store)
+        self.assertNotIn('http', store)
+
     def test_localization(self):
         def names(locale):
             root = ET.parse(ROOT/f'app/src/main/res/{locale}/strings.xml').getroot()
