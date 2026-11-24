@@ -149,6 +149,7 @@ fun main() {
     verifyRoleplayToolkit()
     verifyCharacterContext()
     verifyMemoryBank()
+    verifyRecallContext()
     verifyChatRefresh()
     verifyCharacterBackup()
     verifyCharx()

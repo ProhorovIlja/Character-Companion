@@ -148,10 +148,11 @@ object RoleplayToolkitUi {
         toast(activity, if (ok) R.string.character_draft_copied else R.string.roleplay_failed)
     }
 
-    private fun context(activity: Activity) {
-        val slots = RoleplayToolkit.Slot.entries
+    private fun context(activity: Activity, recalled: String? = null) {
+        val slots = RoleplayToolkit.Slot.entries.filter { recalled == null || it != RoleplayToolkit.Slot.MEMORY }
         val selected = BooleanArray(slots.size)
-        showPrivate(activity, AlertDialog.Builder(activity).setTitle(R.string.roleplay_context)
+        showPrivate(activity, AlertDialog.Builder(activity).setTitle(
+            if (recalled == null) R.string.roleplay_context else R.string.recall_context_add_fields)
             .setMultiChoiceItems(slots.map { activity.getString(title(it)) }.toTypedArray(), selected) { _, index, checked ->
                 selected[index] = checked
             }.setNegativeButton(R.string.cancel, null)
@@ -160,7 +161,14 @@ object RoleplayToolkitUi {
                     val chosen = slots.filterIndexed { index, _ -> selected[index] }
                     val context = activity.applicationContext
                     ManualEditorWork.load(activity, { chosen.associateWith { RoleplayToolkitStore.load(context, it) } }) { result ->
-                        result.fold({ research(activity, it) }, { toast(activity, R.string.roleplay_failed) })
+                        result.fold({ data ->
+                            val combined = if (recalled == null) data else RecallContext.combine(recalled, data)
+                            if (combined != null) research(activity, combined)
+                            else {
+                                toast(activity, R.string.roleplay_context_invalid)
+                                context(activity, recalled)
+                            }
+                        }, { toast(activity, R.string.roleplay_failed) })
                     }
                 }
             }.create())
@@ -393,17 +401,31 @@ object RoleplayToolkitUi {
                 if (response.isFailure) input.error = activity.getString(R.string.roleplay_failed)
                 else if (result == null || result.entries.isEmpty()) input.error = activity.getString(R.string.memory_bank_no_match)
                 else {
-                    val packet = CharacterContext.compose(mapOf(RoleplayToolkit.Slot.MEMORY to result.text))
-                    if (packet == null) input.error = activity.getString(R.string.roleplay_context_invalid)
-                    else {
-                        dialog.dismiss()
-                        showPrivate(activity, AlertDialog.Builder(activity).setTitle(profile)
-                            .setMessage(activity.getString(R.string.memory_bank_recall_count, result.entries.size, result.omitted))
-                            .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.confirm) { _, _ ->
-                                if (active(activity)) previewContext(activity, packet)
-                            }.create())
-                    }
+                    dialog.dismiss()
+                    chooseRecall(activity, profile, result)
                 }
+            }
+        }
+    }
+
+    private fun chooseRecall(activity: Activity, profile: String, result: MemoryBank.Recall) {
+        val entries = result.entries
+        val selected = BooleanArray(entries.size) { true }
+        val labels = entries.map { it.title + " (" + it.body.length + ")" }
+        val dialog = AlertDialog.Builder(activity).setTitle(
+            activity.getString(R.string.recall_context_choose, profile, result.omitted))
+            .setMultiChoiceItems(labels.toTypedArray(), selected) { _, index, checked -> selected[index] = checked }
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.confirm, null).create()
+        showPrivate(activity, dialog)
+        if (!dialog.isShowing) return
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            if (!active(activity)) return@setOnClickListener
+            val text = RecallContext.select(profile, entries, selected.indices.filter { selected[it] }.toSet())
+            if (text == null) toast(activity, R.string.recall_context_empty)
+            else {
+                dialog.dismiss()
+                context(activity, text)
             }
         }
     }

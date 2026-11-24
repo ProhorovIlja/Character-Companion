@@ -456,4 +456,7 @@
     <string name="shell_menu_support">Обслуживание и помощь</string>
     <string name="editor_working">Обработка…</string>
     <string name="editor_character_count">%1$d / %2$d</string>
+    <string name="recall_context_add_fields">Добавить общие поля к выбранным воспоминаниям</string>
+    <string name="recall_context_choose">%1$s — выберите записи (не поместилось: %2$d)</string>
+    <string name="recall_context_empty">Выберите хотя бы одно подходящее воспоминание</string>
 </resources>
