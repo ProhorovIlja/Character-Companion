@@ -1,6 +1,5 @@
-# Explicitly user-authorized, manually started APK compilation only.
-# No push, pull_request, cron, workflow_run, or other automatic triggers.
-name: Build Android APKs (manual)
+# Existing explicitly authorized manual build only. No automatic triggers.
+name: Build Character Companion APK (manual)
 
 on:
   workflow_dispatch:
@@ -10,7 +9,7 @@ permissions:
 
 jobs:
   build-apks:
-    name: Compile GeckoView and WebView debug APKs
+    name: Compile single ARM64 APK with both embedded engines
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -18,91 +17,56 @@ jobs:
         uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-
       - name: Set up Java 21
         uses: actions/setup-java@v6.3.0
         with:
           distribution: temurin
           java-version: '21'
-
       - name: Set up Android SDK command-line tools
         uses: android-actions/setup-android@v4.0.4
         with:
           packages: 'platform-tools'
           log-accepted-android-sdk-licenses: 'false'
-
-      - name: Install Android 37.0 platform and build tools
+      - name: Install Android 37.2 platform and build tools
         shell: bash
-        run: bash scripts/install-android37-sdk.sh legacy
-
+        run: bash scripts/install-android37-sdk.sh gecko
       - name: Verify pinned Gradle wrapper and build prerequisites
         shell: bash
-        run: bash scripts/doctor.sh legacy
-
+        run: bash scripts/doctor.sh gecko
       - name: Run repository Python regression tests
         shell: bash
         run: python3 -m unittest discover -s tests -p 'test_*.py'
-
-      - name: Build and verify GeckoView debug APK
-        id: gecko
-        continue-on-error: true
+      - name: Build and verify combined APK
         shell: bash
         run: |
           set -euo pipefail
-          bash scripts/install-android37-sdk.sh gecko
           bash scripts/build-apk.sh gecko
           bash scripts/verify-debug-apk.sh gecko
-
-      - name: Build and verify WebView debug APK
-        id: legacy
-        continue-on-error: true
+      - name: Collect the single verified APK
         shell: bash
         run: |
           set -euo pipefail
-          bash scripts/build-apk.sh legacy
-          bash scripts/verify-debug-apk.sh legacy
-
-      - name: Collect verified debug APKs and build metadata
-        env:
-          GECKO_OUTCOME: ${{ steps.gecko.outcome }}
-          LEGACY_OUTCOME: ${{ steps.legacy.outcome }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p dist
-          # Never publish files from a failed step, even if a partial file exists.
-          if [[ "$GECKO_OUTCOME" != success ]]; then rm -f dist/CharacterCompanion-gecko-debug.apk; fi
-          if [[ "$LEGACY_OUTCOME" != success ]]; then rm -f dist/CharacterCompanion-legacy-debug.apk; fi
-          shopt -s nullglob
-          apks=(dist/*.apk)
-          if (( ${#apks[@]} == 0 )); then
-            echo 'Neither flavor produced a verified APK.' >&2
-            exit 1
-          fi
-          (cd dist && sha256sum ./*.apk > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          rm -f dist/CharacterCompanion-legacy-debug.apk
+          mv dist/CharacterCompanion-gecko-debug.apk dist/CharacterCompanion-Android-debug.apk
+          (cd dist && sha256sum CharacterCompanion-Android-debug.apk > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
           {
             printf 'COMMIT=%s\n' "$GITHUB_SHA"
             printf 'RUN_ID=%s\n' "$GITHUB_RUN_ID"
             printf 'TRIGGER=workflow_dispatch_ONLY\n'
-            printf 'ANDROID_COMPILE_SDK_GECKO=37.2\nANDROID_COMPILE_SDK_LEGACY=37.0\n'
-            printf 'BUILD_TYPE=DEBUG_NOT_PRODUCTION\n'
-            printf 'DEVICE_TESTED=NO\n'
-            printf 'GECKO_OUTCOME=%s\nLEGACY_OUTCOME=%s\n' "$GECKO_OUTCOME" "$LEGACY_OUTCOME"
+            printf 'ANDROID_COMPILE_SDK_GECKO=37.2\n'
+            printf 'DISTRIBUTION=ONE_ARM64_APK\nRENDERERS=GECKOVIEW_WEBVIEW_EXTERNAL_BROWSER\n'
+            printf 'BUILD_TYPE=DEBUG_NOT_PRODUCTION\nDEVICE_TESTED=NO\n'
             printf 'APK_SIGNATURE=VERIFIED_DEBUG_KEY\n'
           } > dist/BUILD_INFO.txt
-
-      - name: Upload verified debug APKs and checksums
+      - name: Upload verified debug APK and checksums
         uses: actions/upload-artifact@v7.0.2
         with:
-          name: CharacterCompanion-Android-debug-APKs
-          path: dist/
+          name: CharacterCompanion-Android-debug-APK
+          path: |
+            dist/CharacterCompanion-Android-debug.apk
+            dist/SHA256SUMS.txt
+            dist/BUILD_INFO.txt
+            dist/native-audit-gecko.txt
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
-
-      - name: Report incomplete build as failure after artifact upload
-        if: ${{ !cancelled() && (steps.gecko.outcome == 'failure' || steps.legacy.outcome == 'failure') }}
-        shell: bash
-        run: |
-          echo 'One or more flavors failed. Review both steps; any verified APKs have been uploaded.' >&2
-          exit 1

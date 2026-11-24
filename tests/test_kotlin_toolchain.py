@@ -28,16 +28,14 @@ class KotlinToolchainTests(unittest.TestCase):
         self.assertIn("java-version: '21'", source)
         self.assertEqual(manual_workflow_issues(ROOT), [])
 
-    def test_independent_verified_flavors_do_not_hide_failure(self):
+    def test_single_distribution_apk(self):
         source = (ROOT/'.github/workflows/build-android-apk-manual.yml').read_text()
-        for flavor in ('gecko', 'legacy'):
-            self.assertIn('id: ' + flavor, source)
-            self.assertIn('bash scripts/build-apk.sh ' + flavor, source)
-            self.assertIn('bash scripts/verify-debug-apk.sh ' + flavor, source)
-            self.assertIn('steps.' + flavor + '.outcome', source)
-        self.assertEqual(source.count('continue-on-error: true'), 2)
-        self.assertLess(source.index('Upload verified debug APKs'), source.index('Report incomplete build as failure'))
-        self.assertIn('Neither flavor produced a verified APK.', source)
+        self.assertIn('bash scripts/build-apk.sh gecko', source)
+        self.assertIn('bash scripts/verify-debug-apk.sh gecko', source)
+        self.assertNotIn('bash scripts/build-apk.sh legacy', source)
+        self.assertNotIn('continue-on-error: true', source)
+        self.assertIn('dist/CharacterCompanion-Android-debug.apk', source)
+        self.assertIn('DISTRIBUTION=ONE_ARM64_APK', source)
         verify = (ROOT/'scripts/verify-debug-apk.sh').read_text()
         self.assertIn('CN=Android Debug', verify)
         self.assertIn('versionCode=', verify)

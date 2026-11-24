@@ -32,7 +32,7 @@ class ToolchainCompatibilityTests(unittest.TestCase):
         self.assertIn('platforms/android-$sdk_version/android.jar', installer)
         self.assertNotIn("'platforms;android-37'", installer)
         self.assertIn('ANDROID_COMPILE_SDK_GECKO=37.2',workflow)
-        self.assertIn('ANDROID_COMPILE_SDK_LEGACY=37.0',workflow)
+        self.assertNotIn('ANDROID_COMPILE_SDK_LEGACY=37.0',workflow)
         self.assertIn('workflow_dispatch:',workflow)
         for trigger in ('push:', 'pull_request:', 'schedule:', 'workflow_run:'):
             self.assertNotIn('\n  '+trigger,workflow)

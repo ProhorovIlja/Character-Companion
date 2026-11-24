@@ -13,6 +13,10 @@ class SettingsStore(context: Context) {
     var browserSessionPreferred: Boolean
         get() = prefs.getBoolean("browser_session_preferred", false)
         set(v) = prefs.edit().putBoolean("browser_session_preferred", v).apply()
+    // Shared APK: preserve the chosen embedded engine without transferring browser cookies.
+    var preferWebView: Boolean
+        get() = prefs.getBoolean("prefer_webview", false)
+        set(v) = prefs.edit().putBoolean("prefer_webview", v).apply()
     var browserSessionProvider: String
         get() = prefs.getString("browser_session_provider", "").orEmpty()
         set(v) = prefs.edit().putString("browser_session_provider", v.take(255)).apply()

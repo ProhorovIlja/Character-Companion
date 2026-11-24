@@ -609,6 +609,7 @@ class MainActivity : Activity() {
         ShellMenu.show(this, anchor, listOf(
             ShellMenu.Action(R.string.settings) { showSettings() },
             ShellMenu.Action(R.string.release_center) { ReleaseCenter.show(this) },
+            ShellMenu.Action(R.string.engine_use_gecko, BuildConfig.FLAVOR == "gecko") { returnToGecko() },
             ShellMenu.Action(R.string.forward, ready && webView.canGoForward()) { webView.goForward() },
             ShellMenu.Action(R.string.reload, ready) { webView.reload() },
             ShellMenu.Action(R.string.shell_refresh_cache, ready) {
@@ -640,6 +641,29 @@ class MainActivity : Activity() {
                 BrowserSessionActivity.enter(this, BrowserSessionPolicy.HOME, openNow = true)
             }
             .show()
+    }
+
+    private fun returnToGecko() {
+        if (BuildConfig.FLAVOR != "gecko" || destroyed || isFinishing) return
+        AlertDialog.Builder(this).setTitle(R.string.engine_use_gecko)
+            .setMessage(R.string.engine_switch_warning)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.confirm) { _, _ ->
+                val previous = store.preferWebView
+                store.preferWebView = false
+                try {
+                    startActivity(Intent(Intent.ACTION_SEND).apply {
+                        setClassName(packageName, "$packageName.GeckoActivity")
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, NativeWorkspaceNavigation.safeDestination(lastUrl))
+                        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    })
+                    finish()
+                } catch (_: RuntimeException) {
+                    store.preferWebView = previous
+                    showToast(getString(R.string.engine_switch_failed))
+                }
+            }.show()
     }
 
     private fun confirmBrowserSessionMode() {

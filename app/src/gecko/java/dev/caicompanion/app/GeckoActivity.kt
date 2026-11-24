@@ -96,6 +96,11 @@ class GeckoActivity : Activity() {
             if (intent?.action == Intent.ACTION_SEND) setIntent(Intent(Intent.ACTION_MAIN))
             if (BrowserSessionActivity.enter(this, shared ?: HOME, openNow = shared != null)) return
         }
+        if (!settings.browserSessionPreferred && settings.preferWebView) {
+            val shared = sharedLink(intent)
+            if (intent?.action == Intent.ACTION_SEND) setIntent(Intent(Intent.ACTION_MAIN))
+            if (switchToWebView(shared)) return
+        }
         if (settings.protectScreen) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -185,7 +190,7 @@ class GeckoActivity : Activity() {
             AlertDialog.Builder(this).setTitle(R.string.error_title)
                 .setMessage(R.string.gecko_error)
                 .setPositiveButton(R.string.gecko_legacy) { _, _ ->
-                    startActivity(Intent(this, MainActivity::class.java)); finish()
+                    switchToWebView(activeUrl)
                 }
                 .setNegativeButton(R.string.cancel) { _, _ -> finish() }
                 .show()
@@ -225,6 +230,7 @@ class GeckoActivity : Activity() {
         ShellMenu.show(this, anchor, listOf(
             ShellMenu.Action(R.string.settings) { showGeckoSettings() },
             ShellMenu.Action(R.string.release_center) { ReleaseCenter.show(this) },
+            ShellMenu.Action(R.string.gecko_legacy) { confirmWebViewSwitch() },
             ShellMenu.Action(R.string.device_compat_title) { DeviceRuntimeProbe.show(this, "gecko") },
             ShellMenu.Action(R.string.forward, ready && canGoForward) { session.goForward() },
             ShellMenu.Action(R.string.reload, ready) { session.reload() },
@@ -414,7 +420,7 @@ class GeckoActivity : Activity() {
             .setItems(categories.map { getString(it) }.toTypedArray()) { _, selected ->
                 showGeckoSettingsSection(categories[selected])
             }.setNeutralButton(R.string.gecko_legacy) { _, _ ->
-                startActivity(Intent(this, MainActivity::class.java))
+                confirmWebViewSwitch()
             }.setPositiveButton(R.string.close, null).show()
     }
 
@@ -517,7 +523,7 @@ class GeckoActivity : Activity() {
             .setMessage(if (canRetry) R.string.gecko_recovery_message else R.string.gecko_recovery_limit)
             .setNegativeButton(R.string.cancel, null)
             .setNeutralButton(R.string.gecko_legacy) { _, _ ->
-                startActivity(Intent(this, MainActivity::class.java)); finish()
+                switchToWebView(activeUrl)
             }
         if (canRetry) dialog.setPositiveButton(R.string.retry) { _, _ -> recoverGecko() }
         recoveryDialog = dialog.create().also { it.show() }
@@ -1034,6 +1040,36 @@ class GeckoActivity : Activity() {
         }
         val intent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, link) }
         startActivity(Intent.createChooser(intent, getString(R.string.share)))
+    }
+
+    private fun confirmWebViewSwitch() {
+        AlertDialog.Builder(this).setTitle(R.string.gecko_legacy)
+            .setMessage(R.string.engine_switch_warning)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.confirm) { _, _ -> switchToWebView(activeUrl) }.show()
+    }
+
+    private fun switchToWebView(page: String?): Boolean {
+        if (isFinishing || isDestroyed) return false
+        val previous = settings.preferWebView
+        settings.preferWebView = true
+        return try {
+            startActivity(Intent(this, MainActivity::class.java).apply {
+                // Ordinary startup preserves the native hub and resume-page preference.
+                if (page != null) {
+                    action = Intent.ACTION_SEND
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, NativeWorkspaceNavigation.safeDestination(page))
+                }
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            })
+            finish()
+            true
+        } catch (_: RuntimeException) {
+            settings.preferWebView = previous
+            Toast.makeText(this, R.string.engine_switch_failed, Toast.LENGTH_LONG).show()
+            false
+        }
     }
 
     private fun confirmBrowserSessionMode() {

@@ -288,4 +288,7 @@
     <string name="library_pinned_title">★ %1$s</string>
     <string name="voice_live_preview">Распознавание: %1$s</string>
     <string name="renderer_recovery_required">Движок браузера остановлен. Нажмите «Повторить», чтобы открыть страницу, или используйте внешний браузер.</string>
+    <string name="engine_use_gecko">Перейти на GeckoView</string>
+    <string name="engine_switch_warning">Смена движка закрывает текущую сессию. Несохранённый текст может быть потерян. Сессии входа раздельные; cookies не переносятся.</string>
+    <string name="engine_switch_failed">Не удалось переключить движок браузера.</string>
 </resources>

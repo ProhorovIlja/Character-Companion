@@ -83,6 +83,24 @@ class GeckoFlavorTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('Explicit renderer flavor', result.stderr)
 
+    def test_single_distribution_switches_without_cookie_transfer(self):
+        gecko = (ROOT/'app/src/gecko/java/dev/caicompanion/app/GeckoActivity.kt').read_text()
+        main = (ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
+        store = (ROOT/'app/src/main/java/dev/caicompanion/app/SettingsStore.kt').read_text()
+        self.assertIn('getBoolean("prefer_webview", false)', store)
+        self.assertIn('if (switchToWebView(shared)) return', gecko)
+        self.assertLess(gecko.index('if (switchToWebView(shared)) return'), gecko.index('session = GeckoSession()'))
+        self.assertIn('settings.preferWebView = true', gecko)
+        self.assertIn('settings.preferWebView = previous', gecko)
+        self.assertIn('store.preferWebView = false', main)
+        self.assertIn('store.preferWebView = previous', main)
+        self.assertIn('if (page != null)', gecko.split('private fun switchToWebView(', 1)[1])
+        self.assertIn('NativeWorkspaceNavigation.safeDestination(page)', gecko)
+        self.assertIn('NativeWorkspaceNavigation.safeDestination(lastUrl)', main)
+        self.assertIn('BuildConfig.FLAVOR == "gecko"', main)
+        self.assertNotIn('getCookie(', gecko + main)
+        self.assertIn('case "$FLAVOR" in gecko)', (ROOT/'scripts/prepare-release.sh').read_text())
+
     def test_gecko_l10n_and_resource_references(self):
         vals = (ROOT/'app/src/main/res/values/strings.xml').read_text()
         ru = (ROOT/'app/src/main/res/values-ru/strings.xml').read_text()

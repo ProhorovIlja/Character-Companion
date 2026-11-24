@@ -15,9 +15,9 @@ PKG='dev.caicompanion.app'
 APK="${1:-}"
 SIGNOFF="${2:-}"
 FLAVOR="${3:-}"
-case "$FLAVOR" in gecko|legacy) ;; *) echo "Explicit renderer flavor (gecko|legacy) required." >&2; exit 2;; esac
+case "$FLAVOR" in gecko) ;; *) echo "Explicit renderer flavor gecko required for the single combined release APK." >&2; exit 2;; esac
 if [[ -z "$APK" || -z "$SIGNOFF" || ! -s "$APK" ]]; then
-  echo 'Usage: bash scripts/prepare-release.sh /path/to/app-gecko-release-signed.apk /path/to/device-signoff.txt gecko|legacy' >&2
+  echo 'Usage: bash scripts/prepare-release.sh /path/to/app-gecko-release-signed.apk /path/to/device-signoff.txt gecko' >&2
   echo 'No APK or device signoff: release preparation intentionally refused.' >&2
   exit 2
 fi
