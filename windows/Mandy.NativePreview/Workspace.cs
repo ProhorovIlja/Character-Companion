@@ -71,10 +71,13 @@ internal sealed class Workspace : IDisposable
         }
         catch { lease.Dispose(); throw; }
     }
-    internal List<LocalHistory.Event> Recent()
+    internal List<LocalHistory.Event> Recent() => Page(null);
+
+    // Stable cursor, no OFFSET and no unbounded history materialization.
+    internal List<LocalHistory.Event> Page((long Clock, string Id)? before)
     {
         using var store = new LocalHistory(Database, Character.Account);
-        return store.Page(Character.Character, Character.Chat, 50);
+        return store.Page(Character.Character, Character.Chat, 50, before);
     }
     public void Dispose() => lease.Dispose();
 }
