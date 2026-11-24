@@ -15,7 +15,8 @@ class ImportedRuleStore(context: Context) {
             val text = InputStreamReader(input, StandardCharsets.UTF_8).use { reader ->
                 BoundedText.read(reader, RuleListParser.MAX_CHARACTERS)
             }
-            RuleListParser.parse(text) ?: RuleListParser.Rules()
+            // BoundedText returns null for oversized or unreadable input.
+            text?.let(RuleListParser::parse) ?: RuleListParser.Rules()
         }
     } catch (_: Exception) { RuleListParser.Rules() }
 

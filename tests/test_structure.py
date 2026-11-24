@@ -260,6 +260,9 @@ class Structure(unittest.TestCase):
         self.assertIn('MAX_DOMAINS = 40_000', parser)
         self.assertIn('MAX_LINES = 100_000', parser)
         self.assertIn('AtomicFile', store)
+        # The bounded reader returns String?; a rejected list must not reach parse(String).
+        self.assertIn('text?.let(RuleListParser::parse) ?: RuleListParser.Rules()', store)
+        self.assertNotIn('RuleListParser.parse(text)', store)
         self.assertIn('file.finishWrite(stream)', store)
         self.assertIn('file.failWrite(stream)', store)
         self.assertIn('BoundedText.read(reader, RuleListParser.MAX_CHARACTERS)', activity)

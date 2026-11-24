@@ -378,6 +378,15 @@ fun main() {
     check(RuleListParser.parse("||a.example^\n".repeat(RuleListParser.MAX_LINES + 1)) == null)
     check(RuleListParser.parse("x".repeat(RuleListParser.MAX_CHARACTERS + 1)) == null)
     check(RuleListParser.parse("||ex.example^\n".repeat(3))!!.size == 1)
+    // Match the persisted rules load path: no nullable String reaches parse().
+    fun parseStoredRules(contents: String): RuleListParser.Rules =
+        BoundedText.read(StringReader(contents), RuleListParser.MAX_CHARACTERS)
+            ?.let(RuleListParser::parse) ?: RuleListParser.Rules()
+    check(parseStoredRules("||stored.example^\n").blocked == setOf("stored.example"))
+    check(parseStoredRules("").size == 0)
+    check(parseStoredRules("https://example.com/path").size == 0)
+    check(parseStoredRules("||stored.example^\n" + "x".repeat(RuleListParser.MAX_CHARACTERS)).size == 0)
+
     // Oversized rulesets fail as a whole rather than silently truncating protection.
     val hugeRules = buildString {
         for (i in 1..RuleListParser.MAX_DOMAINS + 1) append("host$i.example\n")
