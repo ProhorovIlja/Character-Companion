@@ -320,4 +320,24 @@
     <string name="lorebook_export_failed">Не удалось безопасно экспортировать в этом формате или результат слишком большой. Попробуйте JSON вместо TXT или копирования.</string>
     <string name="lorebook_copied">Текст скопирован. Вставьте в официальный редактор импорта лорбуков.</string>
     <string name="lorebook_saved">Преобразованный файл сохранён. Выберите его в официальном редакторе импорта лорбуков.</string>
+    <string name="lorebook_new">Создать лорбук</string>
+    <string name="lorebook_metadata">Изменить название и описание</string>
+    <string name="lorebook_add_entry">Добавить запись</string>
+    <string name="lorebook_search">Поиск по названиям, ключам и содержимому</string>
+    <string name="lorebook_search_apply">Поиск</string>
+    <string name="lorebook_review_only">Только требующие проверки</string>
+    <string name="lorebook_review_label">Проверить: %1$s</string>
+    <string name="lorebook_name">Название лорбука</string>
+    <string name="lorebook_description">Описание лорбука</string>
+    <string name="lorebook_entry_title">Название записи</string>
+    <string name="lorebook_entry_keys">Ключи, по одному на строку (пустые строки пропускаются)</string>
+    <string name="lorebook_entry_content">Содержимое записи</string>
+    <string name="lorebook_edit_entry">Изменить запись</string>
+    <string name="lorebook_preview_entry">Просмотр записи</string>
+    <string name="lorebook_duplicate">Дублировать запись</string>
+    <string name="lorebook_delete">Удалить запись</string>
+    <string name="lorebook_delete_confirm">Удалить эту запись из локального черновика?</string>
+    <string name="lorebook_delete_last">Оставьте хотя бы одну запись. Чтобы заменить черновик, создайте новый лорбук.</string>
+    <string name="lorebook_edit_limit">Не удалось сохранить изменение в пределах локальных ограничений. Черновик сохранён.</string>
+    <string name="lorebook_close_warning">Закрыть редактор? Локальные изменения не сохраняются без явного экспорта.</string>
 </resources>

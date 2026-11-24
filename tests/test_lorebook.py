@@ -27,6 +27,20 @@ class LorebookTests(unittest.TestCase):
                       'put("comment", entry.title)', 'put("key", JSONArray(entry.keys))'):
             self.assertIn(token, j)
 
+    def test_local_editor(self):
+        a = (JAVA/'LorebookActivity.kt').read_text()
+        for token in ('LorebookEditor.search(it, query, reviewOnly.isChecked)',
+                      'visibleIndices.getOrNull(index)?.let(::entryActions)',
+                      'LorebookEditor.replace(current, index,',
+                      'LorebookEditor.remove(current, index)',
+                      'LorebookEditor.metadata(current,',
+                      'current.entries.any(LorebookEditor::review)',
+                      'dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener',
+                      'R.string.lorebook_close_warning',
+                      'isSaveFromParentEnabled = false',
+                      'if (keys.text.toString() == originalKeys) entry.keys'):
+            self.assertIn(token, a)
+
     def test_localization(self):
         def names(locale):
             root = ET.parse(ROOT/f'app/src/main/res/{locale}/strings.xml').getroot()

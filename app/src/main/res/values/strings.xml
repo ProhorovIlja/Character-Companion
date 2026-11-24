@@ -320,4 +320,24 @@
     <string name="lorebook_export_failed">Could not export safely in this format or the output is too large. Try JSON instead of TXT or copy.</string>
     <string name="lorebook_copied">Text copied. Paste into the official Lorebook Import editor.</string>
     <string name="lorebook_saved">Converted file saved. Select it in the official Lorebook Import editor.</string>
+    <string name="lorebook_new">Create new lorebook</string>
+    <string name="lorebook_metadata">Edit name and description</string>
+    <string name="lorebook_add_entry">Add entry</string>
+    <string name="lorebook_search">Search titles, keywords and content</string>
+    <string name="lorebook_search_apply">Search</string>
+    <string name="lorebook_review_only">Needs review only</string>
+    <string name="lorebook_review_label">Review: %1$s</string>
+    <string name="lorebook_name">Lorebook name</string>
+    <string name="lorebook_description">Lorebook description</string>
+    <string name="lorebook_entry_title">Entry title</string>
+    <string name="lorebook_entry_keys">Keywords, one per line (blank lines ignored)</string>
+    <string name="lorebook_entry_content">Entry content</string>
+    <string name="lorebook_edit_entry">Edit entry</string>
+    <string name="lorebook_preview_entry">Preview entry</string>
+    <string name="lorebook_duplicate">Duplicate entry</string>
+    <string name="lorebook_delete">Delete entry</string>
+    <string name="lorebook_delete_confirm">Delete this entry from the local draft?</string>
+    <string name="lorebook_delete_last">Keep at least one entry. Create a new lorebook to replace the draft.</string>
+    <string name="lorebook_edit_limit">Cannot save this edit within the local size limits. Existing draft kept.</string>
+    <string name="lorebook_close_warning">Close this workspace? Local changes are not retained unless you explicitly export them.</string>
 </resources>

@@ -13,3 +13,6 @@ References:
 - https://github.com/proto-deus/Silly-Tavern-Explorer
 
 QA: local pure Kotlin text grammar and bounds tests; Android JSON parser, SAF, clipboard, native preview and actual official import require Android build/device testing. No subscription bypass or automated publication.
+
+## Local creation and editing
+Create a new draft, edit book name/description, add, preview, edit, duplicate or explicitly delete entries. The original imported document is unchanged. Search titles, keywords and contents with an explicit Search action (up to eight terms); the review-only filter flags missing fields, over-eight keywords and repeated case-insensitive keywords within an entry. Search results map back to original indices. Keywords use one line per key; untouched imported keys are preserved verbatim. Invalid edits leave the dialog open and retain the existing draft. A final entry cannot be deleted, but a new book can replace the draft. No silent truncation or deduplication. The preview remains memory-only; export before closing, which now requires confirmation. Reviewed https://github.com/SamYTTK/ST-EnhancedLorebook and https://github.com/ActualBroeckchen/SLEd as interface references, not copied code. No new dependencies or network access. Actual Android UI testing required.
