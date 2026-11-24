@@ -29,3 +29,8 @@ kotlinc "$src/EmbeddedLlama.kt" "$src/EmbeddedTextSink.kt" "$src/NativeModelLibr
 # Independent character memory regression.
 kotlinc "$src/NativeConversation.kt" "$src/NativeCharacterMemory.kt" tests/NativeCharacterMemorySmoke.kt -include-runtime -d "$tmp/memory.jar"
 "$java_home/bin/java" -jar "$tmp/memory.jar"
+
+# Evidence-bound relationship assessment regression (no real model).
+kotlinc "$src/NativeConversation.kt" "$src/NativeCharacterMemory.kt" "$src/NativeChatWorkspace.kt" \
+  "$src/RelationshipAssessment.kt" tests/RelationshipAssessmentSmoke.kt -include-runtime -d "$tmp/assessment.jar"
+"$java_home/bin/java" -jar "$tmp/assessment.jar"
