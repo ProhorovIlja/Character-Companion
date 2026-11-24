@@ -30,7 +30,7 @@ class VoiceDraft(unittest.TestCase):
         self.assertNotIn('httpURLConnection', ACTIVITY)
 
     def test_draft_does_not_automatically_send_or_persist(self):
-        self.assertIn('VoiceRecognitionOptions.edit(original, alternatives, start, end)', ACTIVITY)
+        self.assertIn('VoiceAlternatives.Choice.build(original, alternatives, start, end)', ACTIVITY)
         self.assertIn('Intent.ACTION_CREATE_DOCUMENT', ACTIVITY)
         self.assertIn('ClipData.newPlainText', ACTIVITY)
         self.assertIn('override fun onPause()', ACTIVITY)
@@ -117,7 +117,7 @@ class VoiceDraft(unittest.TestCase):
         self.assertIn('val bounds = selection(current, start, end)', policy)
         self.assertIn('Character.isHighSurrogate', policy)
         self.assertIn('editor.selectionStart.takeIf { it >= 0 } ?: original.length', ACTIVITY)
-        self.assertIn('editor.setSelection(edit.caret)', ACTIVITY)
+        self.assertIn('editor.setSelection(choice.edit.caret)', ACTIVITY)
         self.assertIn('val selectionStart: Int, val selectionEnd: Int', ACTIVITY)
         self.assertIn('editor.setSelection(restored.first, restored.last)', ACTIVITY)
         self.assertNotIn('onSaveInstanceState', ACTIVITY)
@@ -125,7 +125,7 @@ class VoiceDraft(unittest.TestCase):
     def test_undo_is_memory_only_and_does_not_overwrite_manual_edits(self):
         self.assertIn('lastSpeechEdit?.restore(editor.text.toString())', ACTIVITY)
         self.assertIn('lastSpeechEdit = null', ACTIVITY)
-        self.assertIn('lastSpeechEdit?.available(s.toString())', ACTIVITY)
+        self.assertIn('lastSpeechEdit?.available(current)', ACTIVITY)
         self.assertIn('lastSpeechEdit = retained.speechUndo?.takeIf', ACTIVITY)
         self.assertIn('target.scheme != "content"', ACTIVITY)
         self.assertIn('VoiceDraftPolicy.validText(content)', ACTIVITY)
@@ -149,7 +149,7 @@ class VoiceDraft(unittest.TestCase):
         self.assertNotIn('acceptRecognition(', block)
         self.assertIn('speechPreview.text = ""', ACTIVITY)
         self.assertIn('languageSpinner.isEnabled = false', ACTIVITY)
-        self.assertIn('VoiceRecognitionOptions.edit', ACTIVITY)
+        self.assertIn('VoiceAlternatives.Choice.build', ACTIVITY)
         self.assertIn('!active() || !resumed || finishingRecognition', block)
         self.assertIn('if (active()) markRecognitionProcessing()', ACTIVITY)
         self.assertIn('if (active() && !finishingRecognition)', ACTIVITY)

@@ -458,8 +458,10 @@ class VoiceDraftActivity : Activity() {
                     if (!active() || !resumed || finishingRecognition) return
                     val preview = VoiceRecognitionOptions.preview(
                         partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION))
-                    speechPreview.text = preview?.let { getString(R.string.voice_live_preview, it) }.orEmpty()
-                    speechPreview.visibility = if (preview == null) View.GONE else View.VISIBLE
+                    val rendered = preview?.let { getString(R.string.voice_live_preview, it) }.orEmpty()
+                    val visibility = if (preview == null) View.GONE else View.VISIBLE
+                    if (speechPreview.text.toString() != rendered) speechPreview.text = rendered
+                    if (speechPreview.visibility != visibility) speechPreview.visibility = visibility
                 }
                 override fun onEvent(eventType: Int, params: Bundle?) {}
             })

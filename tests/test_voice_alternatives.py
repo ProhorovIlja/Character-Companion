@@ -12,6 +12,10 @@ class VoiceAlternativesTests(unittest.TestCase):
                       'lastChoice = retained.choice?.takeIf', 'lastSpeechEdit = choice.undo()',
                       'if (lastChoice?.matches(current) != true) lastChoice = null'):
             self.assertIn(token, source)
+    def test_identical_partial_preview_is_not_redrawn(self):
+        source = (ROOT / 'app/src/main/java/dev/caicompanion/app/VoiceDraftActivity.kt').read_text()
+        self.assertIn('if (speechPreview.text.toString() != rendered) speechPreview.text = rendered', source)
+        self.assertIn('if (speechPreview.visibility != visibility) speechPreview.visibility = visibility', source)
     def test_localization(self):
         for locale in ('values', 'values-ru'):
             names = {x.get('name') for x in ET.parse(ROOT / f'app/src/main/res/{locale}/strings.xml').getroot()}
