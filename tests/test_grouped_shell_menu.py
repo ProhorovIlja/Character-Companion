@@ -20,6 +20,8 @@ class GroupedShellMenuTests(unittest.TestCase):
             self.assertIn('R.string.refresh_current_chat else R.string.reload', menu)
             self.assertIn('ShellMenu.Action(R.string.settings)', menu)
             self.assertIn('ShellMenu.Action(R.string.roleplay_title)', menu)
+            direct = [line for line in menu.splitlines() if 'ShellMenu.Action(' in line and 'section =' not in line]
+            self.assertEqual(len(direct), 3)
             for section in ('CREATOR', 'PAGE', 'PRIVACY', 'SUPPORT'):
                 self.assertIn('section = ShellMenu.Section.' + section, menu)
     def test_bilingual_sections(self):

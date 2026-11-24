@@ -634,7 +634,7 @@ class MainActivity : Activity() {
             ShellMenu.Action(R.string.character_draft_title, section = ShellMenu.Section.CREATOR) { startActivity(Intent(this, CharacterDraftActivity::class.java)) },
             ShellMenu.Action(R.string.roleplay_title) { RoleplayToolkitUi.show(this) },
             ShellMenu.Action(R.string.engine_use_gecko, BuildConfig.FLAVOR == "gecko", section = ShellMenu.Section.SUPPORT) { returnToGecko() },
-            ShellMenu.Action(R.string.forward, ready && webView.canGoForward()) { webView.goForward() },
+            ShellMenu.Action(R.string.forward, ready && webView.canGoForward(), section = ShellMenu.Section.PAGE) { webView.goForward() },
             ShellMenu.Action(R.string.shell_refresh_cache, ready, section = ShellMenu.Section.PAGE) {
                 webView.clearCache(true); webView.reload(); showToast(getString(R.string.cache_refreshed))
             },
