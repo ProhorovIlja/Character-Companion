@@ -61,6 +61,14 @@ fi
 if ! command -v unzip >/dev/null || ! unzip -tq "$APK" >/dev/null; then
   echo 'APK ZIP integrity check failed.' >&2; exit 2
 fi
+# Native segment alignment and archive alignment are independent requirements.
+ZIPALIGN="$(dirname "$APKSIGNER")/zipalign"
+if [[ ! -x "$ZIPALIGN" ]] || ! "$ZIPALIGN" -c -P 16 4 "$APK"; then
+  echo 'APK 16 KiB ZIP alignment verification failed or unavailable.' >&2; exit 2
+fi
+if ! python3 scripts/check_apk_native.py "$APK" "$FLAVOR"; then
+  echo 'APK native ELF alignment verification failed.' >&2; exit 2
+fi
 if [[ ! -f docs/RELEASE_TEMPLATE.md ]]; then
   echo 'Missing checked-in release notes template.' >&2; exit 2
 fi
@@ -78,6 +86,8 @@ commit=$(git rev-parse HEAD)
 package_id=$PKG
 apk_signature=verified_by_apksigner
 manifest=verified_by_aapt
+native_elf_audit=passed_or_no_native_libraries
+zip_alignment_16k=verified_by_zipalign
 qa=provided_manual_device_signoff
 release_upload=NOT_PERFORMED
 INFO

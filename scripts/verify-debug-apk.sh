@@ -9,7 +9,7 @@ tools="$sdk/build-tools/36.0.0"
 apk="app/build/outputs/apk/$flavor/debug/app-$flavor-debug.apk"
 output="dist/CharacterCompanion-$flavor-debug.apk"
 mkdir -p dist
-rm -f -- "$output"
+rm -f -- "$output" "dist/native-audit-$flavor.txt"
 test -n "$sdk"
 test -s "$apk"
 unzip -tqq "$apk"
@@ -28,5 +28,21 @@ grep -Fq "package: name='dev.caicompanion.app' versionCode='$code' versionName='
 if [[ "$flavor" == gecko ]]; then
   grep -Eq '^lib/arm64-v8a/[^/]+[.]so$' <<< "$entries"
 fi
+# Keep debug artifacts available for diagnosis even when native alignment fails.
+# A failed audit must never be interpreted as 16 KiB device compatibility.
+{
+    if python3 scripts/check_apk_native.py "$apk" "$flavor"; then
+        echo 'ELF_CHECK_EXIT=0'
+    else
+        echo 'ELF_CHECK_EXIT=NONZERO'
+    fi
+    if "$tools/zipalign" -c -P 16 4 "$apk"; then
+        echo 'ZIP_ALIGNMENT_16K=PASSED'
+    else
+        echo 'ZIP_ALIGNMENT_16K=FAILED_OR_UNAVAILABLE'
+    fi
+    echo 'DEVICE_16K_RUNTIME=NOT_TESTED'
+} > "dist/native-audit-$flavor.txt" 2>&1
+cat "dist/native-audit-$flavor.txt"
 cp -- "$apk" "$output"
 printf 'VERIFIED_DEBUG_APK=%s\n' "$output"
