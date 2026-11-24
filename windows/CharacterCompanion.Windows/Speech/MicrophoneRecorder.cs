@@ -100,14 +100,17 @@ public sealed class MicrophoneRecorder : IDisposable
         try
         {
             var native = await _stopped.Task.WaitAsync(TimeSpan.FromSeconds(15));
-            using (var source = new WaveFileReader(native))
+            // Foreground-requested normalization only. Keep the UI responsive;
+            // await completion before exposing the WAV or cleaning up its source.
+            await Task.Run(() =>
             {
+                using var source = new WaveFileReader(native);
                 var format = source.WaveFormat;
                 if (format.Encoding != WaveFormatEncoding.Pcm || format.BitsPerSample != 16)
                     throw new InvalidDataException("Unsupported source WAV format.");
                 using var output = new WaveFileWriter(FilePath, new WaveFormat(16_000, 16, 1));
                 Pcm16Resampler.Convert(source, output, format.SampleRate, format.Channels, source.Length);
-            }
+            });
             return FilePath;
         }
         catch
