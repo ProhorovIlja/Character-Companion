@@ -144,6 +144,7 @@ fun main() {
     verifyLorebookDraft()
     verifyPngLorebook()
     verifyCharacterDraft()
+    verifyCharacterExtras()
     verifyCharacterBackup()
     verifyCharx()
     // ASCII fast path must preserve label boundaries and allowlist precedence.

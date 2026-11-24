@@ -402,4 +402,8 @@
     <string name="release_verifying_package">Verifying APK package, version and signing identity…</string>
     <string name="release_rate_limited">GitHub temporarily rate-limited requests. Try checking manually later.</string>
     <string name="voice_alternatives">Recognition alternatives</string>
+    <string name="character_draft_add_item">Add item</string>
+    <string name="character_draft_move_up">Move up</string>
+    <string name="character_draft_move_down">Move down</string>
+    <string name="character_draft_remove_item_confirm">Remove this item?</string>
 </resources>

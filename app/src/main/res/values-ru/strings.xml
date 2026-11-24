@@ -402,4 +402,8 @@
     <string name="release_verifying_package">Проверка пакета, версии и подписи APK…</string>
     <string name="release_rate_limited">GitHub временно ограничил запросы. Повторите проверку вручную позже.</string>
     <string name="voice_alternatives">Варианты распознавания</string>
+    <string name="character_draft_add_item">Добавить</string>
+    <string name="character_draft_move_up">Переместить выше</string>
+    <string name="character_draft_move_down">Переместить ниже</string>
+    <string name="character_draft_remove_item_confirm">Удалить этот элемент?</string>
 </resources>

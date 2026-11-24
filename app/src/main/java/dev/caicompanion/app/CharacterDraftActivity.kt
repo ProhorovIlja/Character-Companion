@@ -72,9 +72,14 @@ class CharacterDraftActivity : Activity() {
         for (field in CharacterDraftPolicy.Field.entries) {
             fieldButtons[field] = button(label(field)) { fieldMenu(field) }
         }
-        button(R.string.character_draft_alternatives) { alternatives() }
-        button(R.string.character_draft_tags) { preview(R.string.character_draft_tags, draft.tags.joinToString("\n")) }
-        button(R.string.character_draft_notes) { preview(R.string.character_draft_notes, draft.sourceNotes) }
+        button(R.string.character_draft_alternatives) { editList(CharacterDraftExtras.Field.GREETINGS) }
+        button(R.string.character_draft_tags) { editList(CharacterDraftExtras.Field.TAGS) }
+        button(R.string.character_draft_notes) {
+            val before = draft
+            textEditor(R.string.character_draft_notes, before.sourceNotes, CharacterDraftPolicy.MAX_FIELD, before) {
+                CharacterDraftExtras.notes(before, it)
+            }
+        }
         status = TextView(this)
         column.addView(status)
         button(R.string.close) { confirmClose() }
@@ -113,52 +118,93 @@ class CharacterDraftActivity : Activity() {
 
     private fun edit(field: CharacterDraftPolicy.Field) {
         val before = draft
+        textEditor(label(field), before.value(field),
+            if (field == CharacterDraftPolicy.Field.NAME) 512 else CharacterDraftPolicy.MAX_FIELD, before) {
+            CharacterDraftPolicy.edit(before, field, it)
+        }
+    }
+
+    private fun textEditor(title: Int, initial: String, max: Int, before: CharacterDraftPolicy.Draft,
+                           transform: (String) -> CharacterDraftPolicy.Draft?) {
         val editor = EditText(this).apply {
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
             imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
-            setText(before.value(field))
+            filters = arrayOf(android.text.InputFilter.LengthFilter(max))
+            setText(initial)
             isSaveEnabled = false
             isSaveFromParentEnabled = false
             importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
             minLines = 2; maxLines = 10
         }
-        val dialog = AlertDialog.Builder(this).setTitle(label(field))
+        val dialog = AlertDialog.Builder(this).setTitle(title)
             .setView(ScrollView(this).apply { addView(editor) })
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.confirm, null).create()
         dialog.show()
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-            val next = CharacterDraftPolicy.edit(before, field, editor.text.toString())
-            if (next == null || draft !== before) editor.error = getString(R.string.character_draft_invalid)
+            val next = transform(editor.text.toString())
+            if (next == null || draft !== before || busy || picking) editor.error = getString(R.string.character_draft_invalid)
             else { draft = next; refresh(); dialog.dismiss() }
         }
     }
 
-    private fun preview(title: Int, text: String) {
-        if (text.isEmpty()) { status.setText(R.string.character_draft_empty); return }
-        AlertDialog.Builder(this).setTitle(title).setMessage(text)
-            .setPositiveButton(R.string.character_draft_copy) { _, _ -> copy(text) }
-            .setNegativeButton(R.string.close, null).show()
+    private fun listTitle(field: CharacterDraftExtras.Field): Int =
+        if (field == CharacterDraftExtras.Field.GREETINGS) R.string.character_draft_alternatives
+        else R.string.character_draft_tags
+
+    private fun editList(field: CharacterDraftExtras.Field) {
+        val before = draft
+        val items = CharacterDraftExtras.items(before, field)
+        val labels = items.mapIndexed { index, value -> (index + 1).toString() + ". " + CharacterDraftExtras.label(value) }
+        val dialog = AlertDialog.Builder(this).setTitle(listTitle(field))
+            .setItems(labels.toTypedArray()) { _, index ->
+                if (draft === before && !busy && !picking) listItem(field, before, index)
+            }.setNegativeButton(R.string.close, null)
+            .setPositiveButton(R.string.character_draft_add_item) { _, _ ->
+                if (draft === before && !busy && !picking) {
+                    textEditor(listTitle(field), "", field.maxChars, before) {
+                        CharacterDraftExtras.edit(before, field, null, it)
+                    }
+                }
+            }.create()
+        dialog.show()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = items.size < CharacterDraftPolicy.MAX_LIST
     }
 
-    private fun alternatives() {
-        val before = draft
-        if (before.alternatives.isEmpty()) { status.setText(R.string.character_draft_empty); return }
-        val labels = before.alternatives.mapIndexed { index, text ->
-            getString(R.string.character_draft_alternative_row, index + 1, text.length)
+    private fun listItem(field: CharacterDraftExtras.Field, before: CharacterDraftPolicy.Draft, index: Int) {
+        val items = CharacterDraftExtras.items(before, field)
+        val value = items.getOrNull(index) ?: return
+        fun apply(next: CharacterDraftPolicy.Draft?) {
+            if (draft !== before || busy || picking) return
+            if (next == null) status.setText(R.string.character_draft_invalid)
+            else { draft = next; refresh() }
         }
-        AlertDialog.Builder(this).setTitle(R.string.character_draft_alternatives)
-            .setItems(labels.toTypedArray()) { _, index ->
-                val value = before.alternatives[index]
-                AlertDialog.Builder(this).setMessage(value)
-                    .setPositiveButton(R.string.character_draft_use_greeting) { _, _ ->
-                        if (draft === before) {
-                            val next = CharacterDraftPolicy.useAlternative(before, index)
-                            if (next != null) { draft = next; refresh() }
-                            else status.setText(R.string.character_draft_invalid)
-                        }
-                    }.setNeutralButton(R.string.character_draft_copy) { _, _ -> copy(value) }
-                    .setNegativeButton(R.string.cancel, null).show()
+        val actions = mutableListOf<Pair<Int, () -> Unit>>()
+        actions.add(R.string.character_draft_edit to {
+            textEditor(listTitle(field), value, field.maxChars, before) {
+                CharacterDraftExtras.edit(before, field, index, it)
+            }
+        })
+        actions.add(R.string.character_draft_copy to { copy(value) })
+        if (field == CharacterDraftExtras.Field.GREETINGS) actions.add(R.string.character_draft_use_greeting to {
+            apply(CharacterDraftPolicy.useAlternative(before, index))
+        })
+        if (index > 0) actions.add(R.string.character_draft_move_up to {
+            apply(CharacterDraftExtras.move(before, field, index, -1))
+        })
+        if (index < items.lastIndex) actions.add(R.string.character_draft_move_down to {
+            apply(CharacterDraftExtras.move(before, field, index, 1))
+        })
+        actions.add(R.string.character_draft_library_delete to {
+            AlertDialog.Builder(this).setMessage(R.string.character_draft_remove_item_confirm)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.confirm) { _, _ ->
+                    apply(CharacterDraftExtras.remove(before, field, index))
+                }.show()
+        })
+        AlertDialog.Builder(this).setTitle(CharacterDraftExtras.label(value))
+            .setItems(actions.map { getString(it.first) }.toTypedArray()) { _, selected ->
+                if (draft === before && !busy && !picking) actions[selected].second()
             }.setNegativeButton(R.string.close, null).show()
     }
 
