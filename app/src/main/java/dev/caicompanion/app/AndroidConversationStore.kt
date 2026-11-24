@@ -166,6 +166,26 @@ class AndroidConversationStore(context: Context, private val account: String) :
         HistorySnapshot.export(historyKey, manifestKey, account, snapshot, pages, stage)
     }
 
+    /** Internal explicit local backup. Target and staging root must be trusted local paths. */
+    fun exportBackup(target: java.nio.file.Path, privateRoot: java.nio.file.Path, historyKey: ByteArray,
+                     manifestKey: ByteArray, snapshot: String): String =
+        HistoryBackup.capture(target, privateRoot, manifestKey, account) { stage ->
+            exportSnapshot(historyKey, manifestKey, snapshot, stage)
+        }
+
+    /** Local staged immutable file only; the entire restore is one database transaction. */
+    fun importBackup(source: java.nio.file.Path, historyKey: ByteArray, manifestKey: ByteArray): SnapshotImport = write { db ->
+        var count = 0
+        val snapshot = HistoryBackup.restore(source, historyKey, manifestKey, account) { rows ->
+            for (row in rows) {
+                val existing = find(db, row.id)
+                if (existing == null) { insert(db, row); count++ }
+                else require(existing == row) { "Conflicting message ID" }
+            }
+        }
+        SnapshotImport(snapshot, count)
+    }
+
     override fun commitReply(user: NativeConversation.Event, id: String, text: String): NativeConversation.Event = write { db ->
         require(user.role == "user" && id == NativeConversation.replyId(user.id))
         require(find(db, user.id) == user)
