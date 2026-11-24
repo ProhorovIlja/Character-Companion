@@ -49,6 +49,8 @@ internal sealed class LocalHistory : IDisposable
             else if (version != 1) throw new InvalidDataException("Unsupported history schema.");
             if (!string.Equals(Scalar(tx, "SELECT account FROM vault WHERE singleton=1") as string, account, StringComparison.Ordinal))
                 throw new InvalidDataException("History account mismatch.");
+            // Local-only editable drafts: additive to v1, never part of exported message events.
+            Exec(tx, "CREATE TABLE IF NOT EXISTS local_drafts (character TEXT NOT NULL, chat TEXT NOT NULL, text TEXT NOT NULL, PRIMARY KEY(character,chat))");
             tx.Commit();
         }
         catch { db.Dispose(); throw; }
@@ -136,10 +138,40 @@ internal sealed class LocalHistory : IDisposable
         Exec(tx, "UPDATE vault SET clock=max(clock,$clock) WHERE singleton=1", ("$clock",e.Clock));
         return e;
     }
+    internal string ReadDraft(string character, string chat)
+    {
+        Id(character); Id(chat);
+        var text = Scalar(null, "SELECT text FROM local_drafts WHERE character=$character AND chat=$chat",
+            ("$character",character),("$chat",chat)) as string ?? "";
+        ValidateDraft(text);
+        return text;
+    }
+    private static void ValidateDraft(string text)
+    {
+        if (text.Length > 16000 || text.Any(c => c < 32 && c != '\t' && c != '\r' && c != '\n'))
+            throw new ArgumentException("Invalid draft.");
+        _ = Utf8.GetByteCount(text);
+    }
+    internal void SaveDraft(string character, string chat, string text)
+    {
+        Id(character); Id(chat); ValidateDraft(text);
+        using var tx = db.BeginTransaction(deferred: false);
+        var owner = Scalar(tx, "SELECT character FROM chats WHERE id=$chat", ("$chat",chat));
+        if (owner != null && !Equals(owner,character)) throw new InvalidDataException("Conflicting chat owner.");
+        if (text.Length == 0)
+            Exec(tx, "DELETE FROM local_drafts WHERE character=$character AND chat=$chat", ("$character",character),("$chat",chat));
+        else
+            Exec(tx, "INSERT INTO local_drafts(character,chat,text) VALUES ($character,$chat,$text) ON CONFLICT(character,chat) DO UPDATE SET text=excluded.text",
+                ("$character",character),("$chat",chat),("$text",text));
+        tx.Commit();
+    }
     internal Event AppendUser(string id, string device, string character, string chat, string mode, string text)
     {
         using var tx = db.BeginTransaction(deferred: false);
         var e = Insert(tx, new Event(id,device,character,chat,Find(tx,id)?.Clock ?? NextClock(tx),"user",mode,text));
+        // The exact saved draft is consumed in the same transaction as its user event.
+        Exec(tx, "DELETE FROM local_drafts WHERE character=$character AND chat=$chat AND text=$text",
+            ("$character",character),("$chat",chat),("$text",text));
         tx.Commit();
         return e;
     }
