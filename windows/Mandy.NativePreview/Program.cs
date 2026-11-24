@@ -375,6 +375,46 @@ internal sealed class ChatWindow : Window
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException or ArgumentException) { return false; }
     }
 
+    private static string EncodeTheme(Dictionary<string, Color> values) =>
+        System.Text.Json.JsonSerializer.Serialize(new
+        {
+            schema = 1,
+            name = "Custom",
+            colors = ColorRoles.ToDictionary(role => role.Key, role =>
+            {
+                Color c = values[role.Key];
+                return $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+            })
+        }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+
+    private static Dictionary<string, Color>? DecodeTheme(string raw)
+    {
+        if (raw.Length is < 1 or > 2048) return null;
+        try
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(raw, new System.Text.Json.JsonDocumentOptions { MaxDepth = 4 });
+            var root = document.RootElement;
+            if (root.ValueKind != System.Text.Json.JsonValueKind.Object ||
+                !root.EnumerateObject().Select(p => p.Name).OrderBy(x => x, StringComparer.Ordinal)
+                    .SequenceEqual(new[] { "colors", "name", "schema" }) ||
+                !root.GetProperty("schema").TryGetInt32(out int version) || version != 1 ||
+                root.GetProperty("name").GetString() is not { Length: > 0 and <= 80 }) return null;
+            var colors = root.GetProperty("colors");
+            if (colors.ValueKind != System.Text.Json.JsonValueKind.Object ||
+                !colors.EnumerateObject().Select(p => p.Name).OrderBy(x => x, StringComparer.Ordinal)
+                    .SequenceEqual(ColorRoles.Select(r => r.Key).OrderBy(x => x, StringComparer.Ordinal))) return null;
+            var result = new Dictionary<string, Color>();
+            foreach (var role in ColorRoles)
+            {
+                var value = colors.GetProperty(role.Key).GetString();
+                if (value == null || !System.Text.RegularExpressions.Regex.IsMatch(value, @"\A#[0-9a-fA-F]{6}\z")) return null;
+                result.Add(role.Key, (Color)ColorConverter.ConvertFromString(value));
+            }
+            return ColorError(result) == null ? result : null;
+        }
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or InvalidOperationException or FormatException or ArgumentException) { return null; }
+    }
+
     private Dictionary<string, Color>? EditColors(Dictionary<string, Color> existing, Dictionary<string, Color> defaults)
     {
         var panel = new StackPanel { Margin = new Thickness(16) };
@@ -392,23 +432,61 @@ internal sealed class ChatWindow : Window
         }
         var warning = new TextBlock { Text = "Use #RRGGBB. Contrast is checked before applying.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0,12,0,8) };
         panel.Children.Add(warning);
+        var copyTheme = new Button { Content = "Copy theme JSON" };
+        var importTheme = new Button { Content = "Import theme JSON" };
+        panel.Children.Add(Buttons(copyTheme, importTheme));
         var reset = new Button { Content = "Reset fields" };
         var apply = new Button { Content = "Apply", IsDefault = true };
         var cancel = new Button { Content = "Cancel", IsCancel = true };
         panel.Children.Add(Buttons(reset, apply, cancel));
         Dictionary<string, Color>? result = null;
         reset.Click += (_, _) => { foreach (var field in fields) field.Value.Text = Hex(defaults[field.Key]); };
-        apply.Click += (_, _) =>
+        Dictionary<string, Color>? Candidate()
         {
             var candidate = new Dictionary<string, Color>();
             foreach (var field in fields)
             {
                 if (!System.Text.RegularExpressions.Regex.IsMatch(field.Value.Text, @"\A#[0-9a-fA-F]{6}\z"))
-                { warning.Text = "Enter a six-digit hexadecimal color."; field.Value.Focus(); return; }
+                { warning.Text = "Enter a six-digit hexadecimal color."; field.Value.Focus(); return null; }
                 candidate.Add(field.Key, (Color)ColorConverter.ConvertFromString(field.Value.Text));
             }
             var error = ColorError(candidate);
-            if (error != null) { warning.Text = error; return; }
+            if (error != null) { warning.Text = error; return null; }
+            return candidate;
+        }
+        copyTheme.Click += (_, _) =>
+        {
+            var candidate = Candidate();
+            if (candidate == null) return;
+            try { Clipboard.SetText(EncodeTheme(candidate)); warning.Text = "Theme copied. No chat or account data included."; }
+            catch (System.Runtime.InteropServices.ExternalException) { warning.Text = "Clipboard unavailable."; }
+        };
+        importTheme.Click += (_, _) =>
+        {
+            var input = new TextBox { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MaxLength = 2048, MinHeight = 180, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+            AutomationProperties.SetName(input, "Paste theme JSON");
+            var importPanel = new StackPanel { Margin = new Thickness(16) };
+            importPanel.Children.Add(input);
+            var error = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0,8,0,0) };
+            importPanel.Children.Add(error);
+            var load = new Button { Content = "Load fields", IsDefault = true };
+            var back = new Button { Content = "Cancel", IsCancel = true };
+            importPanel.Children.Add(Buttons(load, back));
+            var importer = new Window { Owner = dialog, Title = "Import theme JSON", Width = 430, SizeToContent = SizeToContent.Height, WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false, Content = importPanel };
+            load.Click += (_, _) =>
+            {
+                var candidate = DecodeTheme(input.Text);
+                if (candidate == null) { error.Text = "Invalid theme or insufficient contrast."; return; }
+                foreach (var field in fields) field.Value.Text = Hex(candidate[field.Key]);
+                warning.Text = "Theme loaded into fields. Apply to save.";
+                importer.DialogResult = true;
+            };
+            importer.ShowDialog();
+        };
+        apply.Click += (_, _) =>
+        {
+            var candidate = Candidate();
+            if (candidate == null) return;
             result = candidate; dialog.DialogResult = true;
         };
         return dialog.ShowDialog() == true ? result : null;
