@@ -97,8 +97,8 @@ class AndroidConversationStore(context: Context, private val account: String) :
         if (before != null) {
             require(before.first in 1..NativeConversation.MAX_CLOCK)
             NativeConversation.canonicalId(before.second)
-            sql += " AND (clock < ? OR (clock = ? AND id < ?))"
-            args.addAll(listOf(before.first.toString(), before.first.toString(), before.second))
+            sql += " AND (clock,id) < (?,?)"
+            args.addAll(listOf(before.first.toString(), before.second))
         }
         args.add(limit.toString())
         return db.rawQuery("$sql ORDER BY clock DESC,id DESC LIMIT ?", args.toTypedArray()).use { c ->
@@ -133,8 +133,8 @@ class AndroidConversationStore(context: Context, private val account: String) :
         if (after != null) {
             require(after.first in 1..NativeConversation.MAX_CLOCK)
             NativeConversation.canonicalId(after.second)
-            sql += " WHERE (clock > ? OR (clock = ? AND id > ?))"
-            args.addAll(listOf(after.first.toString(), after.first.toString(), after.second))
+            sql += " WHERE (clock,id) > (?,?)"
+            args.addAll(listOf(after.first.toString(), after.second))
         }
         // 64 x maximum 16,000 UTF-16 units plus JSON overhead remains under 4 MiB.
         sql += " ORDER BY clock ASC,id ASC LIMIT 64"

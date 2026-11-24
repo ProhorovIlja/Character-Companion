@@ -253,6 +253,7 @@ class MandyWorkspaceActivity : Activity() {
             if (s.memory.memories.size < NativeCharacterMemory.MAX_MEMORIES) panel.addView(button("Review memory from dialogue…") { chooseAssessmentModel(s, forMemory = true) })
         }
         panel.addView(button("New conversation") { createChat(profile) })
+        if (s.rows.isNotEmpty()) panel.addView(button("Browse conversation history…") { browseHistory(s, profile.name) })
         if (s.rows.isEmpty()) panel.addView(label("No messages yet."))
         else s.rows.forEach {
             val name = if (it.role == "user") "You" else profile.name
@@ -281,6 +282,65 @@ class MandyWorkspaceActivity : Activity() {
             else panel.addView(label("Import a trusted model in AI models, then refresh."))
         } else panel.addView(Button(this).apply { text = "Send • embedded build unavailable"; isAllCaps = false; isEnabled = false })
     }
+    /** Explicit, bounded history pages. Does not rebuild the main composer or change its draft. */
+    private fun browseHistory(s: Snapshot, characterName: String) {
+        val ticket = s.ticket ?: return
+        if (!resumed || busy || !alive() || current?.ticket != ticket) return
+        val container = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), dp(8), dp(12), dp(8)) }
+        val message = label("Opening history…", 14f)
+        val rows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val scroll = ScrollView(this).apply { addView(rows) }
+        val older = Button(this).apply { text = "Older messages"; isAllCaps = false; isEnabled = false }
+        val latest = Button(this).apply { text = "Latest messages"; isAllCaps = false; isEnabled = false }
+        container.addView(message)
+        container.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(320)))
+        container.addView(older)
+        container.addView(latest)
+        val dialog = AlertDialog.Builder(this).setTitle("Conversation history")
+            .setView(container).setNegativeButton("Close", null).create()
+        var next: Pair<Long, String>? = null
+        var loading = false
+        fun load(before: Pair<Long, String>?) {
+            if (loading || !dialog.isShowing || !resumed || current?.ticket != ticket) return
+            loading = true; older.isEnabled = false; latest.isEnabled = false
+            message.text = "Opening history…"
+            disk.execute {
+                val result = runCatching {
+                    require(workspace.visible(ticket))
+                    AndroidConversationStore(applicationContext, account).use {
+                        it.page(ticket.key.character, ticket.key.chat, 31, before)
+                    }
+                }
+                runOnUiThread {
+                    if (!alive() || !dialog.isShowing) return@runOnUiThread
+                    if (!resumed || current?.ticket != ticket) { dialog.dismiss(); return@runOnUiThread }
+                    loading = false
+                    latest.isEnabled = true
+                    result.onSuccess { page ->
+                        val shown = page.take(30)
+                        next = if (page.size > 30) shown.last().let { it.clock to it.id } else null
+                        rows.removeAllViews()
+                        shown.asReversed().forEach {
+                            val author = if (it.role == "user") "You" else characterName
+                            rows.addView(label(author + "\n" + it.text).apply { setTextIsSelectable(true) })
+                        }
+                        scroll.scrollTo(0, 0)
+                        message.text = if (shown.isEmpty()) "No messages on this page" else
+                            if (next == null) "Oldest messages reached" else "Showing up to 30 messages"
+                        older.isEnabled = next != null
+                    }.onFailure {
+                        message.text = "History page unavailable. Existing data preserved."
+                        older.isEnabled = next != null
+                    }
+                }
+            }
+        }
+        older.setOnClickListener { next?.let { load(it) } }
+        latest.setOnClickListener { load(null) }
+        dialog.show()
+        load(null)
+    }
+
     private fun chooseModel(s: Snapshot, mode: String = "text") {
         val ticket = s.ticket ?: return
         val draft = editor?.text?.toString() ?: return
