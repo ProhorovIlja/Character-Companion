@@ -1,3 +1,5 @@
+**New primary direction (2026-11-24):** independent private Android + Windows AI companion, local-first with encrypted Drive continuity planned and GitHub releases. Existing Character.AI shells remain optional compatibility paths. Initial portable text-history reference and tests are in shared/continuity.py; native runtime and cloud sync are not implemented. [Architecture and delivery gates](docs/UNIFIED_COMPANION.md).
+
 **0.38.0-rc1 (source):** foreground-only sign-in compatibility, stale navigation protection, exact route fingerprints, accurate Gecko tracker-protection labels, and coherent filter counters. Android build and hardware QA pending.
 
 **0.37.0-rc1 (source):** safer private draft recovery, discard confirmation, keyboard-learning opt-out, adaptive voice actions, and browser-session launch recovery. Android compilation and device verification pending.
