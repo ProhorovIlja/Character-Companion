@@ -39,3 +39,7 @@ kotlinc "$src/NativeConversation.kt" "$src/NativeCharacterMemory.kt" "$src/Nativ
 kotlinc "$src/NativeConversation.kt" "$src/NativeCharacterMemory.kt" "$src/NativeChatWorkspace.kt" \
   "$src/RelationshipAssessment.kt" "$src/MemoryAssessment.kt" tests/MemoryAssessmentSmoke.kt -include-runtime -d "$tmp/memory-assessment.jar"
 "$java_home/bin/java" -jar "$tmp/memory-assessment.jar"
+
+# Memory format compatibility and weighted retrieval.
+kotlinc "$src/NativeConversation.kt" "$src/NativeCharacterMemory.kt" tests/NativeMemoryScaleSmoke.kt -include-runtime -d "$tmp/memory-scale.jar"
+"$java_home/bin/java" -jar "$tmp/memory-scale.jar"

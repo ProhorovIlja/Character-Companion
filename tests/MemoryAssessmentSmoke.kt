@@ -61,7 +61,7 @@ fun main() {
         bad { MemoryAssessment.apply(history, memory, key, fresh, true) }
         verify(memory.get(other.character).memories.isEmpty())
         val current = memory.get(key.character)
-        val full = memory.edit(key.character, current.copy(memories = List(32) { "Memory $it" }))
+        val full = memory.edit(key.character, current.copy(memories = List(NativeCharacterMemory.MAX_MEMORIES) { "Memory $it" }))
         val u2 = history.appendUser(id(12), id(6), key.character, key.chat, "text", "Another preference")
         history.commitReply(u2, NativeConversation.replyId(u2.id), "Understood")
         verify(MemoryAssessment.propose(history, key, full) { _, _ -> error("full store must not infer") } == null)

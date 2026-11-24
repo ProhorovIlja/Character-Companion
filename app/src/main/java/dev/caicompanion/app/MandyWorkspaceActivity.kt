@@ -179,7 +179,7 @@ class MandyWorkspaceActivity : Activity() {
         panel.addView(button("Memory & relationship") { editMemory(profile, s.memory) })
         if (BuildConfig.MANDY_EMBEDDED_PREVIEW && s.models.isNotEmpty() && s.rows.lastOrNull()?.role == "character" && s.draft.pending == null) {
             panel.addView(button("Review relationship from dialogue…") { chooseAssessmentModel(s) })
-            if (s.memory.memories.size < 32) panel.addView(button("Review memory from dialogue…") { chooseAssessmentModel(s, forMemory = true) })
+            if (s.memory.memories.size < NativeCharacterMemory.MAX_MEMORIES) panel.addView(button("Review memory from dialogue…") { chooseAssessmentModel(s, forMemory = true) })
         }
         panel.addView(button("New conversation") { createChat(profile) })
         if (s.rows.isEmpty()) panel.addView(label("No messages yet."))
@@ -376,14 +376,14 @@ class MandyWorkspaceActivity : Activity() {
         }
         val relationship = input("Shared relationship history", 800, state.relationship)
         val pinned = input("Always remember", 1200, state.pinned)
-        val notes = input("Relevant memories, one per line", 13200, state.memories.joinToString("\n"))
+        val notes = input("Relevant memories, one per line", NativeCharacterMemory.MAX_EDITOR_UNITS, state.memories.joinToString("\n"))
         fields.addView(label("Fictional relationship"))
         fields.addView(stage)
         fields.addView(label("Relationship note"))
         fields.addView(relationship)
         fields.addView(label("Pinned memory"))
         fields.addView(pinned)
-        fields.addView(label("Up to 32 memories, 400 characters each. Remove a line to remove a memory."))
+        fields.addView(label("Up to 128 memories, 400 characters each. Remove a line to remove a memory."))
         fields.addView(notes)
         val dialog = AlertDialog.Builder(this).setTitle("Memory · " + profile.name)
             .setView(ScrollView(this).apply { addView(fields) })
