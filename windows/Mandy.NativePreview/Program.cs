@@ -23,7 +23,7 @@ internal static class Program
         var app = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };
         try
         {
-            app.Resources.MergedDictionaries.Add(new ResourceDictionary
+            if (!SystemParameters.HighContrast) app.Resources.MergedDictionaries.Add(new ResourceDictionary
             {
                 Source = new Uri("pack://application:,,,/PresentationFramework.Fluent;component/Themes/Fluent.Dark.xaml")
             });
@@ -723,8 +723,9 @@ internal sealed class ChatWindow : Window
         }
         catch (Exception)
         {
-            capture.Dispose();
-            MicrophoneRecorder.EraseTemporaryRecording(capture.FilePath);
+            try { capture.Dispose(); }
+            catch (Exception) { /* Preserve the original start failure and restore the UI. */ }
+            finally { MicrophoneRecorder.EraseTemporaryRecording(capture.FilePath); }
             recorder = null;
             Finish();
             status.Text = "Microphone could not start. Draft preserved.";
@@ -774,6 +775,7 @@ internal sealed class ChatWindow : Window
         finally
         {
             try { capture.Dispose(); }
+            catch (Exception) { status.Text = "Microphone cleanup failed; check the recording device."; sendRequested = false; }
             finally { MicrophoneRecorder.EraseTemporaryRecording(wav ?? capture.FilePath); }
             recorder = null;
             speechFinishing = false;
