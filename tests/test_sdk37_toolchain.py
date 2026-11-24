@@ -8,14 +8,14 @@ class ToolchainCompatibilityTests(unittest.TestCase):
         root=(ROOT/'build.gradle.kts').read_text()
         app=(ROOT/'app/build.gradle.kts').read_text()
         props=(ROOT/'gradle/wrapper/gradle-wrapper.properties').read_text()
-        self.assertIn('version "9.1.1"',root)
+        self.assertIn('version "9.3.1"',root)
         self.assertIn('version = release(37)',app)
         self.assertIn('minorApiLevel = 0',app)
         self.assertIn('targetSdk = 36',app)
         self.assertNotIn('org.jetbrains.kotlin.android',root+app)
         self.assertNotIn('kotlinOptions',app)
-        self.assertIn('gradle-9.3.1-bin.zip',props)
-        self.assertIn('b266d5ff6b90eada6dc3b20cb090e3731302e553a27c5d3e4df1f0d76beaff06',props)
+        self.assertIn('gradle-9.7.0-bin.zip',props)
+        self.assertIn('84fbba45c7f4c64abc77460e1c00f541e9f960e3c7ed2538f1ede19eacd873ae',props)
 
     def test_build_helpers_require_android37(self):
         for path in ('scripts/doctor.sh','scripts/build-apk-windows.ps1'):

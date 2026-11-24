@@ -15,18 +15,18 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Check out this revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
+      - name: Set up Java 21
+        uses: actions/setup-java@v6.3.0
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - name: Set up Android SDK command-line tools
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v4.0.4
         with:
           packages: 'platform-tools'
           log-accepted-android-sdk-licenses: 'false'
@@ -43,32 +43,41 @@ jobs:
         shell: bash
         run: python3 -m unittest discover -s tests -p 'test_*.py'
 
-      - name: Build GeckoView and WebView debug APKs
+      - name: Build and verify GeckoView debug APK
+        id: gecko
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           bash scripts/build-apk.sh gecko
-          bash scripts/build-apk.sh legacy
+          bash scripts/verify-debug-apk.sh gecko
 
-      - name: Check APK signatures, package IDs, and archive integrity
+      - name: Build and verify WebView debug APK
+        id: legacy
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
-          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
-          build_tools="$sdk_root/build-tools/36.0.0"
+          bash scripts/build-apk.sh legacy
+          bash scripts/verify-debug-apk.sh legacy
+
+      - name: Collect verified debug APKs and build metadata
+        env:
+          GECKO_OUTCOME: ${{ steps.gecko.outcome }}
+          LEGACY_OUTCOME: ${{ steps.legacy.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
           mkdir -p dist
-          for flavor in gecko legacy; do
-            apk="app/build/outputs/apk/$flavor/debug/app-$flavor-debug.apk"
-            test -s "$apk"
-            unzip -tqq "$apk"
-            entries="$(unzip -Z -1 "$apk")"
-            grep -Fxq 'AndroidManifest.xml' <<< "$entries"
-            grep -Fxq 'classes.dex' <<< "$entries"
-            "$build_tools/apksigner" verify --verbose "$apk"
-            badging="$("$build_tools/aapt" dump badging "$apk")"
-            grep -E "^package: name='dev[.]caicompanion[.]app' " <<< "$badging"
-            cp -- "$apk" "dist/CharacterCompanion-$flavor-debug.apk"
-          done
+          # Never publish files from a failed step, even if a partial file exists.
+          if [[ "$GECKO_OUTCOME" != success ]]; then rm -f dist/CharacterCompanion-gecko-debug.apk; fi
+          if [[ "$LEGACY_OUTCOME" != success ]]; then rm -f dist/CharacterCompanion-legacy-debug.apk; fi
+          shopt -s nullglob
+          apks=(dist/*.apk)
+          if (( ${#apks[@]} == 0 )); then
+            echo 'Neither flavor produced a verified APK.' >&2
+            exit 1
+          fi
           (cd dist && sha256sum ./*.apk > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
           {
             printf 'COMMIT=%s\n' "$GITHUB_SHA"
@@ -77,14 +86,22 @@ jobs:
             printf 'ANDROID_COMPILE_SDK=37\n'
             printf 'BUILD_TYPE=DEBUG_NOT_PRODUCTION\n'
             printf 'DEVICE_TESTED=NO\n'
+            printf 'GECKO_OUTCOME=%s\nLEGACY_OUTCOME=%s\n' "$GECKO_OUTCOME" "$LEGACY_OUTCOME"
             printf 'APK_SIGNATURE=VERIFIED_DEBUG_KEY\n'
           } > dist/BUILD_INFO.txt
 
-      - name: Upload both debug APKs and checksums
-        uses: actions/upload-artifact@v4
+      - name: Upload verified debug APKs and checksums
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: CharacterCompanion-Android-debug-APKs
           path: dist/
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
+
+      - name: Report incomplete build as failure after artifact upload
+        if: ${{ !cancelled() && (steps.gecko.outcome == 'failure' || steps.legacy.outcome == 'failure') }}
+        shell: bash
+        run: |
+          echo 'One or more flavors failed. Review both steps; any verified APKs have been uploaded.' >&2
+          exit 1

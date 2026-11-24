@@ -1,3 +1,5 @@
+**Исправление сборки №5 (24.11.2026):** Kotlin 2.2 не может прочитать метаданные библиотек Kotlin 2.4.10. Актуальная согласованная конфигурация: Kotlin/KGP/stdlib 2.4.21, AGP 9.3.1, Gradle 9.7.0 (с проверенным Wrapper JAR), JDK 21 на ручном runner, compile API 37.0 / target 36, GeckoView 159.0.20261102144711, AndroidX Core 1.19.1, WebKit 1.18.0, Browser 1.10.0. Обновлены GitHub Actions. Оба варианта собираются независимо, публикуются только проверенные APK; неполная сборка считается ошибкой. APK пока не подтверждён. [Подробности](docs/BUILD_FIX_RUN5_KOTLIN.md).
+
 **Исправление сборки №3 (24.11.2026):** Android 17 SDK теперь устанавливается как `platforms;android-37.0`, а Gradle явно использует API 37.0. Добавлены регрессионные тесты SDK Manager. APK ещё не собран; нужен новый ручной запуск GitHub Actions. Автоматических триггеров нет. [Подробности](docs/BUILD_FIX_RUN3_SDK37_PACKAGE.md).
 
 **Исправление после GitHub Actions №2 (24.11.2026):** настоящий runner дошёл до `:app:checkGeckoDebugAarMetadata`. GeckoView 156 требует compile SDK 37, AndroidX Core 1.19 требует AGP 9.1+. Сборка обновлена до **AGP 9.1.1 / Gradle 9.3.1 / compileSdk 37**, Kotlin теперь встроен в AGP. **targetSdk оставлен 36** до проверки на Android 17. Существует только разрешённая пользователем ручная сборка (`workflow_dispatch`), **APK пока не создан**. [Подробности](docs/BUILD_FIX_RUN2_SDK37.md).
@@ -70,7 +72,7 @@
 
 - **Историческое состояние до загрузки второго архива:** `Character+AI_+Chat,+Talk,+Text_1.17.4_APKPure.xapk` занимает 278 738 234 байта, а Google Drive отклоняет загрузки больше 268 435 456 байт. Нельзя считать, что официальный APK уже разобран или изучен.
 - Добавлены самостоятельные утилиты `tools/split_xapk.py` и `tools/inspect_xapk.py`: безопасное деление исходного XAPK на последовательные части по 190 МиБ и статический анализ APK-модулей, разрешений, ABI, DEX и SHA-256 **без запуска чужого кода**. Проверены на синтетических архивах. Инструкции: `docs/XAPK_AUDIT.md`.
-- Для Android 17 (API 37), включая Pixel 8a на LineageOS, добавлены ручная диагностика `scripts/device-android17-preflight.sh` и план испытаний `docs/ANDROID_17.md`. Сейчас compileSdk=37 и AGP 9.1.1, но targetSdk=36 оставлен до аппаратных тестов; нужна успешная сборка.
+- Для Android 17 (API 37), включая Pixel 8a на LineageOS, добавлены ручная диагностика `scripts/device-android17-preflight.sh` и план испытаний `docs/ANDROID_17.md`. Сейчас compileSdk=37 и AGP 9.3.1, но targetSdk=36 оставлен до аппаратных тестов; нужна успешная сборка.
 - Activity явно допускает изменение размеров; исправлен выбор `aapt` в проверке пакета перед выпуском. APK не собран и устройство не проверено; предупреждения Google Play Protect при ручной установке гарантированно убрать нельзя. Фоновых задач и CI нет.
 
 ## Что нового в v0.10.0-rc1 (без APK)
@@ -147,7 +149,7 @@
 
 ## Сборка
 
-Нужны Android Studio, **SDK Platform 37**, **JDK 17**, **Gradle 9.3.1**, **AGP 9.1.1** со встроенным Kotlin. Клонируйте весь репозиторий GitHub (включая проверенный Gradle Wrapper), откройте корень в Android Studio, выполните Sync и `Build → Build APK(s)` либо запустите вручную `bash scripts/build-apk.sh`. В облегчённом ZIP нет `gradle-wrapper.jar`; альтернативно нужен установленный Gradle 9.3.1. APK появляются в `app/build/outputs/apk/gecko/debug/app-gecko-debug.apk` и `app/build/outputs/apk/legacy/debug/app-legacy-debug.apk` **только после успешной сборки**. Приложение рассчитано на Android 10 и выше.
+Нужны Android Studio, **SDK Platform 37**, **JDK 17**, **Gradle 9.7.0**, **AGP 9.3.1** со встроенным Kotlin. Клонируйте весь репозиторий GitHub (включая проверенный Gradle Wrapper), откройте корень в Android Studio, выполните Sync и `Build → Build APK(s)` либо запустите вручную `bash scripts/build-apk.sh`. В облегчённом ZIP нет `gradle-wrapper.jar`; альтернативно нужен установленный Gradle 9.7.0. APK появляются в `app/build/outputs/apk/gecko/debug/app-gecko-debug.apk` и `app/build/outputs/apk/legacy/debug/app-legacy-debug.apk` **только после успешной сборки**. Приложение рассчитано на Android 10 и выше.
 
 Ручная проверка инструментов: `bash scripts/doctor.sh` (ничего не устанавливает и не запускает автоматически). Локальные тесты без SDK: `bash scripts/test-offline.sh`. Список обязательных проверок на телефоне — [docs/QA.md](docs/QA.md). Исследования — [docs/RESEARCH.md](docs/RESEARCH.md); ограничения и безопасность — [docs/SECURITY.md](docs/SECURITY.md), изменения — [docs/CHANGELOG.md](docs/CHANGELOG.md).
 

@@ -25,7 +25,7 @@
 - **System WebView**: leverages updatable Chromium and existing device implementation. GeckoView is a possible alternative but bundles another rendering engine, has larger distribution overhead and needs real OAuth/voice compatibility testing.
 - **Domain blocker**: fast immutable snapshot matcher with user-controlled lists, no third-party SDK or outbound telemetry. A full ABP/EasyList engine is substantially more complex; Brave's MPL-2.0 Rust engine is a candidate for a properly isolated, licensed module **only after benchmarks and functional verification**. No code copied.
 - **C++/Rust**: add only after profiling a hot path where native code improves latency without worsening crash risk/ABI size.
-- **Android 17**: API 37 compilation requires a compatible AGP/Gradle/Kotlin toolchain. Current compileSdk=37 (AGP 9.1.1) and targetSdk=36 have not been validated on Android 17. Test on Pixel 8a/LineageOS before raising targetSdk.
+- **Android 17**: API 37 compilation requires a compatible AGP/Gradle/Kotlin toolchain. Current compileSdk=37 (AGP 9.3.1) and targetSdk=36 have not been validated on Android 17. Test on Pixel 8a/LineageOS before raising targetSdk.
 - **Performance proof**: measure cold start, navigation, memory PSS, battery drain and frame jank on device before claiming faster than official client. Baseline Profiles/Macrobenchmark are optional future tools, not automatic CI.
 
 ## Publishing gate

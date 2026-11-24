@@ -20,7 +20,7 @@ The Gecko ARM64 flavor now exposes a local searchable/bookmarkable library and a
 
 Android now has two explicit Gradle flavors:
 
-- `gecko`: launcher is `GeckoActivity` with Mozilla GeckoView as its initial browsing engine, targeting arm64-v8a for Pixel 8a (`akita`, Tensor G3). Pinned `org.mozilla.geckoview:geckoview-arm64-v8a:156.0.20260921121718` from Mozilla Maven. Adds a separate native Gecko toolbar, back/forward/reload/home, manual share, first-party navigation policy, external-browser confirmation, basic Gecko tracking protection and an explicit microphone/camera consent flow. The user's optional public page resume and screenshot-protection setting are shared with the legacy shell. **No system WebView is initialized in the normal Gecko launcher path.** The legacy browser tools are accessible explicitly for features not ported yet.
+- `gecko`: launcher is `GeckoActivity` with Mozilla GeckoView as its initial browsing engine, targeting arm64-v8a for Pixel 8a (`akita`, Tensor G3). Pinned `org.mozilla.geckoview:geckoview-arm64-v8a:159.0.20261102144711` from Mozilla Maven. Adds a separate native Gecko toolbar, back/forward/reload/home, manual share, first-party navigation policy, external-browser confirmation, basic Gecko tracking protection and an explicit microphone/camera consent flow. The user's optional public page resume and screenshot-protection setting are shared with the legacy shell. **No system WebView is initialized in the normal Gecko launcher path.** The legacy browser tools are accessible explicitly for features not ported yet.
 - `legacy`: original existing MainActivity, Android System WebView/AndroidX WebKit provider, manually imported domain lists, offline hub, picker, download policy and diagnostics. It remains for functional parity and fallbacks.
 
 Both flavors use the same application ID, so **they cannot be installed side by side** without assigning separate application IDs. Gecko's cookies, app permission grants and in-process state are **not** migrated from the existing Android WebView profile. Do not promise SSO across engines. The gecko variant carries embedded ARM64 Gecko libraries and may be substantially larger.
@@ -36,7 +36,7 @@ bash scripts/build-apk.sh gecko  # ARM64 Android GeckoView debug preview
 bash scripts/build-apk.sh legacy # Existing WebView fallback
 ```
 
-These are **manual commands**; no GitHub Actions, background jobs, schedules, or automatic downloads are configured by the project. The Gecko AAR must be resolved from `https://maven.mozilla.org/maven2/` and its binary integrity and provenance checked by the build operator. An official Android SDK, JDK 17+, Gradle 9.3.1, Android SDK 37 and an actual Android 17 device are needed. This development environment does not include the Android SDK or Gradle distribution and **did not compile any APK**.
+These are **manual commands**; the approved GitHub Actions build is manual-only, with no automatic triggers, background monitoring or schedules. The Gecko AAR must be resolved from `https://maven.mozilla.org/maven2/` and its binary integrity and provenance checked by the build operator. An official Android SDK, JDK 17+, Gradle 9.7.0, Android SDK 37 and an actual Android 17 device are needed. This development environment does not include the Android SDK or Gradle distribution and **did not compile any APK**.
 
 ## Security and compatibility boundaries
 
@@ -45,7 +45,7 @@ These are **manual commands**; no GitHub Actions, background jobs, schedules, or
 - Microphone/camera are off by default. The user first enables media requests, then Android permission is checked, then each Gecko media request gets its own visible prompt; no location, notifications or local-network permission is auto-approved.
 - As of v0.24.0-source Gecko implements explicit SAF file selection and bounded, user-confirmed first-party downloads and basic JS prompts. It still lacks complete fullscreen video, cross-origin CDN download handling, session restore across engine crashes, full settings parity and seamless OAuth. Its toolbar includes an explicit way into the established native tools / legacy browser.
 - Native Gecko profile is separate from WebView cookies. No raw cookie export/import, account token injection, private Character.AI API, or copied proprietary XAPK code.
-- The current API 37 / Android 17 runtime is a **test target**; build now uses compile SDK 37, target SDK 36 and AGP 9.1.1 and must not be represented as API-37-targeted.
+- The current API 37 / Android 17 runtime is a **test target**; build now uses compile SDK 37, target SDK 36 and AGP 9.3.1 and must not be represented as API-37-targeted.
 - Pixel 8a uses `akita`, not Pixel 8 `shiba`. Both MindTheGapps and Morphe microG may be present; they are different applications, not proof that Google OAuth works in Gecko.
 
 ## Manual acceptance plan before promoting Gecko to stable
@@ -64,7 +64,7 @@ These are **manual commands**; no GitHub Actions, background jobs, schedules, or
 - [Mozilla getting started / Maven repository / Java 17](https://firefox-source-docs.mozilla.org/mobile/android/geckoview/consumer/geckoview-quick-start.html)
 - [Mozilla current navigation delegate API](https://mozilla.github.io/geckoview/javadoc/mozilla-central/org/mozilla/geckoview/GeckoSession.NavigationDelegate.html)
 - [Mozilla site and device permissions](https://firefox-source-docs.mozilla.org/mobile/android/geckoview/consumer/permissions.html)
-- [Published ARM64 GeckoView 156.0.20260921121718 artifact](https://mvnrepository.com/artifact/org.mozilla.geckoview/geckoview-arm64-v8a/156.0.20260921121718)
+- [Published ARM64 GeckoView 159.0.20261102144711 artifact](https://mvnrepository.com/artifact/org.mozilla.geckoview/geckoview-arm64-v8a/159.0.20261102144711)
 - [LineageOS `akita` device repository](https://github.com/LineageOS/android_device_google_akita/tree/lineage-24.0)
 
 ## v0.29.0 — stale file prompt prevention

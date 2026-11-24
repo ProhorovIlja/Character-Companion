@@ -8,7 +8,7 @@ This repository has no GitHub Actions, schedules, upload hooks, services or auto
 
 ## Local requirements
 
-- Official Gradle 8.13 bootstrap Wrapper binary (full GitHub checkout) fetching checksum-pinned Gradle 9.3.1, JDK 17+, Android SDK Platform 37, build-tools with ``aapt` (for dump badging) and `apksigner`.
+- Official Gradle 9.7.0 bootstrap Wrapper binary (full GitHub checkout) fetching checksum-pinned Gradle 9.7.0, JDK 17+, Android SDK Platform 37, build-tools with ``aapt` (for dump badging) and `apksigner`.
 - Release signing key owned by the maintainer. Never commit `.jks`, keystore properties, passwords or service-account credentials.
 - A configured build/signing method under maintainer control. `:app:assembleRelease` is not assumed to create a signed APK by default.
 - Real Android devices or emulators on API 29, 33, 35, 36 and 37; a separate manual device signoff.
@@ -44,7 +44,7 @@ Use the repository's **GitHub Releases** page only after verifying the source ar
 
 ## Android 17 and official-XAPK analysis
 
-`docs/ANDROID_17.md` describes a manual Pixel 8a/LineageOS API 37 device matrix. The current app targets API 36 intentionally; the former SDK36/AGP8.13 build failed; the current compileSdk37/AGP9.1.1 build still needs real validation. `docs/XAPK_AUDIT.md` explains the 256-MiB Drive connector limit and safe, manual XAPK splitting and static inspection. Do not include third-party app APKs/Dex/assets in releases or claim successful reverse analysis before bytes are available.
+`docs/ANDROID_17.md` describes a manual Pixel 8a/LineageOS API 37 device matrix. The current app targets API 36 intentionally; the former SDK36/AGP8.13 build failed; the current compileSdk37/AGP9.3.1 build still needs real validation. `docs/XAPK_AUDIT.md` explains the 256-MiB Drive connector limit and safe, manual XAPK splitting and static inspection. Do not include third-party app APKs/Dex/assets in releases or claim successful reverse analysis before bytes are available.
 
 ## Offline native bookmark QA (0.15.0 source candidate)
 

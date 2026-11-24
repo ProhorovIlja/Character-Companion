@@ -9,8 +9,8 @@ if command -v java >/dev/null 2>&1; then
 else
   echo 'JAVA_FOUND=NO'; fail=1
 fi
-expected_jar='81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f'
-expected_dist='b266d5ff6b90eada6dc3b20cb090e3731302e553a27c5d3e4df1f0d76beaff06'
+expected_jar='7a9ce74cff467ca1bf60a4fcd9f05185acceda4d0f382434d393e17864262c5d'
+expected_dist='84fbba45c7f4c64abc77460e1c00f541e9f960e3c7ed2538f1ede19eacd873ae'
 wrapper='gradle/wrapper/gradle-wrapper.jar'
 props='gradle/wrapper/gradle-wrapper.properties'
 if [[ -f "$wrapper" ]]; then
@@ -27,7 +27,7 @@ if [[ -f "$wrapper" ]]; then
     echo 'GRADLE_WRAPPER_SHA256=FAIL_OR_UNAVAILABLE'; fail=1
   fi
   if [[ -f "$props" ]] && \
-      grep -Fxq 'distributionUrl=https\://services.gradle.org/distributions/gradle-9.3.1-bin.zip' "$props" && \
+      grep -Fxq 'distributionUrl=https\://services.gradle.org/distributions/gradle-9.7.0-bin.zip' "$props" && \
       grep -Fxq "distributionSha256Sum=$expected_dist" "$props"; then
     echo 'GRADLE_DISTRIBUTION_PIN=PASS'
   else
@@ -41,10 +41,10 @@ elif command -v gradle >/dev/null 2>&1; then
     raw_version=''
   fi
   gradle_version="$(printf '%s\n' "$raw_version" | sed -nE 's/^Gradle ([0-9]+(\.[0-9]+)+)$/\1/p' | head -1)"
-  if [[ "$gradle_version" == '9.3.1' ]]; then
-    echo 'GRADLE_VERSION=9.3.1_VERIFIED'
+  if [[ "$gradle_version" == '9.7.0' ]]; then
+    echo 'GRADLE_VERSION=9.7.0_VERIFIED'
   else
-    echo 'GRADLE_VERSION=UNSUPPORTED_EXPECT_9.3.1'; fail=1
+    echo 'GRADLE_VERSION=UNSUPPORTED_EXPECT_9.7.0'; fail=1
   fi
 else
   echo 'GRADLE_FOUND=NO'; fail=1

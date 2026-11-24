@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Manual foreground-only Android build. No CI, background tasks, signing or upload.
-# Accepts an official Gradle wrapper OR a locally installed Gradle 9.3.1.
+# Accepts an official Gradle wrapper OR a locally installed Gradle 9.7.0.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 FLAVOR="${1:-}"
@@ -11,7 +11,7 @@ case "$FLAVOR" in
 esac
 bash scripts/doctor.sh
 if [[ ! -f gradle/wrapper/gradle-wrapper.jar ]] && ! command -v gradle >/dev/null 2>&1; then
-  echo 'Gradle 9.3.1 is required for lightweight source archives.' >&2; exit 1
+  echo 'Gradle 9.7.0 is required for lightweight source archives.' >&2; exit 1
 fi
 # Refuse stale output; report success only for the current invocation.
 rm -f -- "$APK"

@@ -1,12 +1,10 @@
 # Gradle Wrapper provenance
 
-`gradle-wrapper.jar` is sourced from the official `gradle/gradle` GitHub repository at the stable `v8.13.0` tag (Apache-2.0). No project-specific code has been inserted into the jar.
+The Gradle 9.7.0 bootstrap JAR is obtained from the official `gradle/gradle` repository at tag `v9.7.0`, with the published SHA-256 checked before committing it. No project-specific code is inserted into the JAR.
 
-The unchanged Gradle 8.13 **bootstrap wrapper JAR** is verified against the official Gradle reference:
+- Wrapper JAR SHA-256: `7a9ce74cff467ca1bf60a4fcd9f05185acceda4d0f382434d393e17864262c5d`
+- Gradle 9.7.0 binary distribution SHA-256: `84fbba45c7f4c64abc77460e1c00f541e9f960e3c7ed2538f1ede19eacd873ae`
+- Official checksums: https://gradle.org/release-checksums/
+- Official source: https://github.com/gradle/gradle/blob/v9.7.0/gradle/wrapper/gradle-wrapper.jar
 
-- Wrapper JAR: `81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f`
-- Current **Gradle 9.3.1** distribution ZIP: `b266d5ff6b90eada6dc3b20cb090e3731302e553a27c5d3e4df1f0d76beaff06` (the wrapper bootstraps this newer distribution)
-
-Source: https://gradle.org/release-checksums/
-
-The official jar is committed as a binary only in the canonical GitHub repository. The lightweight local source ZIP has no Gradle wrapper JAR; clone GitHub for the full wrapper or supply Gradle 9.3.1. There is no Android SDK or APK bundled with this repository.
+The canonical GitHub checkout includes the verified binary JAR. Lightweight source-only snapshots may omit it; use a complete GitHub clone or an independently installed Gradle 9.7.0. No Android SDK or APK is bundled in the repository.

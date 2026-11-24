@@ -31,7 +31,7 @@ class GeckoFlavorTests(unittest.TestCase):
         build = (ROOT/'app/build.gradle.kts').read_text()
         settings = (ROOT/'settings.gradle.kts').read_text()
         self.assertIn('geckoImplementation', build)
-        self.assertIn('geckoview-arm64-v8a:156.0.20260921121718', build)
+        self.assertIn('geckoview-arm64-v8a:159.0.20261102144711', build)
         self.assertIn('create("gecko")', build)
         self.assertIn('create("legacy")', build)
         self.assertIn('abiFilters.add("arm64-v8a")', build)

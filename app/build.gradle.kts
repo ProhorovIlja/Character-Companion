@@ -30,7 +30,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    // AGP 9.1 provides built-in Kotlin; JVM target follows Java 17 compileOptions.
+    // AGP 9.3 provides built-in Kotlin (KGP 2.4.21 is pinned at the root); JVM target follows Java 17 compileOptions.
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -43,8 +43,14 @@ android {
 }
 
 dependencies {
+    // Keep the application Kotlin libraries aligned with the actual compiler.
+    // AndroidX Core's transitive stdlib 2.4.10 caused build #5 to fail with KGP 2.2.
+    implementation(platform("org.jetbrains.kotlin:kotlin-bom:2.4.21"))
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:2.4.21")
+    implementation("androidx.core:core:1.19.1")
+    implementation("androidx.core:core-ktx:1.19.1")
     // Gecko browser is confined to the opt-in arm64 flavor. Legacy does not ship it.
-    add("geckoImplementation", "org.mozilla.geckoview:geckoview-arm64-v8a:156.0.20260921121718")
+    add("geckoImplementation", "org.mozilla.geckoview:geckoview-arm64-v8a:159.0.20261102144711")
     // Stable AndroidX WebKit 1.18.0 (2026-11-18). Service-worker request interception.
     implementation("androidx.webkit:webkit:1.18.0")
     // Browser-backed Custom Tabs share the default browser's sign-in state,

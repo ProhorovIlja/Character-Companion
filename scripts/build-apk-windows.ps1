@@ -17,9 +17,9 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $wrapperJar = Join-Path $root 'gradle\wrapper\gradle-wrapper.jar'
 $wrapperBat = Join-Path $root 'gradlew.bat'
 # Full GitHub clones contain the verified wrapper. Lightweight source ZIPs do not,
-# so they require a preinstalled Gradle 9.3.1; do not download or install silently.
-$expectedJar = '81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f'
-$expectedDist = 'b266d5ff6b90eada6dc3b20cb090e3731302e553a27c5d3e4df1f0d76beaff06'
+# so they require a preinstalled Gradle 9.7.0; do not download or install silently.
+$expectedJar = '7a9ce74cff467ca1bf60a4fcd9f05185acceda4d0f382434d393e17864262c5d'
+$expectedDist = '84fbba45c7f4c64abc77460e1c00f541e9f960e3c7ed2538f1ede19eacd873ae'
 $gradleCommand = $null
 if (Test-Path -LiteralPath $wrapperJar -PathType Leaf) {
     if (-not (Test-Path -LiteralPath $wrapperBat -PathType Leaf)) {
@@ -34,23 +34,23 @@ if (Test-Path -LiteralPath $wrapperJar -PathType Leaf) {
         Fail 'Gradle Wrapper distribution properties are missing.'
     }
     $lines = @(Get-Content -LiteralPath $props)
-    if (($lines -cnotcontains 'distributionUrl=https\://services.gradle.org/distributions/gradle-9.3.1-bin.zip') -or
+    if (($lines -cnotcontains 'distributionUrl=https\://services.gradle.org/distributions/gradle-9.7.0-bin.zip') -or
         ($lines -cnotcontains "distributionSha256Sum=$expectedDist")) {
-        Fail 'Gradle 9.3.1 distribution URL/checksum pin is invalid.'
+        Fail 'Gradle 9.7.0 distribution URL/checksum pin is invalid.'
     }
     $gradleCommand = $wrapperBat
     Write-Output 'GRADLE_PROVIDER=VERIFIED_WRAPPER'
 } else {
     $candidate = Get-Command 'gradle' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($null -eq $candidate) {
-        Fail 'Missing Gradle Wrapper JAR and Gradle 9.3.1. Clone full GitHub repo or install Gradle 9.3.1 locally.'
+        Fail 'Missing Gradle Wrapper JAR and Gradle 9.7.0. Clone full GitHub repo or install Gradle 9.7.0 locally.'
     }
     $gradleCommand = $candidate.Source
     $versionText = (& $gradleCommand '--version' 2>&1) -join "`n"
-    if (($LASTEXITCODE -ne 0) -or ($versionText -notmatch '(?m)^Gradle 9\.3\.1\s*$')) {
-        Fail 'Installed Gradle version is not 9.3.1. Refusing an unverified toolchain.'
+    if (($LASTEXITCODE -ne 0) -or ($versionText -notmatch '(?m)^Gradle 9\.7\.0\s*$')) {
+        Fail 'Installed Gradle version is not 9.7.0. Refusing an unverified toolchain.'
     }
-    Write-Output 'GRADLE_PROVIDER=LOCAL_GRADLE_9.3.1'
+    Write-Output 'GRADLE_PROVIDER=LOCAL_GRADLE_9.7.0'
 }
 $javaExe = if ($env:JAVA_HOME) { Join-Path $env:JAVA_HOME 'bin\java.exe' } else { 'java.exe' }
 if (-not (Get-Command $javaExe -ErrorAction SilentlyContinue)) {

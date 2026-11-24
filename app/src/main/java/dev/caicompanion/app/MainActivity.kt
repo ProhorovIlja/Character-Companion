@@ -988,7 +988,7 @@ class MainActivity : Activity() {
         val url = UrlPolicy.sanitizeBookmark(webView.url) ?: HOME
         val saved = store.listBookmarks()
         val options = mutableListOf(getString(R.string.bookmark_add), getString(R.string.bookmark_remove))
-        options += saved.map { "☆ ${it.first}" }
+        options.addAll(saved.map { "☆ ${it.first}" })
         AlertDialog.Builder(this).setTitle(getString(R.string.bookmarks))
             .setItems(options.toTypedArray()) { _, selected ->
                 when (selected) {
@@ -1109,7 +1109,7 @@ class MainActivity : Activity() {
         val zoomValue = TextView(this).apply { text = "${store.textZoom}%"; setTextColor(ACCENT) }
         layout.addView(zoomValue)
         val zoomBar = SeekBar(this).apply {
-            max = 100; progress = store.textZoom - 75
+            max = 100; this.progress = store.textZoom - 75
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                     zoomValue.text = "${progress + 75}%"
