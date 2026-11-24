@@ -90,6 +90,44 @@ class AndroidConversationStore(context: Context, private val account: String) :
     }
     fun page(character: String, chat: String, limit: Int = 50, before: Pair<Long, String>? = null) = page(readableDatabase, character, chat, limit, before)
     override fun recent(character: String, chat: String, limit: Int) = page(character, chat, limit)
+    /** Authenticate and validate a whole batch before the atomic database write. */
+    fun importEncrypted(key: ByteArray, envelope: ByteArray): Int {
+        val events = HistoryWire.decode(EncryptedHistoryEnvelope.open(key, account, envelope))
+        return write { db ->
+            var count = 0
+            for (event in events) {
+                val existing = find(db, event.id)
+                if (existing == null) { insert(db, event); count++ }
+                else require(existing == event) { "Conflicting message ID" }
+            }
+            count
+        }
+    }
+
+    data class EncryptedPage(val envelope: ByteArray, val last: Pair<Long, String>)
+
+    /** A single bounded page, not a complete authenticated snapshot.
+     * Do not use a previous export cursor as a permanent sync watermark: imported older
+     * events may precede it. Caller must serialize export with writes for complete traversal.
+     */
+    fun exportEncryptedPage(key: ByteArray, after: Pair<Long, String>? = null): EncryptedPage? {
+        val args = mutableListOf<String>()
+        var sql = "SELECT $columns FROM messages"
+        if (after != null) {
+            require(after.first in 1..NativeConversation.MAX_CLOCK)
+            NativeConversation.canonicalId(after.second)
+            sql += " WHERE (clock > ? OR (clock = ? AND id > ?))"
+            args.addAll(listOf(after.first.toString(), after.first.toString(), after.second))
+        }
+        // 64 x maximum 16,000 UTF-16 units plus JSON overhead remains under 4 MiB.
+        sql += " ORDER BY clock ASC,id ASC LIMIT 64"
+        val rows = readableDatabase.rawQuery(sql, args.toTypedArray()).use { c ->
+            buildList { while (c.moveToNext()) add(event(c)) }
+        }
+        val last = rows.lastOrNull() ?: return null
+        return EncryptedPage(EncryptedHistoryEnvelope.seal(key, account, HistoryWire.encode(rows)), last.clock to last.id)
+    }
+
     override fun commitReply(user: NativeConversation.Event, id: String, text: String): NativeConversation.Event = write { db ->
         require(user.role == "user" && id == NativeConversation.replyId(user.id))
         require(find(db, user.id) == user)
