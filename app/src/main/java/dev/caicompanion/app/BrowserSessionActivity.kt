@@ -88,6 +88,7 @@ class BrowserSessionActivity : Activity() {
         })
         column.addView(action(R.string.browser_mode_embedded) { returnToEmbedded() })
         column.addView(action(R.string.release_center) { ReleaseCenter.show(this) })
+        column.addView(action(R.string.lorebook_title) { startActivity(Intent(this, LorebookActivity::class.java)) })
         column.addView(action(R.string.section_data) { settingsBackup.show() })
         column.addView(action(R.string.shell_theme_title) { ShellAppearance.choose(this) })
         column.addView(action(R.string.device_compat_title) { DeviceRuntimeProbe.show(this, "browser") })

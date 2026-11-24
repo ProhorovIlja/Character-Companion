@@ -301,4 +301,23 @@
     <string name="shell_theme_dark">Dark</string>
     <string name="shell_theme_amoled">AMOLED black</string>
     <string name="shell_theme_restart">Apply appearance and reopen this screen? Unsaved page text may be lost. Web content keeps its own appearance.</string>
+    <string name="lorebook_title">Lorebook import</string>
+    <string name="lorebook_help">Prepare a lorebook locally from structured TXT or JSON (up to 2 million characters). Export a file or copy text, then use Create → Lorebook → Import in Character.AI. Service access, linking and publishing depend on your account.</string>
+    <string name="lorebook_open">Open lorebook file</string>
+    <string name="lorebook_paste">Paste lorebook text or JSON</string>
+    <string name="lorebook_empty">No lorebook loaded.</string>
+    <string name="lorebook_untitled">Untitled</string>
+    <string name="lorebook_summary">%1$s\nEntries: %2$d · Need review: %3$d · Disabled skipped: %4$d</string>
+    <string name="lorebook_loss">Some source fields or trigger rules are not supported by the target format. The original file is unchanged.</string>
+    <string name="lorebook_replace">Replace the current local preview? Export it first if you want to keep it.</string>
+    <string name="lorebook_processing">Processing locally…</string>
+    <string name="lorebook_failed">Could not import this file. Check UTF-8 encoding, supported format and size limits. Existing preview was kept.</string>
+    <string name="lorebook_loaded">Loaded locally. Tap an entry to review it.</string>
+    <string name="lorebook_export_json">Save Character.AI JSON</string>
+    <string name="lorebook_export_text">Save structured TXT</string>
+    <string name="lorebook_copy">Copy structured TXT</string>
+    <string name="lorebook_export_warning">Review missing titles, content or keywords, entries with more than eight keywords, and unsupported source settings. Disabled entries are omitted. JSON names and descriptions may need to be entered in the official editor. Export anyway?</string>
+    <string name="lorebook_export_failed">Could not export safely in this format or the output is too large. Try JSON instead of TXT or copy.</string>
+    <string name="lorebook_copied">Text copied. Paste into the official Lorebook Import editor.</string>
+    <string name="lorebook_saved">Converted file saved. Select it in the official Lorebook Import editor.</string>
 </resources>

@@ -301,4 +301,23 @@
     <string name="shell_theme_dark">Тёмное</string>
     <string name="shell_theme_amoled">AMOLED чёрное</string>
     <string name="shell_theme_restart">Применить оформление и открыть экран заново? Несохранённый текст может быть потерян. Внешний вид веб-страниц не изменится.</string>
+    <string name="lorebook_title">Импорт лорбуков</string>
+    <string name="lorebook_help">Подготовьте лорбук локально из структурированного TXT или JSON (до 2 млн символов). Экспортируйте файл или скопируйте текст, затем выберите Create → Lorebook → Import в Character.AI. Доступ, привязка и публикация зависят от аккаунта.</string>
+    <string name="lorebook_open">Открыть файл лорбука</string>
+    <string name="lorebook_paste">Вставить текст или JSON</string>
+    <string name="lorebook_empty">Лорбук не загружен.</string>
+    <string name="lorebook_untitled">Без названия</string>
+    <string name="lorebook_summary">%1$s\nЗаписи: %2$d · Требуют проверки: %3$d · Пропущено отключённых: %4$d</string>
+    <string name="lorebook_loss">Некоторые поля или правила активации не поддерживаются целевым форматом. Исходный файл не изменён.</string>
+    <string name="lorebook_replace">Заменить текущий локальный просмотр? Сначала экспортируйте его, если хотите сохранить.</string>
+    <string name="lorebook_processing">Локальная обработка…</string>
+    <string name="lorebook_failed">Не удалось импортировать файл. Проверьте кодировку UTF-8, формат и размер. Текущий просмотр сохранён.</string>
+    <string name="lorebook_loaded">Загружено локально. Нажмите на запись для просмотра.</string>
+    <string name="lorebook_export_json">Сохранить JSON Character.AI</string>
+    <string name="lorebook_export_text">Сохранить структурированный TXT</string>
+    <string name="lorebook_copy">Копировать структурированный TXT</string>
+    <string name="lorebook_export_warning">Проверьте отсутствующие заголовки, содержимое или ключи, записи с более чем восемью ключами и неподдерживаемые настройки. Отключённые записи пропускаются. Название и описание из JSON может потребоваться указать в официальном редакторе. Экспортировать?</string>
+    <string name="lorebook_export_failed">Не удалось безопасно экспортировать в этом формате или результат слишком большой. Попробуйте JSON вместо TXT или копирования.</string>
+    <string name="lorebook_copied">Текст скопирован. Вставьте в официальный редактор импорта лорбуков.</string>
+    <string name="lorebook_saved">Преобразованный файл сохранён. Выберите его в официальном редакторе импорта лорбуков.</string>
 </resources>
