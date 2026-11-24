@@ -44,27 +44,26 @@ object RoleplayToolkitUi {
     }
 
     fun show(activity: Activity) {
+        if (active(activity)) activity.startActivity(Intent(activity, ModuleCenterActivity::class.java))
+    }
+
+    internal fun open(activity: Activity, module: CompanionModules.Module) {
         if (!active(activity)) return
-        val slots = RoleplayToolkit.Slot.entries
-        val labels = slots.map { activity.getString(title(it)) } + listOf(
-            activity.getString(R.string.roleplay_context), activity.getString(R.string.roleplay_web_search),
-            activity.getString(R.string.roleplay_dice), activity.getString(R.string.memory_bank_title),
-            activity.getString(R.string.memory_transfer_title), activity.getString(R.string.wiki_research_title))
-        showPrivate(activity, AlertDialog.Builder(activity).setTitle(R.string.roleplay_title)
-            .setItems(labels.toTypedArray()) { _, index ->
-                if (active(activity)) {
-                    val slot = slots.getOrNull(index)
-                    if (slot != null) edit(activity, slot)
-                    else when (index - slots.size) {
-                        0 -> context(activity)
-                        1 -> search(activity)
-                        2 -> dice(activity)
-                        3 -> memoryBank(activity)
-                        4 -> activity.startActivity(Intent(activity, MemoryBackupActivity::class.java))
-                        5 -> wikipediaPrompt(activity) { packet -> research(activity, emptyMap(), packet) }
-                    }
-                }
-            }.setNegativeButton(R.string.close, null).create())
+        when (module) {
+            CompanionModules.Module.CHARACTER -> activity.startActivity(Intent(activity, CharacterDraftActivity::class.java))
+            CompanionModules.Module.LOREBOOK -> activity.startActivity(Intent(activity, LorebookActivity::class.java))
+            CompanionModules.Module.PERSONA -> edit(activity, RoleplayToolkit.Slot.PERSONA)
+            CompanionModules.Module.SCENE -> edit(activity, RoleplayToolkit.Slot.SCENE)
+            CompanionModules.Module.PROMPT -> edit(activity, RoleplayToolkit.Slot.PROMPT)
+            CompanionModules.Module.MEMORY_BANK -> memoryBank(activity)
+            CompanionModules.Module.CHAT_MEMORY -> edit(activity, RoleplayToolkit.Slot.MEMORY)
+            CompanionModules.Module.CONTEXT -> context(activity)
+            CompanionModules.Module.WIKIPEDIA -> wikipediaPrompt(activity) { packet -> research(activity, emptyMap(), packet) }
+            CompanionModules.Module.WEB_SEARCH -> search(activity)
+            CompanionModules.Module.MEMORY_BACKUP -> activity.startActivity(Intent(activity, MemoryBackupActivity::class.java))
+            CompanionModules.Module.DICE -> dice(activity)
+            CompanionModules.Module.FREE_HELP -> FreeExperienceHelp.show(activity)
+        }
     }
 
     private fun edit(activity: Activity, slot: RoleplayToolkit.Slot) {

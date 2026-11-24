@@ -413,7 +413,7 @@
     <string name="free_experience_http429">Сервис ограничил запросы (HTTP 429). Подождите перед повторной попыткой.</string>
     <string name="free_experience_http503">Сервис временно недоступен (HTTP 503). Оригинальная страница сохранена.</string>
     <string name="refresh_current_chat">Обновить текущий чат</string>
-    <string name="roleplay_title">Инструменты ролевой игры</string>
+    <string name="roleplay_title">Модули</string>
     <string name="roleplay_persona">Персона</string>
     <string name="roleplay_scene">Сцена</string>
     <string name="roleplay_memory">Память чата</string>
@@ -475,4 +475,10 @@
     <string name="wiki_research_empty">Нет подходящих выдержек</string>
     <string name="wiki_research_select">Выберите источники</string>
     <string name="wiki_research_choose_one">Выберите хотя бы один источник</string>
+    <string name="module_center_title">Модули</string>
+    <string name="module_center_search">Поиск модулей</string>
+    <string name="module_center_creator">Создание персонажей</string>
+    <string name="module_center_knowledge">Память и знания</string>
+    <string name="module_center_utilities">Инструменты и помощь</string>
+    <string name="module_center_empty">Модули не найдены</string>
 </resources>

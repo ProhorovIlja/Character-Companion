@@ -44,6 +44,7 @@
             android:launchMode="singleTop" />
         <activity android:name=".LorebookActivity" android:exported="false" />
         <activity android:name=".MemoryBackupActivity" android:exported="false" />
+        <activity android:name=".ModuleCenterActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".CharacterDraftActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".VoiceDraftActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" />

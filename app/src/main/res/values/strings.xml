@@ -413,7 +413,7 @@
     <string name="free_experience_http429">The service rate-limited requests (HTTP 429). Wait before trying again.</string>
     <string name="free_experience_http503">The service is temporarily unavailable (HTTP 503). Its original page is preserved.</string>
     <string name="refresh_current_chat">Refresh current chat</string>
-    <string name="roleplay_title">Roleplay toolkit</string>
+    <string name="roleplay_title">Modules</string>
     <string name="roleplay_persona">Persona</string>
     <string name="roleplay_scene">Scene</string>
     <string name="roleplay_memory">Chat memory</string>
@@ -475,4 +475,10 @@
     <string name="wiki_research_empty">No usable excerpts found</string>
     <string name="wiki_research_select">Select sources</string>
     <string name="wiki_research_choose_one">Select at least one source</string>
+    <string name="module_center_title">Modules</string>
+    <string name="module_center_search">Search modules</string>
+    <string name="module_center_creator">Character creation</string>
+    <string name="module_center_knowledge">Memory and knowledge</string>
+    <string name="module_center_utilities">Utilities and help</string>
+    <string name="module_center_empty">No matching modules</string>
 </resources>
