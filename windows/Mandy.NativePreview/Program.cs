@@ -1,4 +1,7 @@
 using System.IO;
+using System.Diagnostics;
+using System.Text;
+using System.Windows.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -29,6 +32,8 @@ internal sealed class ChatWindow : Window
     private readonly PasswordBox key = new() { MaxLength = 128 };
     private readonly TextBox draft = new() { MaxLength = 16000, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 76, MaxHeight = 144, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
     private readonly ListBox history = new() { HorizontalContentAlignment = HorizontalAlignment.Stretch };
+    private readonly Expander configuration = new() { Header = "Workspace and local AI settings", IsExpanded = true };
+    private readonly TextBox liveReply = new() { IsReadOnly = true, TextWrapping = TextWrapping.Wrap, MaxHeight = 160, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Visibility = Visibility.Collapsed, IsUndoEnabled = false, Margin = new Thickness(0, 0, 0, 8) };
     private readonly TextBlock status = new() { Text = "Choose an empty folder to create a workspace, or open an existing one.", TextWrapping = TextWrapping.Wrap };
     private readonly Button choose = new() { Content = "Choose folder" };
     private readonly Button create = new() { Content = "Create" };
@@ -50,8 +55,9 @@ internal sealed class ChatWindow : Window
         Foreground = Brushes.WhiteSmoke;
         var layout = new DockPanel { Margin = new Thickness(18), LastChildFill = true };
         var settings = new StackPanel();
-        DockPanel.SetDock(settings, Dock.Top);
-        layout.Children.Add(settings);
+        DockPanel.SetDock(configuration, Dock.Top);
+        configuration.Content = settings;
+        layout.Children.Add(configuration);
         settings.Children.Add(new TextBlock { Text = "Mandy AI", FontSize = 24, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0,0,0,10) });
         settings.Children.Add(Labeled("Local workspace", folder));
         settings.Children.Add(Buttons(choose, create, open));
@@ -63,6 +69,7 @@ internal sealed class ChatWindow : Window
         var composer = new StackPanel { Margin = new Thickness(0,8,0,0) };
         DockPanel.SetDock(composer, Dock.Bottom);
         layout.Children.Add(composer);
+        composer.Children.Add(liveReply);
         composer.Children.Add(draft);
         composer.Children.Add(Buttons(send, stop, refresh));
         composer.Children.Add(status);
@@ -163,6 +170,7 @@ internal sealed class ChatWindow : Window
             workspace = await Task.Run(() => Workspace.Open(path, isNew, characterName, characterIdentity));
             name.Text = workspace.Character.Name; identity.Text = workspace.Character.Identity;
             ShowRows(await Task.Run(workspace.Recent));
+            configuration.IsExpanded = false;
             status.Text = pending == null ? "Local workspace ready." : "A saved user message is awaiting a reply.";
         }
         catch (Exception)
@@ -201,10 +209,35 @@ internal sealed class ChatWindow : Window
         var turn = new LocalChatTurn(w.Database, client);
         busy = true; operation = new CancellationTokenSource(); UpdateControls();
         status.Text = "Generating locally…";
+        liveReply.Clear();
+        liveReply.Visibility = Visibility.Collapsed;
+        // The provider bounds output to 16,000 UTF-16 units. Coalesce fragments on
+        // the calling worker, with at most one synchronous UI dispatch outstanding.
+        // No timer, detached task or polling is needed.
+        var preview = new StringBuilder();
+        var cadence = Stopwatch.StartNew();
+        bool first = true;
+        var token = operation.Token;
+        void OnFragment(string fragment)
+        {
+            token.ThrowIfCancellationRequested();
+            preview.Append(fragment);
+            if (!first && cadence.ElapsedMilliseconds < 50) return;
+            first = false;
+            string snapshot = preview.ToString();
+            Dispatcher.Invoke(() =>
+            {
+                if (token.IsCancellationRequested || closeRequested) return;
+                liveReply.Visibility = Visibility.Visible;
+                liveReply.Text = snapshot;
+                liveReply.ScrollToEnd();
+            }, DispatcherPriority.Background);
+            cadence.Restart();
+        }
         bool saved = false;
         try
         {
-            await turn.SendAsync(request, cancellationToken: operation.Token);
+            await turn.SendAsync(request, preview: OnFragment, cancellationToken: token);
             saved = true;
             draft.Clear();
             status.Text = "Reply saved.";
@@ -223,6 +256,9 @@ internal sealed class ChatWindow : Window
                 historyValid = false;
                 status.Text = "History unavailable. Refresh before sending again.";
             }
+            // Only durable database rows are displayed as completed messages.
+            liveReply.Clear();
+            liveReply.Visibility = Visibility.Collapsed;
             Finish();
         }
     }
