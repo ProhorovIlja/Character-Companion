@@ -53,6 +53,26 @@ fun main() {
         bad { run {} }
         bad { generate(first) }
         run(b.sha256) { verify(generate(it) == "Hello 🌙") }
+        session.close()
+        val reports = mutableListOf<ModelPreparation>()
+        fun measured(sha: String = b.sha256, stop: () -> Boolean = { false }, action: (EmbeddedLlama) -> Unit = {}) =
+            session.useMeasured(library, sha, stop, {}, { reports.add(it) }, action)
+        measured { verify(generate(it) == "Hello 🌙") }
+        verify(reports.size == 1 && !reports[0].reused)
+        verify(reports[0].let { it.verifyNanos >= 0 && it.admissionNanos >= 0 && it.loadNanos >= 0 })
+        measured()
+        verify(reports.size == 2 && reports[1].reused && reports[1].loadNanos == 0L)
+        verify(reports[1].verifyNanos >= 0 && reports[1].admissionNanos >= 0)
+        bad { measured { error("failed") } }
+        verify(reports.size == 2)
+        measured()
+        verify(reports.size == 3 && !reports[2].reused)
+        bad { measured(stop = { true }) }
+        verify(reports.size == 3)
+        measured()
+        verify(reports.size == 4 && !reports[3].reused)
+        bad { session.useMeasured(library, b.sha256, { false }, { error("refused") }, { reports.add(it) }) {} }
+        verify(reports.size == 4)
         println("ResidentModel: $checks checks passed (JNI test double)")
     } finally { session.close(); root.toFile().deleteRecursively() }
 }

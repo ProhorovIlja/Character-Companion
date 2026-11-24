@@ -304,12 +304,14 @@ class MandyWorkspaceActivity : Activity() {
             val text = StringBuilder()
             var lastUpdate = 0L
             var metrics: GenerationMetrics? = null
+            var preparation: ModelPreparation? = null
             val result = runCatching {
                 workspace.edit(ticket, draft)
                 saved = true
                 if (!retry) workspace.prepare(ticket, mode)
                 AndroidConversationStore(applicationContext, account).use { history ->
-                    EmbeddedChatTurn.sendWithMemory(workspace, ticket, library, history, modelLibrary(), sha, memory, stopped::get, admit = { admitModel(it, preset.contextTokens) }, preset = preset, resident = resident, onMetrics = { metrics = it }) { origin, part ->
+                    EmbeddedChatTurn.sendWithMemory(workspace, ticket, library, history, modelLibrary(), sha, memory, stopped::get, admit = { admitModel(it, preset.contextTokens) }, preset = preset, resident = resident, onMetrics = { metrics = it },
+                        onPreparation = { preparation = it }) { origin, part ->
                         text.append(part)
                         val now = System.nanoTime()
                         if (now - lastUpdate >= 100_000_000L) {
@@ -340,7 +342,12 @@ class MandyWorkspaceActivity : Activity() {
                         "Reply saved · " + m.promptTokens + " input / " + m.outputTokens + " output tokens · " +
                             m.retainedMessages + " messages · " + m.fittingAttempts + " fitting attempts\n" +
                             "Fit " + m.fitNanos / 1_000_000 + " ms · context " + m.contextNanos / 1_000_000 +
-                            " ms · prefill " + m.prefillNanos / 1_000_000 + " ms · generation " + m.generationNanos / 1_000_000 + " ms"
+                            " ms · prefill " + m.prefillNanos / 1_000_000 + " ms · generation " + m.generationNanos / 1_000_000 + " ms" +
+                            (preparation?.let { prep ->
+                                "\n" + (if (prep.reused) "Resident model" else "Model loaded") +
+                                    " · verify " + prep.verifyNanos / 1_000_000 + " ms · admission " +
+                                    prep.admissionNanos / 1_000_000 + " ms · load " + prep.loadNanos / 1_000_000 + " ms"
+                            } ?: "")
                     } ?: "Reply saved"
                     stopped.get() -> "Stopped • check saved draft or pending message"
                     result.exceptionOrNull() is ModelAdmission.Denied -> admissionMessage(result.exceptionOrNull() as ModelAdmission.Denied) + " • pending message retained"

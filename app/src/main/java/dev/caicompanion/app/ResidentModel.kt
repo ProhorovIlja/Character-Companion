@@ -3,6 +3,10 @@ package dev.caicompanion.app
 import java.io.Closeable
 import java.io.IOException
 
+/** Preparation intervals only; no persistent telemetry. */
+internal data class ModelPreparation(val reused: Boolean, val verifyNanos: Long,
+                                     val admissionNanos: Long, val loadNanos: Long)
+
 /** One verified model per foreground workspace. Fresh context per generation. */
 internal class ResidentModel : Closeable {
     private data class Loaded(val model: NativeModelLibrary.Model, val engine: EmbeddedLlama)
@@ -18,8 +22,13 @@ internal class ResidentModel : Closeable {
         clear()
     }
     /** Keep the full digest check and admission on every turn. No engine may escape this callback. */
-    @Synchronized fun <T> useModel(library: NativeModelLibrary, sha: String, cancelled: () -> Boolean,
-                                  admit: (NativeModelLibrary.Model) -> Unit, action: (EmbeddedLlama) -> T): T {
+    fun <T> useModel(library: NativeModelLibrary, sha: String, cancelled: () -> Boolean,
+                     admit: (NativeModelLibrary.Model) -> Unit, action: (EmbeddedLlama) -> T): T =
+        useMeasured(library, sha, cancelled, admit, {}, action)
+
+    @Synchronized fun <T> useMeasured(library: NativeModelLibrary, sha: String, cancelled: () -> Boolean,
+                                      admit: (NativeModelLibrary.Model) -> Unit,
+                                      onPreparation: (ModelPreparation) -> Unit, action: (EmbeddedLlama) -> T): T {
         check(!active) { "Reentrant inference" }
         active = true
         fun checkActive() {
@@ -29,15 +38,24 @@ internal class ResidentModel : Closeable {
             checkActive()
             // Release a different model before verification or memory admission.
             if (loaded?.model?.sha256 != sha) clear()
+            val verifyStart = System.nanoTime()
             val model = library.verify(sha, cancelled)
+            val verifyNanos = System.nanoTime() - verifyStart
             if (loaded?.model != model) clear()
             checkActive()
+            val admissionStart = System.nanoTime()
             admit(model)
+            val admissionNanos = System.nanoTime() - admissionStart
             checkActive()
+            val reused = loaded != null
+            val loadStart = System.nanoTime()
             val engine = loaded?.engine ?: EmbeddedLlama.openVerified(model, cancelled).also {
                 loaded = Loaded(model, it)
             }
+            val loadNanos = if (reused) 0L else System.nanoTime() - loadStart
             val result = action(engine)
+            checkActive()
+            onPreparation(ModelPreparation(reused, verifyNanos, admissionNanos, loadNanos))
             checkActive()
             return result
         } catch (failure: Throwable) {
