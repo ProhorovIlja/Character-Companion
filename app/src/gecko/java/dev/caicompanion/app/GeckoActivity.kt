@@ -7,6 +7,8 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.os.SystemClock
 import android.text.Editable
+import android.text.InputFilter
+import android.text.InputType
 import android.text.TextWatcher
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -243,18 +245,44 @@ class GeckoActivity : Activity() {
             Toast.makeText(this, R.string.hub_bookmark_invalid, Toast.LENGTH_SHORT).show()
             return
         }
+        editLibraryBookmark("Character.AI", url) {}
+    }
+
+    /** Same validated local editor for add, save and rename; no network request. */
+    private fun editLibraryBookmark(initialTitle: String, fixedUrl: String?, onSaved: () -> Unit) {
+        val fields = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), dp(4))
+        }
         val title = EditText(this).apply {
             setSingleLine(true)
-            setText("Character.AI")
-            selectAll()
+            hint = getString(R.string.hub_bookmark_name_hint)
+            filters = arrayOf(InputFilter.LengthFilter(90))
+            setText(initialTitle)
         }
-        AlertDialog.Builder(this).setTitle(R.string.bookmark_add).setView(title)
-            .setPositiveButton(R.string.confirm) { _, _ ->
-                val saved = settings.addBookmark(title.text.toString(), url)
-                Toast.makeText(this,
-                    if (saved) R.string.bookmark_saved else R.string.hub_bookmark_invalid,
-                    Toast.LENGTH_SHORT).show()
-            }.setNegativeButton(R.string.cancel, null).show()
+        val link = EditText(this).apply {
+            setSingleLine(true)
+            hint = getString(R.string.hub_bookmark_url_hint)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            filters = arrayOf(InputFilter.LengthFilter(4096))
+        }
+        fields.addView(title)
+        if (fixedUrl == null) fields.addView(link)
+        val editor = AlertDialog.Builder(this)
+            .setTitle(if (fixedUrl == null) R.string.hub_bookmark_manual_add else R.string.bookmark_add)
+            .setView(fields).setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.apply, null).create()
+        editor.show()
+        editor.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val url = fixedUrl ?: link.text.toString()
+            if (settings.addBookmark(title.text.toString(), url)) {
+                editor.dismiss()
+                onSaved()
+                Toast.makeText(this, R.string.bookmark_saved, Toast.LENGTH_SHORT).show()
+            } else {
+                (if (fixedUrl == null) link else title).error = getString(R.string.hub_bookmark_invalid)
+            }
+        }
     }
 
     /** Native library: search/selection/deletion work without network requests. */
@@ -266,6 +294,7 @@ class GeckoActivity : Activity() {
         val search = EditText(this).apply {
             setSingleLine(true)
             hint = getString(R.string.hub_search_hint)
+            filters = arrayOf(InputFilter.LengthFilter(80))
         }
         val empty = TextView(this).apply {
             setText(R.string.hub_empty)
@@ -288,7 +317,8 @@ class GeckoActivity : Activity() {
             empty.visibility = if (visible.isEmpty()) View.VISIBLE else View.GONE
         }
         val dialog = AlertDialog.Builder(this).setTitle(R.string.bookmarks)
-            .setView(layout).setPositiveButton(R.string.close, null).create()
+            .setView(layout).setPositiveButton(R.string.close, null)
+            .setNeutralButton(R.string.bookmark_add, null).create()
         list.setOnItemClickListener { _, _, position, _ ->
             val url = visible.getOrNull(position)?.second?.let(UrlPolicy::sanitizeBookmark)
             if (url != null && ::session.isInitialized && session.isOpen && !needsRecovery) {
@@ -302,13 +332,21 @@ class GeckoActivity : Activity() {
         list.setOnItemLongClickListener { _, _, position, _ ->
             val bookmark = visible.getOrNull(position)
             if (bookmark != null) {
-                AlertDialog.Builder(this).setTitle(R.string.hub_bookmark_delete)
-                    .setMessage(R.string.hub_bookmark_confirm_delete)
-                    .setPositiveButton(R.string.delete) { _, _ ->
-                        settings.removeBookmark(bookmark.second)
-                        refresh()
-                        Toast.makeText(this, R.string.bookmark_removed, Toast.LENGTH_SHORT).show()
-                    }.setNegativeButton(R.string.cancel, null).show()
+                val options = arrayOf(getString(R.string.hub_bookmark_rename),
+                    getString(R.string.hub_bookmark_browser), getString(R.string.hub_bookmark_delete))
+                AlertDialog.Builder(this).setTitle(bookmark.first).setItems(options) { _, choice ->
+                    when (choice) {
+                        0 -> editLibraryBookmark(bookmark.first, bookmark.second, refresh)
+                        1 -> confirmBrowser(bookmark.second)
+                        2 -> AlertDialog.Builder(this).setTitle(R.string.hub_bookmark_delete)
+                            .setMessage(R.string.hub_bookmark_confirm_delete)
+                            .setPositiveButton(R.string.delete) { _, _ ->
+                                settings.removeBookmark(bookmark.second)
+                                refresh()
+                                Toast.makeText(this, R.string.bookmark_removed, Toast.LENGTH_SHORT).show()
+                            }.setNegativeButton(R.string.cancel, null).show()
+                    }
+                }.setNegativeButton(R.string.cancel, null).show()
             }
             true
         }
@@ -319,6 +357,9 @@ class GeckoActivity : Activity() {
         })
         refresh()
         dialog.show()
+        dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+            editLibraryBookmark("", null, refresh)
+        }
     }
 
     private fun settingCheckbox(label: Int, selected: Boolean, change: (Boolean) -> Unit): CheckBox =

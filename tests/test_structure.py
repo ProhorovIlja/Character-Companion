@@ -29,6 +29,9 @@ class Structure(unittest.TestCase):
     def test_offline_native_bookmark_editor_and_deferred_reload(self):
         activity = (ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
         self.assertIn('createOfflineBookmark { refreshNativeBookmarks() }', activity)
+        self.assertIn('getString(R.string.hub_continue)) { closeNativeHub() }', activity)
+        self.assertIn('urlInput.error = getString(R.string.hub_bookmark_invalid)', activity)
+        self.assertNotIn('getString(R.string.hub_continue)) { openFirstPartyPage(lastUrl) }', activity)
         self.assertIn('deferredWebReload.markPending()', activity)
         self.assertIn('flushDeferredWebReload()', activity)
         self.assertIn('deferredWebReload.consumedByNavigation()', activity)

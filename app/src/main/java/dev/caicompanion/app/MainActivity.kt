@@ -822,20 +822,23 @@ class MainActivity : Activity() {
         }
         fields.addView(titleInput)
         fields.addView(urlInput)
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
             .setTitle(R.string.hub_bookmark_manual_add)
             .setView(fields)
             .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.bookmark_add) { _, _ ->
-                val normalized = OfflineBookmarkEditor.normalize(
-                    titleInput.text.toString(), urlInput.text.toString())
-                if (normalized == null) {
-                    showToast(getString(R.string.hub_bookmark_invalid))
-                } else if (store.addBookmark(normalized.first, normalized.second)) {
-                    onSaved()
-                    showToast(getString(R.string.bookmark_saved))
-                } else showToast(getString(R.string.hub_bookmark_invalid))
-            }.show()
+            .setPositiveButton(R.string.bookmark_add, null).create()
+        dialog.show()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val normalized = OfflineBookmarkEditor.normalize(
+                titleInput.text.toString(), urlInput.text.toString())
+            if (normalized == null || !store.addBookmark(normalized.first, normalized.second)) {
+                urlInput.error = getString(R.string.hub_bookmark_invalid)
+            } else {
+                dialog.dismiss()
+                onSaved()
+                showToast(getString(R.string.bookmark_saved))
+            }
+        }
     }
 
     /** Independent native offline home. Does not request Character.AI APIs or load the site. */
@@ -857,7 +860,8 @@ class MainActivity : Activity() {
         }
         layout.addView(heading)
         layout.addView(infoLabel(getString(R.string.hub_description)))
-        addButton(layout, getString(R.string.hub_continue)) { openFirstPartyPage(lastUrl) }
+        // Resume the existing renderer; a reload would discard a live chat draft.
+        addButton(layout, getString(R.string.hub_continue)) { closeNativeHub() }
         addButton(layout, getString(R.string.browser_mode_sign_in)) { confirmBrowserSessionMode() }
         // The manual editor works even before WebView's first navigation.
         var refreshNativeBookmarks: () -> Unit = {}

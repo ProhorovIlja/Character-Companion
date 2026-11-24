@@ -16,6 +16,11 @@ class GeckoNativeControlsTests(unittest.TestCase):
         self.assertIn('NativeLibrarySearch.filter(settings.listBookmarks()', ACTIVITY)
         self.assertIn('settings.removeBookmark(bookmark.second)', ACTIVITY)
         self.assertIn('setOnItemLongClickListener', ACTIVITY)
+        self.assertIn('editLibraryBookmark("", null, refresh)', ACTIVITY)
+        self.assertIn('editLibraryBookmark(bookmark.first, bookmark.second, refresh)', ACTIVITY)
+        self.assertIn('confirmBrowser(bookmark.second)', ACTIVITY)
+        self.assertIn('editor.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener', ACTIVITY)
+        self.assertIn('InputFilter.LengthFilter(80)', ACTIVITY)
         self.assertNotIn('evaluateJavascript', ACTIVITY)
 
     def test_options_are_real_local_preferences_not_dead_switches(self):
