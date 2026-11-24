@@ -98,7 +98,7 @@
     <string name="profile_data_saver">Low data · skip images</string>
     <string name="profile_applied">Profile applied: %1$s</string>
     <string name="external_identity_title">Sign-in in another browser</string>
-    <string name="external_identity_message">Google/Apple authentication can fail in Android WebView. Open Character.AI from the beginning in a browser-backed tab? This tab uses your browser session: sign-in will not automatically transfer back to the filtered WebView.</string>
+    <string name="external_identity_message">Google/Apple sign-in requires a supported browser. Continue in browser-session mode, keeping the official site and its login in the same browser tab? Embedded filtering does not apply there.</string>
     <string name="media_permission_title">Character.AI · access request</string>
     <string name="privacy_stats">Blocked domains · this session</string>
     <string name="privacy_stats_empty">No domains blocked in this session. No URLs or conversations are recorded.</string>
@@ -209,4 +209,12 @@
     <string name="login_compatibility_off">Login compatibility off: protection restored</string>
     <string name="login_compatibility_unavailable">Open Character.AI first to activate login compatibility</string>
     <string name="shield_login">◇ LOGIN</string>
+    <string name="browser_mode_title">Google / Apple browser session</string>
+    <string name="browser_mode_sign_in">Sign in with Google / Apple (browser session)</string>
+    <string name="browser_mode_continue">Continue Character.AI session</string>
+    <string name="browser_mode_home">Open Character.AI home</string>
+    <string name="browser_mode_embedded">Switch to embedded browser (separate sign-in)</string>
+    <string name="browser_mode_explanation">Sign in on the official Character.AI site in the browser tab and keep chatting there. Close the tab to return to this screen, then continue the same browser session. The embedded browser has a separate login. Character Companion filtering, screen protection and embedded voice controls do not apply to the browser tab. No account data is copied. Use the same default browser to retain its sign-in.</string>
+    <string name="browser_mode_no_provider">No compatible Custom Tabs browser. Set a browser supporting Custom Tabs as your default, then try again.</string>
+    <string name="browser_mode_restart">Embedded mode selected. Reopen Character Companion.</string>
 </resources>

@@ -98,7 +98,7 @@
     <string name="profile_data_saver">Экономия · без изображений</string>
     <string name="profile_applied">Применён профиль: %1$s</string>
     <string name="external_identity_title">Вход в другом браузере</string>
-    <string name="external_identity_message">Авторизация Google/Apple может не работать во встроенном WebView. Открыть Character.AI с начала во вкладке системного браузера? Авторизация останется в браузере и не перенесётся автоматически в WebView с фильтрацией.</string>
+    <string name="external_identity_message">Для входа Google/Apple нужен поддерживаемый браузер. Перейти в режим сессии браузера, где вход и общение на официальном сайте останутся в одной вкладке? Встроенная фильтрация там не действует.</string>
     <string name="media_permission_title">Character.AI · запрос доступа</string>
     <string name="privacy_stats">Заблокированные домены · сеанс</string>
     <string name="privacy_stats_empty">За этот сеанс запросы не блокировались. Ссылки и переписки не сохраняются.</string>
@@ -209,4 +209,12 @@
     <string name="login_compatibility_off">Режим входа выключен: защита восстановлена</string>
     <string name="login_compatibility_unavailable">Сначала откройте Character.AI</string>
     <string name="shield_login">◇ ВХОД</string>
+    <string name="browser_mode_title">Сессия Google / Apple</string>
+    <string name="browser_mode_sign_in">Войти через Google / Apple (сессия браузера)</string>
+    <string name="browser_mode_continue">Продолжить сессию Character.AI</string>
+    <string name="browser_mode_home">Открыть главную Character.AI</string>
+    <string name="browser_mode_embedded">Переключиться на встроенный движок (отдельный вход)</string>
+    <string name="browser_mode_explanation">Войдите на официальном сайте Character.AI в браузерной вкладке и продолжайте общение там. Закройте вкладку, чтобы вернуться на этот экран, затем продолжите ту же сессию браузера. Во встроенном движке отдельный вход. Фильтрация Character Companion, защита экрана и встроенное голосовое управление не действуют во вкладке браузера. Данные аккаунта не копируются. Используйте тот же браузер по умолчанию, чтобы сохранить вход.</string>
+    <string name="browser_mode_no_provider">Нет совместимого браузера Custom Tabs. Выберите браузер с поддержкой Custom Tabs по умолчанию и повторите попытку.</string>
+    <string name="browser_mode_restart">Выбран встроенный режим. Откройте Character Companion заново.</string>
 </resources>

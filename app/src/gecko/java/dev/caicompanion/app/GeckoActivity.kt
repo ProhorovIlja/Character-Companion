@@ -87,6 +87,12 @@ class GeckoActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         settings = SettingsStore(this)
+        if (settings.browserSessionPreferred) {
+            val shared = sharedLink(intent)
+            if (intent?.action == Intent.ACTION_SEND) setIntent(Intent(Intent.ACTION_MAIN))
+            BrowserSessionActivity.enter(this, shared ?: HOME, openNow = shared != null)
+            return
+        }
         if (settings.protectScreen) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -299,6 +305,9 @@ class GeckoActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(12), dp(8), dp(12), dp(8))
         }
+        options.addView(button(getString(R.string.browser_mode_sign_in)) {
+            confirmBrowserSessionMode()
+        })
         options.addView(settingCheckbox(R.string.toggle_filter, settings.blocking) {
             settings.blocking = it
             if (::session.isInitialized && session.isOpen)
@@ -888,7 +897,21 @@ class GeckoActivity : Activity() {
         startActivity(Intent.createChooser(intent, getString(R.string.share)))
     }
 
+    private fun confirmBrowserSessionMode() {
+        if (isFinishing || isDestroyed) return
+        AlertDialog.Builder(this).setTitle(R.string.browser_mode_title)
+            .setMessage(R.string.browser_mode_explanation)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.browser_mode_continue) { _, _ ->
+                BrowserSessionActivity.enter(this, BrowserSessionPolicy.HOME, openNow = true)
+            }.show()
+    }
+
     private fun confirmBrowser(url: String) {
+        if (UrlPolicy.isIdentityUrl(url)) {
+            confirmBrowserSessionMode()
+            return
+        }
         // Even on explicit handoff never forward OAuth code/state/token fragments
         // to a different browser with an unrelated cookie jar.
         val target = ExternalBrowserPolicy.target(url) ?: return

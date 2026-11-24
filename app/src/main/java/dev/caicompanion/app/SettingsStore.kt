@@ -7,6 +7,10 @@ import org.json.JSONObject
 /** Stores only browser shell configuration and user bookmarks, never messages or credentials. */
 class SettingsStore(context: Context) {
     private val prefs = context.getSharedPreferences("character_companion_v2", Context.MODE_PRIVATE)
+    // Explicit local mode preference only; never contains account or session data.
+    var browserSessionPreferred: Boolean
+        get() = prefs.getBoolean("browser_session_preferred", false)
+        set(v) = prefs.edit().putBoolean("browser_session_preferred", v).apply()
     var startInHub: Boolean
         get() = prefs.getBoolean("start_in_native_hub", true)
         set(v) = prefs.edit().putBoolean("start_in_native_hub", v).apply()

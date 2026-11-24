@@ -23,7 +23,7 @@ class DebugApkVerificationTests(unittest.TestCase):
         self.tools = self.sdk / 'build-tools/36.0.0'
         self.tools.mkdir(parents=True)
         self.tool('apksigner', "printf '%s\\n' 'Signer #1 certificate DN: CN=Android Debug, O=Android, C=US'")
-        self.tool('aapt', '''printf "%s\\n" "package: name='dev.caicompanion.app' versionCode='33' versionName='0.33.0-rc1'"''')
+        self.tool('aapt', '''printf "%s\\n" "package: name='dev.caicompanion.app' versionCode='34' versionName='0.34.0-rc1'"''')
         self.env = dict(os.environ, ANDROID_HOME=str(self.sdk))
 
     def tool(self, name, source):

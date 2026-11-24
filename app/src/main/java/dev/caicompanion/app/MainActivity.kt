@@ -157,6 +157,10 @@ class MainActivity : Activity() {
         if (intent?.action == Intent.ACTION_SEND) setIntent(Intent(Intent.ACTION_MAIN))
         lastUrl = initialShare ?: (if (store.resumePage) store.lastVisited.ifBlank { HOME } else HOME)
         // An explicit Android Share request must take priority over the offline startup hub.
+        if (store.browserSessionPreferred) {
+            BrowserSessionActivity.enter(this, initialShare ?: HOME, openNow = initialShare != null)
+            return
+        }
         if (NativeStartupPolicy.useHub(store.startInHub, initialShare)) showNativeHub()
         else openFirstPartyPage(lastUrl)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -589,8 +593,20 @@ class MainActivity : Activity() {
             .setNegativeButton(R.string.cancel, null)
             // Restart at the first-party homepage in the browser's own cookie jar.
             // Never forward an in-progress WebView OAuth URL/nonce to another session.
-            .setPositiveButton(R.string.open_browser) { _, _ -> openBrowserTab(BrowserSessionPolicy.HOME) }
+            .setPositiveButton(R.string.browser_mode_continue) { _, _ ->
+                BrowserSessionActivity.enter(this, BrowserSessionPolicy.HOME, openNow = true)
+            }
             .show()
+    }
+
+    private fun confirmBrowserSessionMode() {
+        if (destroyed || isFinishing) return
+        AlertDialog.Builder(this).setTitle(R.string.browser_mode_title)
+            .setMessage(R.string.browser_mode_explanation)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.browser_mode_continue) { _, _ ->
+                BrowserSessionActivity.enter(this, BrowserSessionPolicy.HOME, openNow = true)
+            }.show()
     }
 
     private fun confirmExternalNavigation(url: String) {
@@ -826,6 +842,7 @@ class MainActivity : Activity() {
         layout.addView(heading)
         layout.addView(infoLabel(getString(R.string.hub_description)))
         addButton(layout, getString(R.string.hub_continue)) { openFirstPartyPage(lastUrl) }
+        addButton(layout, getString(R.string.browser_mode_sign_in)) { confirmBrowserSessionMode() }
         addButton(layout, getString(R.string.hub_open_browser)) {
             openBrowserTab(BrowserSessionPolicy.HOME)
         }
@@ -1050,6 +1067,7 @@ class MainActivity : Activity() {
             store.startInHub = it
         }
         layout.addView(sectionLabel(getString(R.string.section_browser_session)))
+        addButton(layout, getString(R.string.browser_mode_sign_in)) { confirmBrowserSessionMode() }
         addButton(layout, getString(R.string.browser_session_open)) {
             openBrowserTab(BrowserSessionPolicy.HOME)
         }
