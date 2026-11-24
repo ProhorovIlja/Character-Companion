@@ -38,6 +38,41 @@
         <item name="shellAction">#141414</item>
         <item name="shellOutline">#383838</item>
     </style>
+    <!-- Independent Mandy workspace: neutral Material-inspired surfaces; legacy shell unchanged. -->
+    <style name="AppTheme.MandyGraphite" parent="AppTheme">
+        <item name="android:windowBackground">#212121</item>
+        <item name="android:statusBarColor">#212121</item>
+        <item name="android:navigationBarColor">#212121</item>
+        <item name="android:colorBackground">#212121</item>
+        <item name="android:colorBackgroundFloating">#292929</item>
+        <item name="android:colorAccent">#F2F2F2</item>
+        <item name="android:colorControlHighlight">#33FFFFFF</item>
+        <item name="shellBackground">#212121</item>
+        <item name="shellChrome">#212121</item>
+        <item name="shellPanel">#303030</item>
+        <item name="shellAction">#383838</item>
+        <item name="shellOutline">#555555</item>
+        <item name="shellText">#F2F2F2</item>
+        <item name="shellMuted">#B5B5B5</item>
+        <item name="shellAccent">#F2F2F2</item>
+        <item name="shellOnAccent">#171717</item>
+        <item name="shellRipple">#33FFFFFF</item>
+        <item name="shellDisabledText">#929292</item>
+        <item name="shellDisabledAction">#292929</item>
+    </style>
+    <style name="AppTheme.MandyAmoled" parent="AppTheme.MandyGraphite">
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:colorBackground">#000000</item>
+        <item name="android:colorBackgroundFloating">#171717</item>
+        <item name="shellBackground">#000000</item>
+        <item name="shellChrome">#000000</item>
+        <item name="shellPanel">#141414</item>
+        <item name="shellAction">#232323</item>
+        <item name="shellOutline">#3D3D3D</item>
+        <item name="shellDisabledAction">#171717</item>
+    </style>
     <style name="CompanionButton" parent="android:style/Widget.Material.Button">
         <item name="android:background">@drawable/settings_action</item>
         <item name="android:backgroundTint">@null</item>
