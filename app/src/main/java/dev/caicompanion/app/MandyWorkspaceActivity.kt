@@ -16,6 +16,15 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.Button
+import android.widget.ImageButton
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.ColorFilter
+import android.graphics.PixelFormat
+import android.graphics.drawable.Drawable
+import android.content.res.ColorStateList
+import android.graphics.drawable.RippleDrawable
+import android.graphics.drawable.GradientDrawable
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -110,9 +119,6 @@ class MandyWorkspaceActivity : Activity() {
             view.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, ime.bottom))
             insets
         }
-        val title = label("Mandy AI", 24f)
-        ViewCompat.setAccessibilityHeading(title, true)
-        root.addView(title)
         status = label("Offline workspace preview", 14f)
         root.addView(status)
         cancelGeneration = Button(this).apply {
@@ -222,6 +228,74 @@ class MandyWorkspaceActivity : Activity() {
         this.text = text; isAllCaps = false; minHeight = dp(48)
         setOnClickListener { if (!busy && alive()) action() }
     }
+    // Original vector geometry, no bitmap bundle or third-party icon dependency.
+    private class ChatGlyph(private val kind: String, color: Int) : Drawable() {
+        private val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            style = Paint.Style.STROKE
+            strokeWidth = 1.8f
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+        private val path = android.graphics.Path()
+        override fun draw(canvas: Canvas) {
+            val scale = minOf(bounds.width(), bounds.height()) / 24f
+            if (scale <= 0f) return
+            val save = canvas.save()
+            canvas.translate(bounds.exactCenterX() - 12f * scale, bounds.exactCenterY() - 12f * scale)
+            canvas.scale(scale, scale)
+            fun l(x: Float, y: Float, xx: Float, yy: Float) = canvas.drawLine(x, y, xx, yy, ink)
+            when (kind) {
+                "menu" -> { l(4f,6f,20f,6f); l(4f,12f,20f,12f); l(4f,18f,15f,18f) }
+                "call" -> {
+                    path.reset(); path.moveTo(4f,4f); path.lineTo(8f,3f); path.lineTo(11f,8f)
+                    path.lineTo(8f,11f); path.quadTo(10f,15f,14f,17f); path.lineTo(17f,14f)
+                    path.lineTo(21f,17f); path.lineTo(20f,21f); path.cubicTo(10f,21f,3f,14f,4f,4f)
+                    path.close(); canvas.drawPath(path,ink)
+                }
+                "settings" -> {
+                    l(4f,6f,6f,6f); l(10f,6f,20f,6f); l(4f,12f,14f,12f); l(18f,12f,20f,12f)
+                    l(4f,18f,8f,18f); l(12f,18f,20f,18f)
+                    canvas.drawCircle(8f,6f,2f,ink); canvas.drawCircle(16f,12f,2f,ink); canvas.drawCircle(10f,18f,2f,ink)
+                }
+                "attach" -> {
+                    path.reset(); path.moveTo(8f,13f); path.lineTo(14f,7f); path.cubicTo(17f,4f,21f,8f,18f,11f)
+                    path.lineTo(10f,19f); path.cubicTo(5f,24f,-1f,17f,4f,12f); path.lineTo(13f,3f)
+                    canvas.drawPath(path,ink)
+                }
+                "mic" -> {
+                    canvas.drawRoundRect(9f,3f,15f,14f,3f,3f,ink)
+                    canvas.drawArc(5f,7f,19f,18f,0f,180f,false,ink)
+                    l(12f,18f,12f,21f); l(8f,21f,16f,21f)
+                }
+                "send" -> { l(12f,20f,12f,4f); l(5f,11f,12f,4f); l(12f,4f,19f,11f) }
+                "retry" -> { canvas.drawArc(4f,4f,20f,20f,25f,300f,false,ink); l(20f,3f,20f,9f); l(14f,9f,20f,9f) }
+            }
+            canvas.restoreToCount(save)
+        }
+        override fun setAlpha(alpha: Int) { ink.alpha = alpha; invalidateSelf() }
+        override fun setColorFilter(colorFilter: ColorFilter?) { ink.colorFilter = colorFilter; invalidateSelf() }
+        @Suppress("DEPRECATION")
+        override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+        override fun getIntrinsicWidth(): Int = 24
+        override fun getIntrinsicHeight(): Int = 24
+    }
+    private fun chatAction(kind: String, description: String, available: Boolean = true, action: () -> Unit) =
+        ImageButton(this).apply {
+            val color = ShellAppearance.color(this@MandyWorkspaceActivity, R.attr.shellText)
+            val mask = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(android.graphics.Color.WHITE) }
+            background = RippleDrawable(ColorStateList.valueOf((color and 0x00ffffff) or 0x22000000), null, mask)
+            setImageDrawable(ChatGlyph(kind, color))
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
+            minimumWidth = dp(48); minimumHeight = dp(48)
+            contentDescription = description
+            tooltipText = description
+            isEnabled = available
+            alpha = if (available) 1f else .42f
+            setOnClickListener { if (available && !busy && alive()) action() }
+        }
     private fun saveAnd(action: () -> Unit) {
         val ticket = current?.ticket
         val text = editor?.text?.toString()
@@ -237,7 +311,7 @@ class MandyWorkspaceActivity : Activity() {
         val profile = ticket?.let { t -> s.profiles.first { it.id == t.key.character } }
         val chat = ticket?.let { t -> profile?.chats?.first { it.id == t.key.chat } }
         val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
-        val libraryButton = button("Characters") {
+        val libraryButton = chatAction("menu", "Characters and conversations") {
             if (s.profiles.isEmpty()) editProfile(null) else choose(s)
         }
         header.addView(libraryButton)
@@ -245,8 +319,8 @@ class MandyWorkspaceActivity : Activity() {
             maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
         }, LinearLayout.LayoutParams(0, -2, 1f))
         // Visible capability placeholders, never request permission or simulate a call.
-        header.addView(button("Call") {}.apply { isEnabled = false; contentDescription = "Voice call not available in this build" })
-        header.addView(button("Settings") { showWorkspaceSettings(s) })
+        header.addView(chatAction("call", "Voice call not available in this build", false) {})
+        header.addView(chatAction("settings", "Settings") { showWorkspaceSettings(s) })
         panel.addView(header)
         if (chat != null) panel.addView(label(chat.title, 14f))
         historyScroll = ScrollView(this).apply { isFillViewport = true }
@@ -262,7 +336,10 @@ class MandyWorkspaceActivity : Activity() {
         if (s.rows.isEmpty()) messages.addView(label("No messages yet."))
         else s.rows.forEach {
             val author = if (it.role == "user") "You" else profile.name
-            messages.addView(label(author + "\n" + it.text).apply { setTextIsSelectable(true) })
+            val row = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(8), dp(8), dp(8), dp(12)) }
+            row.addView(label(author, 13f).apply { setPadding(0, 0, 0, dp(4)); typeface = android.graphics.Typeface.DEFAULT_BOLD })
+            row.addView(label(it.text).apply { setPadding(0, 0, 0, 0); setTextIsSelectable(true); setLineSpacing(dp(3).toFloat(), 1f) })
+            messages.addView(row, LinearLayout.LayoutParams(-1, -2).apply { if (it.role == "user") marginStart = dp(36) else marginEnd = dp(24) })
         }
         if (s.draft.pending != null) {
             messages.addView(label("Pending message • " + s.draft.pending.text))
@@ -275,21 +352,21 @@ class MandyWorkspaceActivity : Activity() {
         val field = input("Message " + profile.name, 16000, s.draft.draft).apply { minLines = 1; maxLines = 4 }
         editor = field
         panel.addView(field)
-        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        actions.addView(button("Attach") {}.apply {
-            isEnabled = false; contentDescription = "Attachments not available in this build"
-        }, LinearLayout.LayoutParams(0, -2, 1f))
-        actions.addView(button("Dictate") {
+        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
+        actions.addView(chatAction("attach", "Attachments not available in this build", false) {})
+        actions.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+        actions.addView(chatAction("mic", "Dictate", s.draft.pending == null) {
             if (BuildConfig.MANDY_WHISPER_PREVIEW && s.speechModels.isNotEmpty()) {
                 AlertDialog.Builder(this).setTitle("Dictation")
                     .setItems(arrayOf("On-device speech recognizer", "Local Whisper")) { _, i ->
                         if (i == 0) chooseSpeechLanguage(s) else chooseOfflineSpeech(s)
                     }.setNegativeButton(android.R.string.cancel, null).show()
             } else chooseSpeechLanguage(s)
-        }, LinearLayout.LayoutParams(0, -2, 1f))
-        actions.addView(button(if (s.draft.pending == null) "Send" else "Retry") { chooseModel(s) }.apply {
-            isEnabled = BuildConfig.MANDY_EMBEDDED_PREVIEW && s.models.isNotEmpty()
-        }, LinearLayout.LayoutParams(0, -2, 1f))
+        })
+        val canSend = BuildConfig.MANDY_EMBEDDED_PREVIEW && s.models.isNotEmpty()
+        actions.addView(chatAction(if (s.draft.pending == null) "send" else "retry",
+            if (!canSend) "Send unavailable: local model required" else if (s.draft.pending == null) "Send message" else "Retry pending message",
+            canSend) { chooseModel(s) })
         panel.addView(actions)
         if (!BuildConfig.MANDY_EMBEDDED_PREVIEW || s.models.isEmpty())
             panel.addView(label("Local model required for Send", 12f))
