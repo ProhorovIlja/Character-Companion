@@ -70,6 +70,8 @@ class MandyWorkspaceActivity : Activity() {
     private var offlineSpeech: OfflineSpeechSession? = null
     private var speechStates: Map<View, Boolean> = emptyMap()
     private lateinit var speechControls: LinearLayout
+    private lateinit var cancelSpeechButton: Button
+    private var normalActions: LinearLayout? = null
     private lateinit var stopSpeech: Button
     private lateinit var sendSpeech: Button
     private var resumed = false
@@ -121,8 +123,11 @@ class MandyWorkspaceActivity : Activity() {
             view.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, ime.bottom))
             insets
         }
-        status = label("Offline workspace preview", 14f)
-        root.addView(status)
+        status = label("Opening local workspace…", 12f).apply {
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setOnClickListener { AlertDialog.Builder(this@MandyWorkspaceActivity).setTitle("Workspace status").setMessage(text).setPositiveButton("Close", null).show() }
+        }
         cancelGeneration = Button(this).apply {
             text = "Stop generation"; isAllCaps = false; visibility = View.GONE
             setOnClickListener { stopped.set(true); isEnabled = false; status.text = "Stopping…" }
@@ -138,18 +143,18 @@ class MandyWorkspaceActivity : Activity() {
         }
         speechControls.addView(stopSpeech, LinearLayout.LayoutParams(0, -2, 1f))
         speechControls.addView(sendSpeech, LinearLayout.LayoutParams(0, -2, 1f))
-        speechControls.addView(Button(this).apply {
+        cancelSpeechButton = Button(this).apply {
             text = "Cancel"; isAllCaps = false
             contentDescription = "Cancel dictation"
             setOnClickListener { cancelSpeech("Dictation cancelled") }
-        }, LinearLayout.LayoutParams(0, -2, 1f))
+        }
+        speechControls.addView(cancelSpeechButton, LinearLayout.LayoutParams(0, -2, 1f))
         panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(8), dp(16), dp(16))
         }
         root.addView(panel, LinearLayout.LayoutParams(-1, 0, 1f))
-        root.addView(cancelGeneration)
-        root.addView(speechControls)
+        root.addView(status)
         setContentView(root)
         ViewCompat.requestApplyInsets(root)
         work {
@@ -285,9 +290,14 @@ class MandyWorkspaceActivity : Activity() {
     }
     private fun chatAction(kind: String, description: String, available: Boolean = true, action: () -> Unit) =
         ImageButton(this).apply {
-            val color = ShellAppearance.color(this@MandyWorkspaceActivity, R.attr.shellText)
+            val primary = kind == "send" || kind == "retry"
+            val color = ShellAppearance.color(this@MandyWorkspaceActivity, if (primary && available) R.attr.shellOnAccent else R.attr.shellText)
             val mask = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(android.graphics.Color.WHITE) }
-            background = RippleDrawable(ColorStateList.valueOf((color and 0x00ffffff) or 0x22000000), null, mask)
+            val fill = if (primary && available) GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(ShellAppearance.color(this@MandyWorkspaceActivity, R.attr.shellAccent))
+            } else null
+            background = RippleDrawable(ColorStateList.valueOf((color and 0x00ffffff) or 0x22000000), fill, mask)
             setImageDrawable(ChatGlyph(kind, color))
             scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
             setPadding(dp(12), dp(12), dp(12), dp(12))
@@ -307,8 +317,23 @@ class MandyWorkspaceActivity : Activity() {
             action()
         }
     }
+    private fun roundedSurface(fill: Int, radius: Int, outlined: Boolean = false) = GradientDrawable().apply {
+        setColor(ShellAppearance.color(this@MandyWorkspaceActivity, fill))
+        cornerRadius = dp(radius).toFloat()
+        if (outlined) setStroke(dp(1), ShellAppearance.color(this@MandyWorkspaceActivity, R.attr.shellOutline))
+    }
+    // One composer action region; no extra recording or generation toolbar below the chat.
+    private fun composerMode(recording: Boolean = false, generating: Boolean = false) {
+        normalActions?.visibility = if (recording || generating) View.GONE else View.VISIBLE
+        speechControls.visibility = if (recording) View.VISIBLE else View.GONE
+        cancelGeneration.visibility = if (generating) View.VISIBLE else View.GONE
+        if (recording) { speechControls.isEnabled = true; cancelSpeechButton.isEnabled = true }
+    }
     private fun render(s: Snapshot) {
+        (cancelGeneration.parent as? ViewGroup)?.removeView(cancelGeneration)
+        (speechControls.parent as? ViewGroup)?.removeView(speechControls)
         panel.removeAllViews()
+        normalActions = null
         editor = null
         val ticket = s.ticket
         val profile = ticket?.let { t -> s.profiles.first { it.id == t.key.character } }
@@ -340,9 +365,13 @@ class MandyWorkspaceActivity : Activity() {
         else s.rows.forEach {
             val author = if (it.role == "user") "You" else profile.name
             val row = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(8), dp(8), dp(8), dp(12)) }
+            if (it.role == "user") row.background = roundedSurface(R.attr.shellAction, 20)
             row.addView(label(author, 13f).apply { setPadding(0, 0, 0, dp(4)); typeface = android.graphics.Typeface.DEFAULT_BOLD })
             row.addView(label(it.text).apply { setPadding(0, 0, 0, 0); setTextIsSelectable(true); setLineSpacing(dp(3).toFloat(), 1f) })
-            messages.addView(row, LinearLayout.LayoutParams(-1, -2).apply { if (it.role == "user") marginStart = dp(36) else marginEnd = dp(24) })
+            messages.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
+                if (it.role == "user") marginStart = dp(36) else marginEnd = dp(24)
+                topMargin = dp(4); bottomMargin = dp(4)
+            })
         }
         if (s.draft.pending != null) {
             messages.addView(label("Pending message • " + s.draft.pending.text))
@@ -352,9 +381,20 @@ class MandyWorkspaceActivity : Activity() {
                     .setPositiveButton("Discard") { _, _ -> saveAnd { workspace.discardPending(ticket, s.draft.pending.id) } }.show()
             })
         }
-        val field = input("Message " + profile.name, 16000, s.draft.draft).apply { minLines = 1; maxLines = 4 }
+        val composer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = roundedSurface(R.attr.shellPanel, 24, outlined = true)
+            setPadding(dp(8), dp(6), dp(8), dp(4))
+        }
+        val field = input("Message " + profile.name, 16000, s.draft.draft).apply {
+            minLines = 1; maxLines = 4
+            background = null
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            setTextColor(ShellAppearance.color(this@MandyWorkspaceActivity, R.attr.shellText))
+            setHintTextColor(ShellAppearance.color(this@MandyWorkspaceActivity, R.attr.shellMuted))
+        }
         editor = field
-        panel.addView(field)
+        composer.addView(field)
         val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
         actions.addView(chatAction("attach", "Attachments not available in this build", false) {})
         actions.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
@@ -370,7 +410,12 @@ class MandyWorkspaceActivity : Activity() {
         actions.addView(chatAction(if (s.draft.pending == null) "send" else "retry",
             if (!canSend) "Send unavailable: local model required" else if (s.draft.pending == null) "Send message" else "Retry pending message",
             canSend) { chooseModel(s) })
-        panel.addView(actions)
+        normalActions = actions
+        composer.addView(actions)
+        composer.addView(cancelGeneration, LinearLayout.LayoutParams(-1, -2))
+        composer.addView(speechControls, LinearLayout.LayoutParams(-1, -2))
+        composerMode()
+        panel.addView(composer)
         if (!BuildConfig.MANDY_EMBEDDED_PREVIEW || s.models.isEmpty())
             panel.addView(label("Local model required for Send", 12f))
         // Scroll only when displaying a fresh snapshot, not on every token.
@@ -506,7 +551,7 @@ class MandyWorkspaceActivity : Activity() {
         messages.addView(preview)
         val previewScroll = historyScroll
         previewScroll.post { if (alive() && historyScroll === previewScroll && busy) previewScroll.scrollTo(0, (messages.height - previewScroll.height).coerceAtLeast(0)) }
-        cancelGeneration.visibility = View.VISIBLE
+        composerMode(generating = true)
         cancelGeneration.isEnabled = true
         status.text = "Experimental generation"
         disk.execute {
@@ -545,7 +590,7 @@ class MandyWorkspaceActivity : Activity() {
             runOnUiThread {
                 if (!alive()) return@runOnUiThread
                 busy = false
-                cancelGeneration.visibility = View.GONE
+                composerMode()
                 if (refreshed != null) {
                     current = refreshed
                     render(refreshed)
@@ -636,7 +681,7 @@ class MandyWorkspaceActivity : Activity() {
         val states = mutableMapOf<View, Boolean>()
         suspendInputs(panel, states)
         speechStates = states
-        speechControls.visibility = View.VISIBLE
+        composerMode(recording = true)
         stopSpeech.isEnabled = true
         sendSpeech.visibility = if (canSend) View.VISIBLE else View.GONE
         sendSpeech.isEnabled = canSend
@@ -764,7 +809,7 @@ class MandyWorkspaceActivity : Activity() {
         recognizer = null
         if (cancel) runCatching { engine?.cancel() }
         runCatching { engine?.destroy() }
-        speechControls.visibility = View.GONE
+        composerMode()
         speechStates.forEach { (view, enabled) -> view.isEnabled = enabled }
         speechStates = emptyMap()
         busy = false
@@ -827,7 +872,7 @@ class MandyWorkspaceActivity : Activity() {
         stopped.set(false)
         val states = mutableMapOf<View, Boolean>()
         suspendInputs(panel, states)
-        cancelGeneration.visibility = View.VISIBLE
+        composerMode(generating = true)
         cancelGeneration.isEnabled = true
         val preset = performancePreset()
         status.text = "Assessing latest completed dialogue…"
@@ -867,7 +912,7 @@ class MandyWorkspaceActivity : Activity() {
             runOnUiThread {
                 if (!alive()) return@runOnUiThread
                 busy = false
-                cancelGeneration.visibility = View.GONE
+                composerMode()
                 states.forEach { (view, enabled) -> view.isEnabled = enabled }
                 if (stopped.get() || current?.ticket != ticket) {
                     status.text = "Assessment stopped"
