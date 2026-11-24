@@ -1,3 +1,6 @@
+import java.security.MessageDigest
+import java.nio.file.Files
+
 plugins {
     id("com.android.application")
 }
@@ -10,6 +13,34 @@ require(companionSdkMinor in setOf(0, 2)) { "Only Android SDK 37.0 and 37.2 are 
 // Embedded preview is explicitly enabled with a local pinned source checkout.
 val mandyLlamaDir = providers.gradleProperty("mandyLlamaDir").orNull
 
+// Optional speech library from the explicit isolated native build helper only.
+val mandyWhisperDir = providers.gradleProperty("mandyWhisperJniDir").orNull
+val mandyWhisperSha = providers.gradleProperty("mandyWhisperSha256").orNull
+require((mandyWhisperDir == null) == (mandyWhisperSha == null)) { "Speech staging directory and digest must be supplied together" }
+val mandyWhisperStage = mandyWhisperDir?.let { path ->
+    require(mandyLlamaDir != null) { "Speech preview requires the independent ARM64 text preview" }
+    require(mandyWhisperSha != null && mandyWhisperSha.matches(Regex("[0-9a-f]{64}"))) { "Invalid speech library digest" }
+    val directory = rootProject.file(path)
+    val abi = directory.resolve("arm64-v8a")
+    val binary = abi.resolve("libmandy_whisper.so")
+    require(directory.list()?.toList() == listOf("arm64-v8a") &&
+            abi.list()?.toList() == listOf("libmandy_whisper.so") &&
+            listOf(directory, abi, binary).none { Files.isSymbolicLink(it.toPath()) } &&
+            binary.isFile && binary.length() in 1L..(128L * 1024 * 1024)) { "Invalid isolated speech staging layout" }
+    val digest = MessageDigest.getInstance("SHA-256")
+    binary.inputStream().use { input ->
+        val buffer = ByteArray(128 * 1024)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            digest.update(buffer, 0, count)
+        }
+    }
+    val actual = digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
+    require(actual == mandyWhisperSha) { "Speech library digest mismatch" }
+    directory
+}
+
 android {
     if (mandyLlamaDir != null) {
         ndkVersion = "29.0.13113456"
@@ -19,6 +50,11 @@ android {
                 version = "3.31.6"
             }
         }
+    }
+    if (mandyWhisperStage != null) {
+        sourceSets.getByName("main").jniLibs.srcDir(mandyWhisperStage)
+        // Preserve the exact audited file bytes through APK packaging.
+        packaging.jniLibs.keepDebugSymbols.add("**/libmandy_whisper.so")
     }
     namespace = "dev.caicompanion.app"
     // Explicit minor API selection: GeckoView = 37.2; legacy WebView = 37.0.
@@ -34,6 +70,7 @@ android {
         versionCode = 38
         versionName = "0.38.0-rc1"
         buildConfigField("boolean", "MANDY_EMBEDDED_PREVIEW", (mandyLlamaDir != null).toString())
+        buildConfigField("boolean", "MANDY_WHISPER_PREVIEW", (mandyWhisperStage != null).toString())
         if (mandyLlamaDir != null) {
             ndk { abiFilters.add("arm64-v8a") }
             externalNativeBuild {

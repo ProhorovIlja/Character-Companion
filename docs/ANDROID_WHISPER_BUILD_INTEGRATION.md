@@ -1,0 +1,17 @@
+# Mandy AI — opt-in combined text and speech Android build
+
+The existing manual foreground build helper now accepts an optional --whisper path to an explicitly prepared clean source checkout at c1a24047871444999b79f5e8612828f45881ae12. The llama.cpp source pin is unchanged. Default invocation without --build performs preflight only. Default text-only build excludes the speech binary. No remote source/model downloads are added by this helper; the existing Gradle build may require its normal configured dependencies. No scheduled task or workflow invocation.
+
+With --build and --whisper, use pinned SDK CMake 3.31.6/Ninja and NDK 29.0.13113456 to build a Release ARM64 CPU Whisper library in a temporary separate directory using c++_static, avoiding two GGML projects in one CMake graph. Audit ELF64 machine, PT_LOAD bounds and 16 KiB alignment with the existing reader. Stage exactly one speech library under arm64-v8a and pass its SHA-256 to the opt-in Gradle source set; Gradle checks layout and digest and preserves the bytes with keepDebugSymbols. The APK audit checks expected presence, uniqueness, architecture, alignment and digest of the speech library (and the existing text/native APK requirements), then existing signature, application ID and zipalign checks run. Temporary directories are cleaned after the attempt. The library is not automatically loaded by packaging, and the build flag only describes intended availability; microphone UI, ASR model import/selection, VAD and actual co-loading remain pending.
+
+Manual preflight:
+    python scripts/build_mandy_embedded.py --sdk "<Android SDK>" --llama "<pinned llama.cpp>" --whisper "<pinned whisper.cpp>"
+
+Manual build (only after preflight):
+    python scripts/build_mandy_embedded.py --sdk "<Android SDK>" --llama "<pinned llama.cpp>" --whisper "<pinned whisper.cpp>" --build
+
+This is a debug APK candidate, not a validated release. Retaining the exact native bytes may increase package size; compare a verified stripped artifact later. ELF and digest checks establish layout/integrity, not source authenticity, native dependency isolation, exported-symbol correctness, successful loading or inference. Assumes a trusted local toolchain and cooperating private files; no protection against malicious local mutation. A failed build/audit must not be distributed even if an APK exists in the output directory. Real runtime validation is mandatory, including co-loading both libraries and low-memory behavior. No real SDK/NDK build, Android Gradle compilation, APK, device or Windows change in this increment.
+
+Validation: all 14 Python build gate unit tests executed successfully on host Python, including the 8 previous tests plus 6 new tests using synthetic ELF/ZIP bytes and mocked CMake/Git. Exact two tested Python source hashes verified before publication. These do not validate the Gradle DSL, real ARM64 binaries or actual packaging. The speech JNI test suite remains a simulated backend. No new package dependency, model weights or external implementation copied.
+
+Research reviewed: https://developer.android.com/guide/practices/page-sizes (16 KiB shared library and package alignment requirements); https://github.com/ggml-org/whisper.cpp/blob/master/examples/cli/README.md and https://github.com/ggml-org/whisper.cpp/tree/master/examples/vad-speech-segments (VAD for non-speech segmentation; deferred until model provisioning and native integration can be validated). Follow docs/UPSTREAM_EVALUATION_POLICY.md for candidate selection and actual-device measurement.

@@ -7,14 +7,18 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 import zipfile
 
-from check_apk_native import audit
+from check_apk_native import audit, check_elf
 
 PIN = 'dbaf582af41941ebbfc4384fb9fa1b40dff7a510'
 WRAPPER_SHA = '7a9ce74cff467ca1bf60a4fcd9f05185acceda4d0f382434d393e17864262c5d'
 DIST_SHA = '84fbba45c7f4c64abc77460e1c00f541e9f960e3c7ed2538f1ede19eacd873ae'
 LIB = 'lib/arm64-v8a/libmandy_llama.so'
+WHISPER_PIN = 'c1a24047871444999b79f5e8612828f45881ae12'
+WHISPER_LIB = 'lib/arm64-v8a/libmandy_whisper.so'
+MAX_WHISPER_BYTES = 128 * 1024 * 1024
 
 
 def digest(path):
@@ -37,12 +41,63 @@ def check_checkout(path):
     require(not output(['git', '-C', path, 'status', '--porcelain', '--untracked-files=all']), 'llama.cpp checkout is dirty')
 
 
-def check_package(apk):
+def check_whisper_checkout(path):
+    require(path.is_dir() and (path / 'include/whisper.h').is_file(), 'Missing whisper.cpp source checkout')
+    require(output(['git', '-C', path, 'rev-parse', 'HEAD']) == WHISPER_PIN, 'Unexpected whisper.cpp revision')
+    require(not output(['git', '-C', path, 'status', '--porcelain', '--untracked-files=all']), 'whisper.cpp checkout is dirty')
+
+
+def check_whisper_toolchain(sdk, suffix):
+    cmake = sdk / 'cmake/3.31.6/bin'
+    toolchain = sdk / 'ndk/29.0.13113456/build/cmake/android.toolchain.cmake'
+    for path in (cmake / ('cmake' + suffix), cmake / ('ninja' + suffix), toolchain):
+        require(path.is_file(), 'Missing speech build tool: ' + str(path))
+    return cmake, toolchain
+
+
+def stage_whisper(source, stage):
+    require(source.is_file() and not source.is_symlink(), 'Missing or linked Whisper output')
+    size = source.stat().st_size
+    require(0 < size <= MAX_WHISPER_BYTES, 'Invalid Whisper output size')
+    with source.open('rb') as stream:
+        issue = check_elf(stream, size, 183)
+    require(not issue, 'Whisper ELF audit failed: ' + str(issue))
+    target = stage / 'arm64-v8a/libmandy_whisper.so'
+    target.parent.mkdir(parents=True)
+    shutil.copyfile(source, target)
+    sha = digest(source)
+    require(digest(target) == sha, 'Whisper staging digest mismatch')
+    return sha
+
+
+def build_whisper(root, sdk, checkout, scratch, suffix):
+    cmake, toolchain = check_whisper_toolchain(sdk, suffix)
+    executable = str(cmake / ('cmake' + suffix))
+    build = scratch / 'whisper-build'
+    out = scratch / 'whisper-output'
+    subprocess.run([executable, '-S', str(root / 'app/src/main/cpp/whisper'), '-B', str(build), '-G', 'Ninja',
+                    '-DCMAKE_MAKE_PROGRAM=' + str(cmake / ('ninja' + suffix)),
+                    '-DCMAKE_TOOLCHAIN_FILE=' + str(toolchain), '-DANDROID_ABI=arm64-v8a',
+                    '-DANDROID_PLATFORM=android-29', '-DANDROID_STL=c++_static', '-DCMAKE_BUILD_TYPE=Release',
+                    '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + str(out), '-DMANDY_WHISPER_DIR=' + str(checkout)], check=True)
+    subprocess.run([executable, '--build', str(build), '--target', 'mandy_whisper'], check=True)
+    stage = scratch / 'jni'
+    return stage, stage_whisper(out / 'libmandy_whisper.so', stage)
+
+
+def check_package(apk, whisper_sha=None):
     with zipfile.ZipFile(apk) as archive:
         names = archive.namelist()
         for name in ('AndroidManifest.xml', 'classes.dex', LIB):
             require(names.count(name) == 1 and archive.getinfo(name).file_size > 0, 'Missing, empty or duplicate APK entry: ' + name)
         require(all(n.startswith('lib/arm64-v8a/') for n in names if n.startswith('lib/') and n.endswith('.so')), 'Non-ARM64 native library')
+        if whisper_sha is None:
+            require(WHISPER_LIB not in names, 'Unexpected speech library in text-only build')
+        else:
+            require(names.count(WHISPER_LIB) == 1 and 0 < archive.getinfo(WHISPER_LIB).file_size <= MAX_WHISPER_BYTES,
+                    'Missing, oversized or duplicate speech library')
+            with archive.open(WHISPER_LIB) as stream:
+                require(hashlib.file_digest(stream, 'sha256').hexdigest() == whisper_sha, 'Packaged speech library digest mismatch')
         require(archive.testzip() is None, 'APK ZIP integrity failure')
     _, errors = audit(apk, 'gecko')
     require(not errors, 'ELF audit failed: ' + '; '.join(errors))
@@ -73,26 +128,39 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sdk', required=True, type=Path)
     parser.add_argument('--llama', required=True, type=Path)
+    parser.add_argument('--whisper', type=Path, help='Optional clean pinned Whisper source checkout')
     parser.add_argument('--build', action='store_true', help='Actually invoke Gradle; otherwise preflight only')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     try:
         sdk, llama = args.sdk.resolve(), args.llama.resolve()
         java, wrapper, tools, suffix = preflight(root, sdk, llama)
+        whisper = args.whisper.resolve() if args.whisper else None
+        if whisper is not None:
+            check_whisper_checkout(whisper)
+            check_whisper_toolchain(sdk, suffix)
         print('PREFLIGHT=PASSED', flush=True)
         if not args.build:
             return 0
         apk = root / 'app/build/outputs/apk/gecko/debug/app-gecko-debug.apk'
         apk.unlink(missing_ok=True)
         env = dict(os.environ, ANDROID_HOME=str(sdk), ANDROID_SDK_ROOT=str(sdk))
-        subprocess.run([java, '-classpath', str(wrapper), 'org.gradle.wrapper.GradleWrapperMain', '--no-daemon', ':app:assembleGeckoDebug', '-PcompanionSdkMinor=2', '-PmandyLlamaDir=' + str(llama)], cwd=root, env=env, check=True)
-        check_package(apk)
+        with tempfile.TemporaryDirectory(prefix='mandy-native-') as temporary:
+            arguments = [java, '-classpath', str(wrapper), 'org.gradle.wrapper.GradleWrapperMain', '--no-daemon',
+                         ':app:assembleGeckoDebug', '-PcompanionSdkMinor=2', '-PmandyLlamaDir=' + str(llama)]
+            whisper_sha = None
+            if whisper is not None:
+                stage, whisper_sha = build_whisper(root, sdk, whisper, Path(temporary), suffix)
+                arguments += ['-PmandyWhisperJniDir=' + str(stage), '-PmandyWhisperSha256=' + whisper_sha]
+            subprocess.run(arguments, cwd=root, env=env, check=True)
+            check_package(apk, whisper_sha)
         certs = output([java, '-jar', tools / 'lib/apksigner.jar', 'verify', '--verbose', '--print-certs', apk])
         require('CN=Android Debug' in certs, 'Expected debug signing identity')
         require("package: name='dev.caicompanion.app'" in output([tools / ('aapt' + suffix), 'dump', 'badging', apk]), 'Unexpected application ID')
         subprocess.run([str(tools / ('zipalign' + suffix)), '-c', '-P', '16', '4', str(apk)], check=True)
         print('EMBEDDED_DEBUG_APK=' + str(apk))
         print('APK_SHA256=' + digest(apk))
+        print('WHISPER_PACKAGED=' + ('YES' if whisper_sha is not None else 'NO'))
         print('NATIVE_ELF_AND_ZIP_ALIGNMENT=PASSED\nDEVICE_TESTED=NO\nMODEL_INFERENCE_TESTED=NO')
         return 0
     except (OSError, ValueError, RuntimeError, subprocess.CalledProcessError, zipfile.BadZipFile) as exc:

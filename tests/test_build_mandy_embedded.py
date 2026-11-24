@@ -70,6 +70,66 @@ class BuildGate(unittest.TestCase):
             with patch.object(build, 'output', side_effect=replies), self.assertRaises(ValueError):
                 build.check_checkout(self.root)
 
+    def test_speech_checkout(self):
+        (self.root / 'include').mkdir()
+        (self.root / 'include/whisper.h').touch()
+        with patch.object(build, 'output', side_effect=[build.WHISPER_PIN, '']):
+            build.check_whisper_checkout(self.root)
+        for replies in (['wrong'], [build.WHISPER_PIN, '?? file']):
+            with patch.object(build, 'output', side_effect=replies), self.assertRaises(ValueError):
+                build.check_whisper_checkout(self.root)
+
+    def test_speech_staging(self):
+        source = self.root / 'native.so'
+        source.write_bytes(elf())
+        stage = self.root / 'stage'
+        sha = build.stage_whisper(source, stage)
+        self.assertEqual(sha, build.digest(source))
+        self.assertEqual((stage / 'arm64-v8a/libmandy_whisper.so').read_bytes(), source.read_bytes())
+
+    def test_speech_bad_elf(self):
+        source = self.root / 'native.so'
+        for data in (b'', elf(4096), elf(machine=62), b'bad'):
+            source.write_bytes(data)
+            with self.assertRaises(ValueError):
+                build.stage_whisper(source, self.root / 'stage')
+
+    def test_speech_package(self):
+        source = self.root / 'native.so'
+        source.write_bytes(elf())
+        self.package([(build.LIB, elf()), (build.WHISPER_LIB, elf())])
+        build.check_package(self.apk, build.digest(source))
+        for sha in (None, '0' * 64):
+            with self.assertRaises(ValueError):
+                build.check_package(self.apk, sha)
+
+    def test_speech_missing_duplicate(self):
+        for libs in ([(build.LIB, elf())], [(build.LIB, elf()), (build.WHISPER_LIB, elf()), (build.WHISPER_LIB, elf())]):
+            self.package(libs)
+            with self.assertRaises(ValueError):
+                build.check_package(self.apk, '0' * 64)
+
+    def test_speech_build_invocation(self):
+        sdk = self.root / 'sdk'
+        cmake = sdk / 'cmake/3.31.6/bin'
+        cmake.mkdir(parents=True)
+        for name in ('cmake', 'ninja'):
+            (cmake / name).touch()
+        toolchain = sdk / 'ndk/29.0.13113456/build/cmake/android.toolchain.cmake'
+        toolchain.parent.mkdir(parents=True)
+        toolchain.touch()
+        scratch = self.root / 'scratch'
+        out = scratch / 'whisper-output'
+        out.mkdir(parents=True)
+        (out / 'libmandy_whisper.so').write_bytes(elf())
+        with patch.object(build.subprocess, 'run') as runner:
+            stage, sha = build.build_whisper(self.root, sdk, self.root / 'checkout', scratch, '')
+        self.assertEqual(runner.call_count, 2)
+        self.assertIn('-DANDROID_STL=c++_static', runner.call_args_list[0].args[0])
+        self.assertIn('-DCMAKE_BUILD_TYPE=Release', runner.call_args_list[0].args[0])
+        self.assertEqual(runner.call_args_list[1].args[0][-2:], ['--target', 'mandy_whisper'])
+        self.assertEqual(sha, build.digest(stage / 'arm64-v8a/libmandy_whisper.so'))
+
     def test_missing_checkout(self):
         with self.assertRaises(ValueError):
             build.check_checkout(self.root)
