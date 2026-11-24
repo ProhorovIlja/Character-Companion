@@ -35,6 +35,8 @@ fun main() {
         val m = models.import(fixture.inputStream())
         val a = chars.create("Mandy", "Мэнди 🌙", "First chat")
         val b = chars.create("Other", "Other identity", "First chat")
+        val memory = NativeCharacterMemory(root.resolve("memory"), account)
+        memory.edit(b.id, NativeCharacterMemory.State(stage = NativeCharacterMemory.Stage.FRIENDS, pinned = "Shared music"))
         val h = TurnHistory()
         val t = w.select(NativeChatWorkspace.Key(a.id, a.chats.single().id))
         fun send(ticket: NativeChatWorkspace.Ticket = t, sha: String = m.sha256, stop: () -> Boolean = { false }, emit: (NativeChatWorkspace.Ticket, String) -> Unit = { _, _ -> }) =
@@ -61,7 +63,7 @@ fun main() {
         val third = w.prepare(bt)
         verify(runCatching { send(bt, "0".repeat(64)) }.isFailure)
         verify(w.state(bt.key).pending == third && h.find(NativeConversation.replyId(third.id)) == null)
-        verify(send(bt).character == b.id)
+        verify(EmbeddedChatTurn.sendWithMemory(w, bt, chars, h, models, m.sha256, memory, onText = { _, _ -> }).character == b.id)
         verify(h.recent(a.id, t.key.chat, 20).size == 4 && h.recent(b.id, bt.key.chat, 20).size == 2)
         w.edit(bt, "normal")
         val fourth = w.prepare(bt)

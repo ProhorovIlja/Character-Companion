@@ -29,9 +29,11 @@ class MandyWorkspaceActivity : Activity() {
                                 val ticket: NativeChatWorkspace.Ticket?,
                                 val draft: NativeChatWorkspace.State,
                                 val rows: List<NativeConversation.Event>,
-                                val models: List<NativeModelLibrary.Model>)
+                                val models: List<NativeModelLibrary.Model>,
+                                val memory: NativeCharacterMemory.State)
     private lateinit var library: NativeCharacterLibrary
     private lateinit var workspace: NativeChatWorkspace
+    private lateinit var memory: NativeCharacterMemory
     private lateinit var account: String
     private lateinit var panel: LinearLayout
     private lateinit var status: TextView
@@ -91,6 +93,7 @@ class MandyWorkspaceActivity : Activity() {
             }
             val base = applicationContext.noBackupFilesDir.toPath()
             library = NativeCharacterLibrary(base.resolve("mandy-characters-v1"), account)
+            memory = NativeCharacterMemory(base.resolve("mandy-memory-v1"), account)
             workspace = NativeChatWorkspace(base.resolve("mandy-workspace-v1"), account, device)
         }
     }
@@ -98,12 +101,12 @@ class MandyWorkspaceActivity : Activity() {
         val profiles = library.list()
         val ticket = workspace.selected()
         val models = if (BuildConfig.MANDY_EMBEDDED_PREVIEW) modelLibrary().list() else emptyList()
-        if (ticket == null) return Snapshot(profiles, null, NativeChatWorkspace.State(), emptyList(), models)
+        if (ticket == null) return Snapshot(profiles, null, NativeChatWorkspace.State(), emptyList(), models, NativeCharacterMemory.State())
         library.resolve(ticket.key)
         val rows = AndroidConversationStore(applicationContext, account).use {
             it.page(ticket.key.character, ticket.key.chat, 50).asReversed()
         }
-        return Snapshot(profiles, ticket, workspace.state(ticket.key), rows, models)
+        return Snapshot(profiles, ticket, workspace.state(ticket.key), rows, models, memory.get(ticket.key.character))
     }
     private fun suspendInputs(view: View, states: MutableMap<View, Boolean>) {
         states[view] = view.isEnabled
@@ -173,6 +176,7 @@ class MandyWorkspaceActivity : Activity() {
         panel.addView(label(profile.name, 22f))
         panel.addView(label(chat.title, 14f))
         panel.addView(button("Edit character") { editProfile(profile) })
+        panel.addView(button("Memory & relationship") { editMemory(profile, s.memory) })
         panel.addView(button("New conversation") { createChat(profile) })
         if (s.rows.isEmpty()) panel.addView(label("No messages yet."))
         else s.rows.forEach {
@@ -230,7 +234,7 @@ class MandyWorkspaceActivity : Activity() {
                 saved = true
                 if (!retry) workspace.prepare(ticket)
                 AndroidConversationStore(applicationContext, account).use { history ->
-                    EmbeddedChatTurn.send(workspace, ticket, library, history, modelLibrary(), sha, stopped::get) { origin, part ->
+                    EmbeddedChatTurn.sendWithMemory(workspace, ticket, library, history, modelLibrary(), sha, memory, stopped::get) { origin, part ->
                         text.append(part)
                         val now = System.nanoTime()
                         if (now - lastUpdate >= 100_000_000L) {
@@ -275,6 +279,41 @@ class MandyWorkspaceActivity : Activity() {
             val (p, c) = choices[index]
             saveAnd { workspace.select(NativeChatWorkspace.Key(p.id, c.id)) }
         }.setNegativeButton(android.R.string.cancel, null).show()
+    }
+    private fun editMemory(profile: NativeCharacterLibrary.Profile, state: NativeCharacterMemory.State) {
+        val fields = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), 0, dp(16), 0) }
+        val stages = NativeCharacterMemory.Stage.entries
+        val stage = android.widget.Spinner(this).apply {
+            adapter = android.widget.ArrayAdapter(this@MandyWorkspaceActivity, android.R.layout.simple_spinner_dropdown_item,
+                stages.map { it.name.lowercase(java.util.Locale.ROOT).replace('_', ' ') })
+            setSelection(state.stage.ordinal)
+        }
+        val relationship = input("Shared relationship history", 800, state.relationship)
+        val pinned = input("Always remember", 1200, state.pinned)
+        val notes = input("Relevant memories, one per line", 13200, state.memories.joinToString("\n"))
+        fields.addView(label("Fictional relationship"))
+        fields.addView(stage)
+        fields.addView(label("Relationship note"))
+        fields.addView(relationship)
+        fields.addView(label("Pinned memory"))
+        fields.addView(pinned)
+        fields.addView(label("Up to 32 memories, 400 characters each. Remove a line to remove a memory."))
+        fields.addView(notes)
+        val dialog = AlertDialog.Builder(this).setTitle("Memory · " + profile.name)
+            .setView(ScrollView(this).apply { addView(fields) })
+            .setNegativeButton(android.R.string.cancel, null).setPositiveButton("Save", null).create()
+        dialog.show()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val proposed = runCatching {
+                state.copy(stage = stages[stage.selectedItemPosition], relationship = relationship.text.toString(),
+                    pinned = pinned.text.toString(), memories = notes.text.toString().lines().map { it.trim() }.filter { it.isNotBlank() })
+            }.getOrElse {
+                notes.error = "Invalid, duplicate or oversized memory entries"
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            saveAnd { memory.edit(profile.id, proposed) }
+        }
     }
     private fun editProfile(profile: NativeCharacterLibrary.Profile?) {
         val fields = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), 0, dp(16), 0) }

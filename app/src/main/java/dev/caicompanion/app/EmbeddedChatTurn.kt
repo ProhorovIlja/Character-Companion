@@ -6,8 +6,17 @@ object EmbeddedChatTurn {
              characters: NativeCharacterLibrary, history: NativeConversation.History,
              models: NativeModelLibrary, trustedSha: String,
              cancelled: () -> Boolean = { false }, onText: (NativeChatWorkspace.Ticket, String) -> Unit): NativeConversation.Event {
+        return sendWithMemory(workspace, ticket, characters, history, models, trustedSha, null, cancelled, onText)
+    }
+    fun sendWithMemory(workspace: NativeChatWorkspace, ticket: NativeChatWorkspace.Ticket,
+                       characters: NativeCharacterLibrary, history: NativeConversation.History,
+                       models: NativeModelLibrary, trustedSha: String, memory: NativeCharacterMemory?,
+                       cancelled: () -> Boolean = { false }, onText: (NativeChatWorkspace.Ticket, String) -> Unit): NativeConversation.Event {
         require(trustedSha.matches(Regex("[0-9a-f]{64}")))
-        val identity = characters.resolve(ticket.key).identity
+        val profile = characters.resolve(ticket.key)
+        require(workspace.visible(ticket)) { "Stale session" }
+        val pending = checkNotNull(workspace.state(ticket.key).pending)
+        val identity = memory?.compose(profile.id, profile.identity, pending.text) ?: profile.identity
         return workspace.sendPending(ticket, history, identity, cancelled, onText) { messages, stop, emit ->
             // Open only if inference is needed. A completed retry needs no model load.
             EmbeddedLlama.open(models, trustedSha, stop).use { engine ->
