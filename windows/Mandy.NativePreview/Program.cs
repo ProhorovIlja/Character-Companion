@@ -51,6 +51,7 @@ internal sealed class ChatWindow : Window
     private readonly Border configuration = new() { Visibility = Visibility.Visible };
     private readonly TextBlock characterTitle = new() { Text = "No character selected", FontSize = 18, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
     private readonly Button settingsButton = new() { Content = "Settings" };
+    private readonly Button charactersButton = new() { Content = "Characters", IsEnabled = false };
     private readonly TextBox liveReply = new() { IsReadOnly = true, TextWrapping = TextWrapping.Wrap, MaxHeight = 160, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Visibility = Visibility.Collapsed, IsUndoEnabled = false, Margin = new Thickness(0, 0, 0, 8) };
     private readonly TextBlock status = new() { Text = "Choose an empty folder to create a workspace, or open an existing one.", TextWrapping = TextWrapping.Wrap };
     private readonly Button choose = new() { Content = "Choose folder" };
@@ -109,6 +110,10 @@ internal sealed class ChatWindow : Window
         var headerActions = Buttons(Unavailable("call", "Call", "Live voice calls are not implemented in this preview."), settingsButton);
         DockPanel.SetDock(headerActions, Dock.Right);
         header.Children.Add(headerActions);
+        DockPanel.SetDock(charactersButton, Dock.Left);
+        charactersButton.Margin = new Thickness(0,0,12,0);
+        header.Children.Add(charactersButton);
+        charactersButton.Click += async (_, _) => await ChooseCharacterAsync();
         header.Children.Add(characterTitle);
         var settings = new StackPanel();
         DockPanel.SetDock(configuration, Dock.Top);
@@ -651,6 +656,7 @@ internal sealed class ChatWindow : Window
         refresh.IsEnabled = workspace != null && !busy;
         saveDraft.IsEnabled = ready && pending == null;
         earlier.IsEnabled = ready;
+        charactersButton.IsEnabled = ready && !closeRequested;
         bool recording = recorder != null;
         chooseSpeechExe.IsEnabled = chooseSpeechModel.IsEnabled = speechLanguage.IsEnabled = !busy;
         dictate.IsEnabled = ready && pending == null;
@@ -806,6 +812,84 @@ internal sealed class ChatWindow : Window
         }
         finally { Finish(); }
     }
+    private async Task ChooseCharacterAsync()
+    {
+        var w = workspace;
+        if (busy || !historyValid || w == null || closeRequested) return;
+        var options = w.Profiles.ToArray();
+        var list = new ListBox { ItemsSource = options, DisplayMemberPath = nameof(Workspace.Profile.Name), MinHeight = 160, MaxHeight = 300 };
+        list.SelectedItem = options.Single(p => p.Character == w.Character.Character);
+        var select = new Button { Content = "Open character", IsDefault = true };
+        var add = new Button { Content = "Create character", IsEnabled = options.Length < 64 };
+        var cancel = new Button { Content = "Cancel", IsCancel = true };
+        var panel = new StackPanel { Margin = new Thickness(16) };
+        panel.Children.Add(list);
+        panel.Children.Add(Buttons(select, add, cancel));
+        var dialog = new Window { Owner = this, Title = "Characters", Width = 430, SizeToContent = SizeToContent.Height,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false, Content = panel };
+        Workspace.Profile? selected = null;
+        bool creating = false;
+        select.Click += (_, _) => { selected = list.SelectedItem as Workspace.Profile; if (selected != null) dialog.DialogResult = true; };
+        add.Click += (_, _) => { creating = true; dialog.DialogResult = true; };
+        if (dialog.ShowDialog() != true) return;
+        string newName = "", newIdentity = "";
+        if (creating)
+        {
+            var n = new TextBox { MaxLength = 120 };
+            var i = new TextBox { MaxLength = 8000, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 120, MaxHeight = 200, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+            var createPanel = new StackPanel { Margin = new Thickness(16) };
+            createPanel.Children.Add(Labeled("Character name", n));
+            createPanel.Children.Add(Labeled("Character identity", i));
+            var createButton = new Button { Content = "Create", IsDefault = true };
+            var back = new Button { Content = "Cancel", IsCancel = true };
+            createPanel.Children.Add(Buttons(createButton, back));
+            var creator = new Window { Owner = this, Title = "New character", Width = 460, SizeToContent = SizeToContent.Height,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false, Content = createPanel };
+            createButton.Click += (_, _) =>
+            {
+                try { LocalHistory.ValidateText(n.Text); LocalHistory.ValidateText(i.Text); creator.DialogResult = true; }
+                catch (ArgumentException) { MessageBox.Show(creator, "Enter a valid name and identity.", "Mandy AI"); }
+            };
+            if (creator.ShowDialog() != true) return;
+            newName = n.Text; newIdentity = i.Text;
+        }
+        else if (selected == null || selected.Character == w.Character.Character) return;
+        var previous = w.Character;
+        string previousDraft = draft.Text, previousSaved = lastSavedDraft;
+        bool saveOld = pending == null && previousDraft != previousSaved;
+        busy = true; UpdateControls();
+        try
+        {
+            var loaded = await Task.Run(() =>
+            {
+                if (saveOld) w.SaveDraft(previousDraft);
+                var target = creating ? w.AddCharacter(newName, newIdentity) : selected!;
+                try
+                {
+                    w.SelectCharacter(target.Character);
+                    return (Rows: w.Recent(), Draft: w.ReadDraft());
+                }
+                catch { w.SelectCharacter(previous.Character); throw; }
+            });
+            draft.Text = loaded.Draft;
+            lastSavedDraft = loaded.Draft;
+            ShowRows(loaded.Rows);
+            name.Text = w.Character.Name;
+            identity.Text = w.Character.Identity;
+            characterTitle.Text = w.Character.Name;
+            status.Text = pending == null ? "Character opened." : "Character opened · pending reply recovered.";
+        }
+        catch (Exception)
+        {
+            // Do not render another character's history alongside the old draft.
+            historyValid = false;
+            draft.Text = previousDraft;
+            lastSavedDraft = previousSaved;
+            status.Text = "Character operation failed. Reopen the workspace to recover the saved selection.";
+        }
+        finally { Finish(); }
+    }
+
     private async Task SaveCurrentDraftAsync()
     {
         var w = workspace;
