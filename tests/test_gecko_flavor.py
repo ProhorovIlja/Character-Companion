@@ -1,3 +1,4 @@
+from manual_workflow_policy import manual_workflow_issues
 """Offline GeckoView architecture/manifest checks; not equivalent to a device build."""
 import pathlib
 import subprocess
@@ -68,7 +69,7 @@ class GeckoFlavorTests(unittest.TestCase):
         self.assertIn('session.close()', src)
 
     def test_no_unsigned_release_or_scheduled_ci(self):
-        self.assertFalse((ROOT/'.github/workflows').exists())
+        self.assertEqual(manual_workflow_issues(ROOT), [])
         build = ROOT/'scripts/build-apk.sh'
         release = ROOT/'scripts/prepare-release.sh'
         self.assertIn('assembleGeckoDebug', build.read_text())

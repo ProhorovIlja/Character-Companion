@@ -1,3 +1,4 @@
+from manual_workflow_policy import manual_workflow_issues
 """Focused Gecko SAF and prompt regression checks (structural, no Android emulator)."""
 from pathlib import Path
 import unittest
@@ -94,7 +95,7 @@ class GeckoTransferTests(unittest.TestCase):
         self.assertIn('versionName = "0.33.0-rc1"', BUILD)
         self.assertIn('create("gecko")',BUILD)
         self.assertIn('create("legacy")',BUILD)
-        self.assertFalse((ROOT/'.github/workflows').exists())
+        self.assertEqual(manual_workflow_issues(ROOT), [])
 
     def test_gecko_avoids_webview_cookie_copying_and_private_apis(self):
         for token in ['android.webkit.WebView','CookieManager','@JavascriptInterface',

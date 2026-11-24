@@ -1,3 +1,4 @@
+from manual_workflow_policy import manual_workflow_issues
 import pathlib
 import re
 import unittest
@@ -17,7 +18,7 @@ class Structure(unittest.TestCase):
         self.assertIn('android-36', script)
         self.assertIn('if ($result -ne 0)', script)
         self.assertIn('DEBUG_ONLY=YES', script)
-        self.assertFalse((ROOT/'.github/workflows').exists())
+        self.assertEqual(manual_workflow_issues(ROOT), [])
 
     def test_resource_xml(self):
         for path in (ROOT/'app/src/main/res').rglob('*.xml'):
@@ -91,7 +92,7 @@ class Structure(unittest.TestCase):
         self.assertNotIn('Build.SERIAL', probe)
         self.assertNotIn('Build.FINGERPRINT', probe)
         self.assertNotIn('getAccounts(', probe)
-        self.assertFalse((ROOT/'.github/workflows').exists())
+        self.assertEqual(manual_workflow_issues(ROOT), [])
 
     def test_android_only(self):
         self.assertTrue((ROOT/'app/build.gradle.kts').exists())
@@ -166,7 +167,7 @@ class Structure(unittest.TestCase):
         self.assertFalse(list(ROOT.rglob('*.apk')))
 
     def test_no_scheduled_actions(self):
-        self.assertFalse((ROOT/'.github/workflows').exists())
+        self.assertEqual(manual_workflow_issues(ROOT), [])
         source=''.join(p.read_text(errors='ignore') for p in ROOT.rglob('*.kt'))
         self.assertNotIn('WorkManager',source)
         self.assertNotIn('AlarmManager',source)
@@ -277,7 +278,7 @@ class Structure(unittest.TestCase):
         self.assertIn('distributionSha256Sum=20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78',props)
         self.assertIn('81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f',provenance)
         self.assertIn('org.gradle.wrapper.GradleWrapperMain',launcher)
-        self.assertFalse((ROOT/'.github/workflows').exists())
+        self.assertEqual(manual_workflow_issues(ROOT), [])
 
     def test_conservative_host_rules(self):
         lines=(ROOT/'app/src/main/assets/blocked-hosts.txt').read_text().splitlines()
@@ -427,7 +428,7 @@ class Structure(unittest.TestCase):
         self.assertIn('$APKSIGNER verify', script)
         self.assertIn('assembleRelease', (ROOT/'docs/RELEASE_PROCESS.md').read_text())
         self.assertIn('No APK has been produced', (ROOT/'docs/RELEASE_NOTES_v0.11.0-rc1.md').read_text())
-        self.assertFalse((ROOT/'.github/workflows').exists())
+        self.assertEqual(manual_workflow_issues(ROOT), [])
 
     def test_all_localized_keys_unique(self):
         for locale in ('values','values-ru'):
