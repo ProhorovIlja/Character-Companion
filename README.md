@@ -1,3 +1,5 @@
+**0.36.0-rc1 (source):** private, explicitly requested focused-editor dictation handoff in both embedded engines; safe draft fallback, fixed Unicode cursor behavior and browser-provider continuity. Hardware validation required. [Details](docs/ANDROID_VOICE_HANDOFF_0.36.md).
+
 **0.35.0-rc1 (source):** compact chat-first Android shell, shared icon navigation, grouped settings, streamlined browser-session screen, finish/cancel dictation and safer bookmark handling. [Design and QA notes](docs/ANDROID_COMPACT_UI_0.35.md). Build/device QA pending.
 
 **0.34.0-rc1 (source):** New browser-session mode for Google/Apple sign-in in both Android flavors. Sign in and chat in the same browser-owned Custom Tab; closing it returns to a native Continue session screen. This does not transfer cookies into embedded GeckoView/WebView or enable native filtering inside the tab. Android build and device QA pending. [Details](docs/ANDROID_BROWSER_SESSION_MODE.md).

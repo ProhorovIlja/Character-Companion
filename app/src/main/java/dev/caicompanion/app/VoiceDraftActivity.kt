@@ -40,6 +40,13 @@ class VoiceDraftActivity : Activity() {
         private const val AUDIO_PERMISSION_REQUEST = 927
         private const val SYSTEM_RECOGNITION_REQUEST = 928
         private const val SAVE_TEXT_REQUEST = 929
+        const val EXTRA_DRAFT = "private_voice_draft"
+        private const val EXTRA_INSERT = "allow_focused_editor"
+        fun handoffIntent(activity: Activity, allowInsert: Boolean, draft: String? = null): Intent =
+            Intent(activity, VoiceDraftActivity::class.java).apply {
+                putExtra(EXTRA_INSERT, allowInsert)
+                VoiceComposerPolicy.validDraft(draft)?.let { putExtra(EXTRA_DRAFT, it) }
+            }
     }
 
     private lateinit var editor: EditText
@@ -49,17 +56,26 @@ class VoiceDraftActivity : Activity() {
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
     private var finishingRecognition = false
+    private var systemRecognitionPending = false
+    private var permissionPending = false
+    private var resumed = false
+    private var allowInsert = false
     private lateinit var cancelListenButton: Button
     private val recognitionGuard = VoiceRecognitionGuard()
     // Only an explicit save action creates a document. Never save a transcript to Bundle.
     private var pendingSaveText: String? = null
     private data class RetainedDraft(
         val text: String, val pendingSave: String?, val languageIndex: Int,
-        val selectionStart: Int, val selectionEnd: Int
+        val selectionStart: Int, val selectionEnd: Int,
+        val allowInsert: Boolean, val systemPending: Boolean, val permissionPending: Boolean
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val initialDraft = VoiceComposerPolicy.validDraft(intent?.getStringExtra(EXTRA_DRAFT))
+        allowInsert = intent?.getBooleanExtra(EXTRA_INSERT, false) == true
+        // Consume text once. No draft in the Activity's retained Intent or saved Bundle.
+        setIntent(Intent(this, VoiceDraftActivity::class.java))
         // Never place the unsent dictation in a saved instance-state Bundle.
         if (SettingsStore(this).protectScreen) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
@@ -122,7 +138,11 @@ class VoiceDraftActivity : Activity() {
         }
         // Only retain the draft in the Activity's in-memory non-configuration instance.
         // Process death still clears it, rather than writing private words into OS state.
+        if (initialDraft != null) { editor.setText(initialDraft); editor.setSelection(editor.length()) }
         (lastNonConfigurationInstance as? RetainedDraft)?.let { retained ->
+            allowInsert = retained.allowInsert
+            systemRecognitionPending = retained.systemPending
+            permissionPending = retained.permissionPending
             editor.setText(retained.text)
             val restored = VoiceDraftPolicy.selection(
                 editor.text.toString(), retained.selectionStart, retained.selectionEnd)
@@ -164,7 +184,21 @@ class VoiceDraftActivity : Activity() {
         action(R.string.voice_save) { saveDraft() }
         action(R.string.voice_clear) { clearDraft() }
         root.addView(actions)
-        // A deliberate handoff back to the browser: no DOM access, no auto-paste/send.
+        if (allowInsert) {
+            root.addView(Button(this).apply {
+                setText(R.string.voice_insert_return)
+                setOnClickListener {
+                    val draft = VoiceComposerPolicy.validDraft(editor.text.toString())
+                    if (listening || systemRecognitionPending || draft == null) {
+                        status.setText(R.string.voice_finish_first)
+                    } else {
+                        setResult(RESULT_OK, Intent().putExtra(EXTRA_DRAFT, draft))
+                        finish()
+                    }
+                }
+            })
+        }
+        // Explicit alternative for any browser. No automatic send or hidden clipboard.
         root.addView(Button(this).apply {
             setText(R.string.voice_copy_return)
             setOnClickListener { copyAndReturn() }
@@ -187,7 +221,7 @@ class VoiceDraftActivity : Activity() {
     }
 
     private fun startOnDevice() {
-        if (listening) return
+        if (listening || systemRecognitionPending || permissionPending || !resumed) return
         if (Build.VERSION.SDK_INT < 31 || !runCatching {
                 SpeechRecognizer.isOnDeviceRecognitionAvailable(this)
             }.getOrDefault(false)) {
@@ -195,7 +229,12 @@ class VoiceDraftActivity : Activity() {
             return
         }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), AUDIO_PERMISSION_REQUEST)
+            permissionPending = true
+            try { requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), AUDIO_PERMISSION_REQUEST) }
+            catch (_: RuntimeException) {
+                permissionPending = false
+                status.setText(R.string.voice_permission_denied)
+            }
             return
         }
         try {
@@ -287,17 +326,21 @@ class VoiceDraftActivity : Activity() {
     }
 
     private fun confirmSystemRecognizer() {
-        if (listening) return
+        if (listening || systemRecognitionPending || permissionPending || !resumed) return
         AlertDialog.Builder(this)
             .setTitle(R.string.voice_system)
             .setMessage(R.string.voice_system_warning)
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.voice_continue) { _, _ ->
+                if (!resumed || systemRecognitionPending || listening) return@setPositiveButton
+                systemRecognitionPending = true
                 try {
                     startActivityForResult(requestIntent(), SYSTEM_RECOGNITION_REQUEST)
                 } catch (_: ActivityNotFoundException) {
+                    systemRecognitionPending = false
                     status.setText(R.string.voice_system_missing)
                 } catch (_: SecurityException) {
+                    systemRecognitionPending = false
                     status.setText(R.string.voice_system_missing)
                 }
             }.show()
@@ -385,8 +428,12 @@ class VoiceDraftActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         when (requestCode) {
-            SYSTEM_RECOGNITION_REQUEST -> if (resultCode == RESULT_OK) acceptRecognition(
-                data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull())
+            SYSTEM_RECOGNITION_REQUEST -> {
+                if (!systemRecognitionPending) return
+                systemRecognitionPending = false
+                if (resultCode == RESULT_OK) acceptRecognition(
+                    data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull())
+            }
             SAVE_TEXT_REQUEST -> {
                 val snapshot = pendingSaveText
                 pendingSaveText = null
@@ -409,17 +456,23 @@ class VoiceDraftActivity : Activity() {
                                             grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == AUDIO_PERMISSION_REQUEST) {
-            if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) startOnDevice()
-            else status.setText(R.string.voice_permission_denied)
+            if (!permissionPending) return
+            permissionPending = false
+            // An OS permission callback is not permission to start recording later in the background.
+            status.setText(if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED)
+                R.string.voice_permission_ready else R.string.voice_permission_denied)
         }
     }
 
     @Deprecated("Keep transient private draft in memory only across configuration changes")
     override fun onRetainNonConfigurationInstance(): Any =
         RetainedDraft(editor.text.toString(), pendingSaveText, languageSpinner.selectedItemPosition,
-            editor.selectionStart, editor.selectionEnd)
+            editor.selectionStart, editor.selectionEnd, allowInsert, systemRecognitionPending, permissionPending)
+
+    override fun onResume() { super.onResume(); resumed = true }
 
     override fun onPause() {
+        resumed = false
         // No listening while another Activity, the home screen or app switcher has focus.
         if (listening) stopListening()
         super.onPause()

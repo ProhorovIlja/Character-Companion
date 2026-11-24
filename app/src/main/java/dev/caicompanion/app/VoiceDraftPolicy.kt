@@ -21,6 +21,10 @@ object VoiceDraftPolicy {
 
     /** Safe, non-persistent selection restoration after Activity recreation. */
     fun selection(text: String, start: Int, end: Int): IntRange {
+        if (start == end) {
+            val caret = boundary(text, start, right = true)
+            return caret..caret
+        }
         val low = boundary(text, minOf(start, end), right = false)
         val high = boundary(text, maxOf(start, end), right = true)
         return low..high

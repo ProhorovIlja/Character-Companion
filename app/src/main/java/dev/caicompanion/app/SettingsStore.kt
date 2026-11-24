@@ -11,6 +11,9 @@ class SettingsStore(context: Context) {
     var browserSessionPreferred: Boolean
         get() = prefs.getBoolean("browser_session_preferred", false)
         set(v) = prefs.edit().putBoolean("browser_session_preferred", v).apply()
+    var browserSessionProvider: String
+        get() = prefs.getString("browser_session_provider", "").orEmpty()
+        set(v) = prefs.edit().putString("browser_session_provider", v.take(255)).apply()
     var startInHub: Boolean
         get() = prefs.getBoolean("start_in_native_hub", false)
         set(v) = prefs.edit().putBoolean("start_in_native_hub", v).apply()

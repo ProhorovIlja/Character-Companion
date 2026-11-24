@@ -13,7 +13,7 @@ FEEDBACK = (ROOT/'app/src/main/java/dev/caicompanion/app/VoiceRecognitionFeedbac
 
 class VoiceDraft(unittest.TestCase):
     def test_all_flavors_have_explicit_entrypoint(self):
-        self.assertIn('Intent(this, VoiceDraftActivity::class.java)', GECKO)
+        self.assertIn('voiceHandoff.launch(this, if (sessionReady()) activeUrl else null)', GECKO)
         self.assertIn('Intent(this, VoiceDraftActivity::class.java)', LEGACY)
         self.assertIn('android:name=".VoiceDraftActivity" android:exported="false"', MANIFEST)
         self.assertIn('android.speech.RecognitionService', MANIFEST)

@@ -74,6 +74,14 @@ class BrowserSessionActivity : Activity() {
             startActivity(Intent(this, VoiceDraftActivity::class.java))
         })
         column.addView(action(R.string.browser_mode_embedded) { returnToEmbedded() })
+        column.addView(action(R.string.browser_mode_change_provider) {
+            android.app.AlertDialog.Builder(this).setMessage(R.string.browser_mode_change_warning)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.browser_mode_change_provider) { _, _ ->
+                    store.browserSessionProvider = ""
+                    openTab()
+                }.show()
+        })
         column.addView(action(R.string.shell_session_info) {
             android.app.AlertDialog.Builder(this).setTitle(R.string.browser_mode_title)
                 .setMessage(R.string.browser_mode_explanation)
@@ -98,9 +106,12 @@ class BrowserSessionActivity : Activity() {
     private fun openTab() {
         // Pin the preferred Custom Tabs provider so an installed app link handler
         // cannot consume the first-party URL before the browser session opens.
-        val provider = CustomTabsClient.getPackageName(this, null)
+        val pinned = store.browserSessionProvider.takeIf { it.isNotBlank() }
+        val provider = if (pinned == null) CustomTabsClient.getPackageName(this, null)
+            else CustomTabsClient.getPackageName(this, listOf(pinned), true)?.takeIf { it == pinned }
         if (provider == null) {
-            Toast.makeText(this, R.string.browser_mode_no_provider, Toast.LENGTH_LONG).show()
+            Toast.makeText(this, if (pinned == null) R.string.browser_mode_no_provider
+                else R.string.browser_mode_provider_unavailable, Toast.LENGTH_LONG).show()
             return
         }
         try {
@@ -110,6 +121,7 @@ class BrowserSessionActivity : Activity() {
                 .setShareState(CustomTabsIntent.SHARE_STATE_OFF).setDefaultColorSchemeParams(colors).build()
             tab.intent.setPackage(provider)
             tab.launchUrl(this, Uri.parse(BrowserSessionPolicy.safeTabUrl(destination)))
+            store.browserSessionProvider = provider
         } catch (_: ActivityNotFoundException) {
             Toast.makeText(this, R.string.browser_mode_no_provider, Toast.LENGTH_LONG).show()
         } catch (_: SecurityException) {

@@ -228,4 +228,12 @@
     <string name="shell_session_info">How browser sign-in works</string>
     <string name="browser_mode_summary">Continue chatting in your existing browser session. Your embedded browser uses a separate sign-in.</string>
     <string name="voice_finish">Finish dictation</string>
+    <string name="voice_insert_return">Insert into focused chat and return</string>
+    <string name="voice_finish_first">Finish dictation and review nonempty text before inserting.</string>
+    <string name="voice_permission_ready">Microphone allowed. Tap dictation to start.</string>
+    <string name="voice_handoff_check">Text handed to the focused editor. Verify it before sending.</string>
+    <string name="voice_handoff_unavailable">Focused chat editor unavailable. Your draft is preserved; copy it or edit it.</string>
+    <string name="browser_mode_change_provider">Change session browser</string>
+    <string name="browser_mode_change_warning">Use the current default compatible browser instead? Its account and cookies may differ.</string>
+    <string name="browser_mode_provider_unavailable">Your previous session browser is unavailable. Restore it or explicitly change session browser.</string>
 </resources>

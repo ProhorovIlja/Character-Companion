@@ -228,4 +228,12 @@
     <string name="shell_session_info">Как работает вход через браузер</string>
     <string name="browser_mode_summary">Продолжите общение в существующей сессии браузера. Встроенный движок использует отдельную авторизацию.</string>
     <string name="voice_finish">Завершить диктовку</string>
+    <string name="voice_insert_return">Вставить в выбранное поле чата и вернуться</string>
+    <string name="voice_finish_first">Завершите диктовку и проверьте текст перед вставкой.</string>
+    <string name="voice_permission_ready">Микрофон разрешён. Нажмите диктовку для начала записи.</string>
+    <string name="voice_handoff_check">Текст передан выбранному полю. Проверьте его перед отправкой.</string>
+    <string name="voice_handoff_unavailable">Поле чата недоступно. Черновик сохранён для редактирования или копирования.</string>
+    <string name="browser_mode_change_provider">Сменить браузер сессии</string>
+    <string name="browser_mode_change_warning">Использовать текущий браузер по умолчанию? В нём может быть другой аккаунт или отдельная авторизация.</string>
+    <string name="browser_mode_provider_unavailable">Прежний браузер сессии недоступен. Восстановите его или явно смените браузер сессии.</string>
 </resources>

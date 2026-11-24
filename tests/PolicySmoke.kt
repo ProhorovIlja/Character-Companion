@@ -2,6 +2,7 @@ import dev.caicompanion.app.LoginCompatibilityPolicy
 import dev.caicompanion.app.LoginCompatibilitySession
 import dev.caicompanion.app.ExternalBrowserPolicy
 import dev.caicompanion.app.VoiceDraftPolicy
+import dev.caicompanion.app.VoiceComposerPolicy
 import dev.caicompanion.app.VoiceRecognitionGuard
 import dev.caicompanion.app.VoiceRecognitionFeedback
 import dev.caicompanion.app.VoiceIssue
@@ -659,10 +660,11 @@ fun main() {
     check(VoiceDraftPolicy.append("hello\n", "world") == "hello\nworld")
     // Android stores cursor positions in UTF-16; never split a surrogate pair.
     val emojiText = "a😀z"
-    check(VoiceDraftPolicy.selection(emojiText, 2, 2) == 1..3)
+    check(VoiceDraftPolicy.selection(emojiText, 2, 2) == 3..3)
     val emojiEdit = VoiceDraftPolicy.insert(emojiText, "hi", 2, 2)!!
-    check(emojiEdit.text == "a hi z")
-    check(emojiEdit.caret == 4)
+    check(emojiEdit.text == "a😀 hi z")
+    check(emojiEdit.caret == 6)
+    check(VoiceDraftPolicy.selection(emojiText, 1, 2) == 1..3)
     check(VoiceDraftPolicy.selection("abc", -1, 9) == 0..3)
     // Check all possible selected UTF-16 ranges for several valid Unicode samples.
     fun wellFormedUtf16(value: String): Boolean {
@@ -687,5 +689,25 @@ fun main() {
             check(changed.text.contains("вставка"))
         }
     }
+    val chat = "https://character.ai/chat/abc_123"
+    check(VoiceComposerPolicy.chatPage(chat) == chat)
+    check(VoiceComposerPolicy.chatPage("https://www.character.ai/chat?char=abc-123") != null)
+    for (bad in listOf("http://character.ai/chat/abc", "https://character.ai.evil.example/chat/abc",
+        "https://accounts.character.ai/chat/abc", "https://character.ai/chat/abc?token=secret",
+        "https://character.ai/chat/abc#secret", "https://evil@character.ai/chat/abc",
+        "https://character.ai:444/chat/abc", "https://character.ai/chat/%2fabc",
+        "https://character.ai/login", "https://character.ai/chat")) {
+        check(VoiceComposerPolicy.chatPage(bad) == null)
+    }
+    val oneShot = VoiceComposerPolicy.Ticket(chat)
+    check(oneShot.consume(chat)); check(!oneShot.consume(chat))
+    val changedPage = VoiceComposerPolicy.Ticket(chat)
+    changedPage.observe("https://character.ai/chat/other")
+    changedPage.observe(chat); check(!changedPage.consume(chat))
+    val reloaded = VoiceComposerPolicy.Ticket(chat)
+    reloaded.invalidate(); check(!reloaded.consume(chat))
+    check(VoiceComposerPolicy.validDraft("  ") == null)
+    check(VoiceComposerPolicy.validDraft("x".repeat(16001)) == null)
+    check(VoiceComposerPolicy.validDraft("  message 🧪  ") == "  message 🧪  ")
     println("PolicySmoke: browser policy, concurrency, URL safety and local statistics assertions passed")
 }

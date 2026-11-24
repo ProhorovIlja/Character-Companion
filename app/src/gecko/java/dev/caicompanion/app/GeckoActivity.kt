@@ -52,6 +52,7 @@ class GeckoActivity : Activity() {
 
     private lateinit var settings: SettingsStore
     private val loginProtection = LoginCompatibilitySession()
+    private val voiceHandoff = VoiceComposerHandoff()
     private lateinit var session: GeckoSession
     private lateinit var surface: GeckoView
     private lateinit var root: LinearLayout
@@ -154,7 +155,7 @@ class GeckoActivity : Activity() {
         actionsRow.addView(navAction(R.string.shell_saved, R.drawable.ic_shell_saved) { showBookmarks() },
             LinearLayout.LayoutParams(0, dp(56), 1f))
         actionsRow.addView(navAction(R.string.shell_voice, R.drawable.ic_shell_mic) {
-            startActivity(Intent(this, VoiceDraftActivity::class.java))
+            voiceHandoff.launch(this, if (sessionReady()) activeUrl else null)
         }, LinearLayout.LayoutParams(0, dp(56), 1f))
         val more = navAction(R.string.shell_more, R.drawable.ic_shell_more) {}
         more.setOnClickListener { showPageMenu(more) }
@@ -412,6 +413,7 @@ class GeckoActivity : Activity() {
 
     /** User-initiated recovery, never a timer or background monitor. Form contents may be lost. */
     private fun geckoExited() {
+        voiceHandoff.invalidate()
         needsRecovery = true
         // A destroyed renderer cannot satisfy old site permissions, pending file
         // prompts or downloads. Keep no callback into the failed session.
@@ -714,7 +716,10 @@ class GeckoActivity : Activity() {
     @Suppress("DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == OPEN_DOCUMENT_CODE) {
+        if (requestCode == VoiceComposerHandoff.REQUEST) {
+            voiceHandoff.receive(resultCode, data)
+            if (started) deliverVoiceDraft()
+        } else if (requestCode == OPEN_DOCUMENT_CODE) {
             val uris = mutableListOf<Uri>()
             if (resultCode == RESULT_OK) {
                 data?.data?.let(uris::add)
@@ -771,6 +776,7 @@ class GeckoActivity : Activity() {
             if (pendingMediaCallback != null &&
                 !UrlPolicy.sameTrustedMediaOrigin(mediaPromptPage, url))
                 revokeMediaPermissions()
+            voiceHandoff.observe(url)
             activeUrl = url ?: HOME
             observeLoginPage(url)
             // Only store public content paths, never credentials, tokens or fragments.
@@ -790,6 +796,7 @@ class GeckoActivity : Activity() {
 
     private val progressDelegate = object : GeckoSession.ProgressDelegate {
         override fun onPageStart(session: GeckoSession, url: String) {
+            voiceHandoff.invalidate()
             // A fresh top-level load invalidates pending document-picker state,
             // including reloads that keep the same URL.
             if (pendingFileResult != null) finishFilePrompt(emptyList())
@@ -1007,7 +1014,23 @@ class GeckoActivity : Activity() {
         super.onStop()
     }
 
+    private fun deliverVoiceDraft() {
+        val page = if (sessionReady()) activeUrl else null
+        voiceHandoff.deliver(this, if (page != null && ::surface.isInitialized) surface else null, page)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && started) deliverVoiceDraft()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        deliverVoiceDraft()
+    }
+
     override fun onDestroy() {
+        voiceHandoff.clear()
         revokeMediaPermissions()
         finishFilePrompt(emptyList())
         abandonDownload()

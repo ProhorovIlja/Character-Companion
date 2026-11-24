@@ -78,6 +78,7 @@ class MainActivity : Activity() {
     private lateinit var store: SettingsStore
     private lateinit var filter: FilterEngine
     private val loginProtection = LoginCompatibilitySession()
+    private val voiceHandoff = VoiceComposerHandoff()
     private lateinit var importedRuleStore: ImportedRuleStore
     private var importedRules: RuleListParser.Rules = RuleListParser.Rules()
     private lateinit var container: FrameLayout
@@ -270,6 +271,7 @@ class MainActivity : Activity() {
                 return filterResponse(request.url.toString())
             }
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                voiceHandoff.invalidate()
                 observeLoginPage(url)
                 // WebRTC grants are scoped to the page that requested them, not its successor.
                 denyPendingMedia()
@@ -291,6 +293,7 @@ class MainActivity : Activity() {
             }
             override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
                 super.doUpdateVisitedHistory(view, url, isReload)
+                if (isReload) voiceHandoff.invalidate() else voiceHandoff.observe(url)
                 observeLoginPage(url)
             }
             override fun onReceivedError(view: WebView?, request: WebResourceRequest, error: WebResourceError) {
@@ -311,6 +314,7 @@ class MainActivity : Activity() {
                     UrlPolicy.isInternal(view?.url)) showError(getString(R.string.error_tls))
             }
             override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                voiceHandoff.invalidate()
                 // Old WebView is unusable. Replace it; don't crash the whole application.
                 if (destroyed) return true
                 denyPendingMedia()
@@ -557,7 +561,7 @@ class MainActivity : Activity() {
         findViewById<View>(R.id.status_badge).setOnLongClickListener { toggleLoginProtection(); true }
         findViewById<View>(R.id.bookmarks).setOnClickListener { showBookmarks() }
         findViewById<View>(R.id.voice).setOnClickListener {
-            startActivity(Intent(this, VoiceDraftActivity::class.java))
+            voiceHandoff.launch(this, currentVoicePage())
         }
         findViewById<View>(R.id.more).setOnClickListener { showPageMenu(it) }
         findViewById<View>(R.id.error_retry).setOnClickListener {
@@ -831,6 +835,7 @@ class MainActivity : Activity() {
 
     /** Independent native offline home. Does not request Character.AI APIs or load the site. */
     private fun showNativeHub() {
+        voiceHandoff.invalidate()
         if (destroyed || nativeHub != null) return
         val panel = ScrollView(this).apply {
             setBackgroundColor(Color.rgb(17, 18, 25))
@@ -923,6 +928,7 @@ class MainActivity : Activity() {
 
     /** First-party navigation always leaves the native workspace before loading WebView. */
     private fun openFirstPartyPage(rawUrl: String) {
+        voiceHandoff.invalidate()
         val safeUrl = NativeWorkspaceNavigation.safeDestination(rawUrl)
         lastUrl = safeUrl
         observeLoginPage(safeUrl)
@@ -1403,6 +1409,7 @@ class MainActivity : Activity() {
         activityResumed = true
         syncRendererLifecycle()
         flushDeferredWebReload()
+        deliverVoiceDraft()
     }
     override fun onStop() {
         // Do not revoke while an Android permission dialog merely pauses the Activity.
@@ -1410,7 +1417,22 @@ class MainActivity : Activity() {
         denyPendingMedia()
         super.onStop()
     }
+    private fun currentVoicePage(): String? =
+        if (!destroyed && ::webView.isInitialized && nativeHub == null && fullscreenView == null &&
+            ::errorOverlay.isInitialized && errorOverlay.visibility != View.VISIBLE) webView.url else null
+
+    private fun deliverVoiceDraft() {
+        val page = currentVoicePage()
+        voiceHandoff.deliver(this, if (page != null) webView else null, page)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && activityResumed) deliverVoiceDraft()
+    }
+
     override fun onDestroy() {
+        voiceHandoff.clear()
         destroyed = true
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             modernBackCallback?.let { onBackInvokedDispatcher.unregisterOnBackInvokedCallback(it) }
@@ -1431,6 +1453,10 @@ class MainActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         when (requestCode) {
+            VoiceComposerHandoff.REQUEST -> {
+                voiceHandoff.receive(resultCode, data)
+                if (activityResumed) deliverVoiceDraft()
+            }
             FILE_PICKER -> {
                 chooser?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data))
                 chooser = null
