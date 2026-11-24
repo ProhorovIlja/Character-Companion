@@ -610,6 +610,7 @@ class MainActivity : Activity() {
             ShellMenu.Action(R.string.settings) { showSettings() },
             ShellMenu.Action(R.string.release_center) { ReleaseCenter.show(this) },
             ShellMenu.Action(R.string.lorebook_title) { startActivity(Intent(this, LorebookActivity::class.java)) },
+            ShellMenu.Action(R.string.character_draft_title) { startActivity(Intent(this, CharacterDraftActivity::class.java)) },
             ShellMenu.Action(R.string.engine_use_gecko, BuildConfig.FLAVOR == "gecko") { returnToGecko() },
             ShellMenu.Action(R.string.forward, ready && webView.canGoForward()) { webView.goForward() },
             ShellMenu.Action(R.string.reload, ready) { webView.reload() },

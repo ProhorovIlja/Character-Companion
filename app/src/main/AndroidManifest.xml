@@ -43,6 +43,7 @@
         <activity android:name=".BrowserSessionActivity" android:exported="false"
             android:launchMode="singleTop" />
         <activity android:name=".LorebookActivity" android:exported="false" />
+        <activity android:name=".CharacterDraftActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".VoiceDraftActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" />
     </application>
