@@ -37,7 +37,8 @@ class MandyWorkspaceActivity : Activity() {
                                 val draft: NativeChatWorkspace.State,
                                 val rows: List<NativeConversation.Event>,
                                 val models: List<NativeModelLibrary.Model>,
-                                val memory: NativeCharacterMemory.State)
+                                val memory: NativeCharacterMemory.State,
+                                val speechModels: List<NativeModelLibrary.Model> = emptyList())
     private lateinit var library: NativeCharacterLibrary
     private lateinit var workspace: NativeChatWorkspace
     private lateinit var memory: NativeCharacterMemory
@@ -53,6 +54,7 @@ class MandyWorkspaceActivity : Activity() {
     private val dictation = NativeDictation()
     private var speechToken: UUID? = null
     private var recognizer: SpeechRecognizer? = null
+    private var offlineSpeech: OfflineSpeechSession? = null
     private var speechStates: Map<View, Boolean> = emptyMap()
     private lateinit var speechControls: LinearLayout
     private lateinit var stopSpeech: Button
@@ -164,12 +166,13 @@ class MandyWorkspaceActivity : Activity() {
         val profiles = library.list()
         val ticket = workspace.selected()
         val models = if (BuildConfig.MANDY_EMBEDDED_PREVIEW) modelLibrary().list() else emptyList()
-        if (ticket == null) return Snapshot(profiles, null, NativeChatWorkspace.State(), emptyList(), models, NativeCharacterMemory.State())
+        val speechModels = if (BuildConfig.MANDY_WHISPER_PREVIEW) AndroidModelImport.library(applicationContext, speech = true).list() else emptyList()
+        if (ticket == null) return Snapshot(profiles, null, NativeChatWorkspace.State(), emptyList(), models, NativeCharacterMemory.State(), speechModels)
         library.resolve(ticket.key)
         val rows = AndroidConversationStore(applicationContext, account).use {
             it.page(ticket.key.character, ticket.key.chat, 50).asReversed()
         }
-        return Snapshot(profiles, ticket, workspace.state(ticket.key), rows, models, memory.get(ticket.key.character))
+        return Snapshot(profiles, ticket, workspace.state(ticket.key), rows, models, memory.get(ticket.key.character), speechModels)
     }
     private fun suspendInputs(view: View, states: MutableMap<View, Boolean>) {
         states[view] = view.isEnabled
@@ -267,6 +270,10 @@ class MandyWorkspaceActivity : Activity() {
         editor = field
         panel.addView(field)
         panel.addView(button("Dictate on device…") { chooseSpeechLanguage(s) })
+        if (BuildConfig.MANDY_WHISPER_PREVIEW) {
+            if (s.speechModels.isNotEmpty()) panel.addView(button("Dictate with local Whisper…") { chooseOfflineSpeech(s) })
+            else panel.addView(label("Import a trusted multilingual Whisper model in AI models, then refresh."))
+        }
         panel.addView(button("Save draft") { saveAnd {} })
         if (BuildConfig.MANDY_EMBEDDED_PREVIEW) {
             panel.addView(button("Refresh model inventory") { saveAnd {} })
@@ -374,19 +381,43 @@ class MandyWorkspaceActivity : Activity() {
         }.setNegativeButton(android.R.string.cancel, null).show()
     }
 
-    private fun beginSpeech(s: Snapshot, language: MandyLanguage) {
+    private fun chooseOfflineSpeech(s: Snapshot) {
+        if (!resumed || busy || !BuildConfig.MANDY_WHISPER_PREVIEW || current?.ticket != s.ticket || s.ticket == null) return
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            status.text = "Grant microphone permission, then tap Dictate again."
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 940)
+            return
+        }
+        val labels = s.speechModels.map { it.sha256 + "\nBytes: " + it.bytes }.toTypedArray()
+        AlertDialog.Builder(this).setTitle("Trusted offline speech model").setItems(labels) { _, index ->
+            val model = s.speechModels[index]
+            AlertDialog.Builder(this).setTitle("Experimental offline dictation")
+                .setMessage("Use only a trusted multilingual model. The microphone and recognition remain local. The result must be reviewed in the draft; speech detection is not validated. The loaded chat model will be released before recording.\nSHA-256: " + model.sha256)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton("Choose language") { _, _ ->
+                    val languages = MandyLanguage.entries
+                    AlertDialog.Builder(this).setTitle("Offline dictation language")
+                        .setItems(languages.map { it.displayName }.toTypedArray()) { _, selected ->
+                            beginSpeech(s, languages[selected], model)
+                        }.setNegativeButton(android.R.string.cancel, null).show()
+                }.show()
+        }.setNegativeButton(android.R.string.cancel, null).show()
+    }
+
+    private fun beginSpeech(s: Snapshot, language: MandyLanguage, offline: NativeModelLibrary.Model? = null) {
         val ticket = s.ticket ?: return
         val field = editor ?: return
-        if (!resumed || busy || current?.ticket != ticket || Build.VERSION.SDK_INT < 31 ||
+        if (!resumed || busy || !alive() || current?.ticket != ticket ||
             checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return
-        if (!SpeechRecognizer.isOnDeviceRecognitionAvailable(this)) {
+        if (offline != null && (!BuildConfig.MANDY_WHISPER_PREVIEW || offline !in s.speechModels)) return
+        if (offline == null && (Build.VERSION.SDK_INT < 31 || !SpeechRecognizer.isOnDeviceRecognitionAvailable(this))) {
             status.text = "On-device recognition unavailable"
             return
         }
         val draft = field.text.toString()
         val start = field.selectionStart.takeIf { it >= 0 } ?: draft.length
         val end = field.selectionEnd.takeIf { it >= 0 } ?: start
-        val canSend = BuildConfig.MANDY_EMBEDDED_PREVIEW && s.draft.pending == null && s.models.isNotEmpty()
+        val canSend = offline == null && BuildConfig.MANDY_EMBEDDED_PREVIEW && s.draft.pending == null && s.models.isNotEmpty()
         val token = runCatching { dictation.begin(ticket, draft, start, end, canSend) }.getOrElse {
             status.text = "Draft is invalid for dictation"; return
         }
@@ -400,6 +431,47 @@ class MandyWorkspaceActivity : Activity() {
         sendSpeech.visibility = if (canSend) View.VISIBLE else View.GONE
         sendSpeech.isEnabled = canSend
         status.text = "Opening on-device microphone…"
+        if (offline != null) {
+            val session = OfflineSpeechSession()
+            offlineSpeech = session
+            val threads = performancePreset().threads
+            disk.execute {
+                val result = runCatching {
+                    session.run(capture = { stop, cancelled ->
+                        require(workspace.visible(ticket))
+                        resident.close()
+                        // Conservative existing admission estimate; actual ASR memory needs measurement.
+                        admitModel(offline, 4096)
+                        runOnUiThread {
+                            if (alive() && resumed && speechToken == token && stopSpeech.isEnabled)
+                                status.text = "Recording locally…"
+                        }
+                        AndroidPcmCapture.record(applicationContext, stopRequested = stop, cancelled = cancelled).samples
+                    }, onTranscribing = {
+                        runOnUiThread {
+                            if (alive() && speechToken == token) {
+                                stopSpeech.isEnabled = false
+                                sendSpeech.isEnabled = false
+                                status.text = "Transcribing locally…"
+                            }
+                        }
+                    }) { pcm, cancelled ->
+                        admitModel(offline, 4096)
+                        EmbeddedWhisper.transcribe(offline.path, offline.sha256, pcm, language, threads, cancelled)
+                    }
+                }
+                runOnUiThread {
+                    if (!alive() || speechToken != token) return@runOnUiThread
+                    if (!resumed) { cancelSpeech("Dictation cancelled"); return@runOnUiThread }
+                    result.onSuccess { completeSpeech(token, ticket, listOf(it)) }
+                        .onFailure { error ->
+                            cancelSpeech(if (error is ModelAdmission.Denied) admissionMessage(error) + " · draft preserved"
+                                else "Offline transcription failed or cancelled · draft preserved")
+                        }
+                }
+            }
+            return
+        }
         try {
             val engine = SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
             recognizer = engine
@@ -420,23 +492,7 @@ class MandyWorkspaceActivity : Activity() {
                 override fun onResults(results: Bundle?) {
                     if (speechToken != token) return
                     if (!resumed || !alive()) { cancelSpeech("Dictation cancelled"); return }
-                    val result = dictation.complete(token, current?.ticket, editor?.text?.toString(),
-                        results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION))
-                    releaseSpeech(token, cancel = false)
-                    if (result == null) { status.text = "No valid transcript · draft preserved"; return }
-                    val target = editor ?: return
-                    if (current?.ticket != ticket) return
-                    target.setText(result.edit.text)
-                    target.setSelection(result.edit.caret)
-                    // Persist before asking to send. Failed persistence leaves editable visible text.
-                    work(afterSuccess = { updated ->
-                        if (updated.ticket == ticket) {
-                            editor?.setSelection(result.edit.caret.coerceIn(0, editor?.length() ?: 0))
-                            status.text = "Dictation saved to draft"
-                            if (result.requestSend && resumed && updated.draft.pending == null && updated.models.isNotEmpty())
-                                chooseModel(updated, mode = "dictation")
-                        }
-                    }) { workspace.edit(ticket, result.edit.text) }
+                    completeSpeech(token, ticket, results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION))
                 }
                 override fun onPartialResults(partialResults: Bundle?) {}
                 override fun onEvent(eventType: Int, params: Bundle?) {}
@@ -454,12 +510,36 @@ class MandyWorkspaceActivity : Activity() {
         }
     }
 
+    private fun completeSpeech(token: UUID, ticket: NativeChatWorkspace.Ticket, candidates: List<String>?) {
+        if (speechToken != token || !alive() || !resumed) return
+        val result = dictation.complete(token, current?.ticket, editor?.text?.toString(),
+            candidates)
+        releaseSpeech(token, cancel = false)
+        if (result == null) { status.text = "No valid transcript · draft preserved"; return }
+        val target = editor ?: return
+        if (current?.ticket != ticket) return
+        target.setText(result.edit.text)
+        target.setSelection(result.edit.caret)
+        // Persist before asking to send. Failed persistence leaves editable visible text.
+        work(afterSuccess = { updated ->
+            if (updated.ticket == ticket) {
+                editor?.setSelection(result.edit.caret.coerceIn(0, editor?.length() ?: 0))
+                status.text = "Dictation saved to draft"
+                if (result.requestSend && resumed && updated.draft.pending == null && updated.models.isNotEmpty())
+                    chooseModel(updated, mode = "dictation")
+            }
+        }) { workspace.edit(ticket, result.edit.text) }
+    }
+
     private fun finishSpeech(send: Boolean) {
         val token = speechToken ?: return
         if (!resumed || !stopSpeech.isEnabled || (send && !sendSpeech.isEnabled)) return
+        val offline = offlineSpeech
+        if (offline != null && (send || !offline.requestStop())) return
         if (!dictation.stop(token, send)) return
         stopSpeech.isEnabled = false; sendSpeech.isEnabled = false
         status.text = "Transcribing…"
+        if (offline != null) return
         try { checkNotNull(recognizer).stopListening() }
         catch (_: Exception) { cancelSpeech("Recognition failed · draft preserved") }
     }
@@ -467,6 +547,9 @@ class MandyWorkspaceActivity : Activity() {
     private fun releaseSpeech(token: UUID, cancel: Boolean) {
         if (speechToken != token) return
         speechToken = null
+        val offline = offlineSpeech
+        offlineSpeech = null
+        if (cancel) offline?.cancel()
         val engine = recognizer
         recognizer = null
         if (cancel) runCatching { engine?.cancel() }
