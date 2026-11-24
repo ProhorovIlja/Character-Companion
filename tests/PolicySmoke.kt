@@ -140,6 +140,7 @@ fun verifyLoginCompatibility() {
 
 fun main() {
     verifyReleasePolicy()
+    verifyUpdateIntegrity()
     verifyLoginCompatibility()
     verifyVoiceDraft()
     // A pending SAF operation may finish only for its original HTTPS page.

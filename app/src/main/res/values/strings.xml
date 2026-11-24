@@ -271,4 +271,11 @@
     <string name="release_older">Published stable release %1$s is older than this installation. Do not downgrade.</string>
     <string name="release_no_compatible">Newer stable release %1$s exists, but no matching APK with valid asset metadata was found.</string>
     <string name="release_update_candidate">Newer stable release %1$s has a matching APK with published SHA-256 metadata. Review release notes; the APK itself and its signer have not been verified.</string>
+    <string name="release_download">Download and verify</string>
+    <string name="release_downloading">Downloading and checking APK integrity. Keep this screen open.</string>
+    <string name="release_verified">The downloaded APK matches the expected size, hash, package, newer version, renderer and current signing identity. Android will ask for installation consent.</string>
+    <string name="release_verify_failed">Could not download, verify or open this update. No automatic installation was performed.</string>
+    <string name="release_install">Open Android installer</string>
+    <string name="release_install_permission">Android does not allow installs from this app. You can change that permission in system settings, then check and download the update again.</string>
+    <string name="release_install_settings">Open installation settings</string>
 </resources>

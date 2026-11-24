@@ -24,9 +24,13 @@ android {
     }
     flavorDimensions += "browserEngine"
     productFlavors {
-        create("legacy") { dimension = "browserEngine" }
+        create("legacy") {
+            dimension = "browserEngine"
+            manifestPlaceholders["companionRenderer"] = "legacy"
+        }
         create("gecko") {
             dimension = "browserEngine"
+            manifestPlaceholders["companionRenderer"] = "gecko"
             ndk { abiFilters.add("arm64-v8a") }
         }
     }

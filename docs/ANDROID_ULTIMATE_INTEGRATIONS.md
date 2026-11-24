@@ -22,3 +22,6 @@ No Windows change, no automation/scheduled checks, no third-party binary importe
 
 ### Release metadata validation
 The update center now compares numeric version names (including installed RC builds) and checks the stable release asset filename, renderer, exact official download URL, upload state, bounded size and published SHA-256 digest format. A matching asset is a candidate only, not a verified APK. A future installer must inspect APK versionCode, application ID, signer and actual downloaded digest. No downloads or unattended checks are triggered by this revision.
+
+### Verified download stage
+User-selected stable candidate downloads into private cache; size and SHA-256 are streamed and checked, redirects limited to exact GitHub asset hosts, archive identity/newer versionCode/renderer manifest marker/non-debug flags/current signer set checked. A restricted FileProvider grants read-only access to the system installer after an explicit tap. No silent install, no scheduled checks. Android build and signed release/device tests are required before declaring operational. Key rotation deliberately fails closed; installed debug APKs cannot be silently upgraded to release-signed builds.

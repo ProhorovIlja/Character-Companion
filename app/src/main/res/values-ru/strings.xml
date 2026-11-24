@@ -271,4 +271,11 @@
     <string name="release_older">Стабильный релиз %1$s старее установленной версии. Не выполняйте понижение версии.</string>
     <string name="release_no_compatible">Доступен более новый релиз %1$s, но подходящий APK с корректными метаданными не найден.</string>
     <string name="release_update_candidate">Более новый релиз %1$s содержит подходящий APK с опубликованными метаданными SHA-256. Проверьте примечания к релизу; сам APK и его подпись ещё не проверены.</string>
+    <string name="release_download">Скачать и проверить</string>
+    <string name="release_downloading">Скачивание и проверка APK. Оставьте этот экран открытым.</string>
+    <string name="release_verified">APK соответствует размеру, хешу, пакету, более новой версии, движку и текущей подписи. Android запросит подтверждение установки.</string>
+    <string name="release_verify_failed">Не удалось скачать, проверить или открыть обновление. Автоматическая установка не выполнялась.</string>
+    <string name="release_install">Открыть установщик Android</string>
+    <string name="release_install_permission">Android запрещает установку из этого приложения. Вы можете изменить разрешение в системных настройках, затем снова проверить и скачать обновление.</string>
+    <string name="release_install_settings">Открыть настройки установки</string>
 </resources>

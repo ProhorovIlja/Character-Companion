@@ -9,7 +9,7 @@ import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** Explicit release lookup, never a scheduler or APK installer. No auth credentials. */
+/** Explicit release lookup, never a scheduler or silent installer. No auth credentials. */
 object ReleaseCenter {
     private const val RELEASES = "https://github.com/ProhorovIlja/Character-Companion/releases"
     private const val LATEST = "https://api.github.com/repos/ProhorovIlja/Character-Companion/releases/latest"
@@ -49,6 +49,7 @@ object ReleaseCenter {
             var connection: HttpsURLConnection? = null
             var result = R.string.release_unavailable
             var tag: String? = null
+            var candidate: ReleasePolicy.Asset? = null
             try {
                 if (!cancelled.get()) {
                     val request = URL(LATEST).openConnection() as HttpsURLConnection
@@ -79,6 +80,7 @@ object ReleaseCenter {
                                         }
                                     } else emptyList()
                                     tag = remote.takeIf { ReleasePolicy.version(it) != null }
+                                    candidate = ReleasePolicy.selectAsset(remote, BuildConfig.FLAVOR, assets)
                                     result = when (ReleasePolicy.status(BuildConfig.VERSION_NAME,
                                         remote, BuildConfig.FLAVOR, assets)) {
                                         ReleasePolicy.Status.CURRENT -> R.string.release_current_match
@@ -101,12 +103,20 @@ object ReleaseCenter {
                 if (cancelled.get() || activity.isFinishing || activity.isDestroyed || !dialog.isShowing)
                     return@runOnUiThread
                 dialog.dismiss()
-                AlertDialog.Builder(activity).setTitle(R.string.release_center)
+                val details = AlertDialog.Builder(activity).setTitle(R.string.release_center)
                     .setMessage(if (result in setOf(R.string.release_current_match, R.string.release_older,
                         R.string.release_no_compatible, R.string.release_update_candidate))
                         activity.getString(result, tag.orEmpty()) else activity.getString(result))
                     .setPositiveButton(R.string.release_open) { _, _ -> open(activity) }
-                    .setNegativeButton(R.string.close, null).show()
+                    .setNegativeButton(R.string.close, null)
+                val selected = candidate
+                val selectedTag = tag
+                if (result == R.string.release_update_candidate && selected != null && selectedTag != null) {
+                    details.setNeutralButton(R.string.release_download) { _, _ ->
+                        UpdateDownload.start(activity, selectedTag, selected)
+                    }
+                }
+                details.show()
             }
         }.start()
     }
