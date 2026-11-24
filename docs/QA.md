@@ -13,7 +13,7 @@
 
 ## Device release gates — NOT completed
 
-1. Build debug APK with Android SDK 36 + AGP 8.13.0 + Kotlin 2.2.0 and check manifest and install on API 29 / 33 / 35 / 36.
+1. Build debug APK with Android SDK 37 + AGP 9.1.1 (built-in Kotlin) and check manifest and install on API 29 / 33 / 35 / 36.
 2. Test new confirmation dialogs for external links and downloads, all four quick profiles, fullscreen HTML video, back button, safe share/copy of OAuth URLs and interruption of pending mic/camera permissions on navigation.
 3. Test page load and chat (with a user-owned test account), link navigation, pop-ups, real sign-in, Chat/Character search, history, settings, share and bookmarks. Treat any embedded Google/Apple OAuth failure as a known external limitation, not a bypass target.
 4. Verify voice/audio capabilities *actually exposed by the website*, whether mic permission prompts function, and whether camera prompts are accurate. Never claim mobile app-only functions are available.
@@ -38,7 +38,7 @@
 
 - 16 Python structural tests passed. Added download-cookie isolation, OAuth hand-off, service worker Activity lifetime and local statistics UI checks.
 - 104 pure Kotlin policy assertions passed with the installed Kotlin 1.9 CLI; including 1000 concurrent blocked requests (four short-lived threads), unsafe filename/path regressions, exception precedence and stats reset.
-- Android SDK, Gradle, adb and real Android runtime are missing; the Android app did not compile in this environment. Kotlin 1.9 standalone checks do not prove AGP 8.13 / AndroidX WebKit 1.18 project compilation.
+- Android SDK, Gradle, adb and real Android runtime are missing; the Android app did not compile in this environment. Kotlin standalone checks do not prove AGP 9.1.1 / AndroidX WebKit 1.18 project compilation.
 - The UI still needs a real Android build, accessibility inspection, sign-in tests and device performance measurements. Do not distribute this as a verified APK.
 
 ## v0.6 targeted device checks — PENDING
@@ -57,7 +57,7 @@
 - Test repeated import, rotation during file picker, process death during write and safe atomic recovery. Verify removal retains built-in rules and manual exclusions.
 - Test long sessions and 10k–40k imported rules on a low-memory Android device: measure heap, UI responsiveness and `shouldInterceptRequest` latency. No benchmark claims from offline JVM tests.
 - Verify Character.AI login, chat, image/CDN and WebRTC with filter enabled, then switch to Compatibility mode to troubleshoot. Google OAuth may be blocked independently of filtering.
-- Build using a full clone containing the verified Gradle Wrapper JAR and a local Android SDK 36, then install the resulting APK on a test device.
+- Build using a full clone containing the verified Gradle Wrapper JAR and a local Android SDK 37, then install the resulting APK on a test device.
 
 ## v0.8 pending manual Android validation
 
@@ -81,7 +81,7 @@
 - 30 Python structure tests passed, including RU/EN resource parity, renderer budget hook, filter TXT export integration, release safety gate and no workflow files.
 - 185 pure Kotlin assertions passed, including crash-budget window expiry, restrictions of third-party downloads, hostname boundaries, allow/block matching and import limits.
 - `scripts/prepare-release.sh` was exercised with no APK and correctly refused to produce release artifacts. This is NOT a substitute for verifying a signed APK.
-- Installed tools: JDK and CLI Kotlin. Missing: Android SDK Platform 36, Android build-tools, Gradle distribution, ADB. APK build and on-device compatibility remain unverified.
+- Installed tools: JDK and CLI Kotlin. Missing locally: Android SDK Platform 37, Android build-tools, Gradle distribution, ADB. APK build and on-device compatibility remain unverified.
 - Manual device signoff and a user-owned release-signing key are mandatory before creating a published GitHub Release.
 
 
@@ -91,7 +91,7 @@
 
 - Static XAPK/AXML inspector and manual raw-part splitter tested on **synthetic** APK/XAPK payloads, including hostile path names, SHA mismatch, malformed binary manifests and nested native ABI detection. Official XAPK was not downloaded because 278,738,234 bytes exceeds the Drive transfer limit of 268,435,456 bytes.
 - Android 17 diagnostic script tests use a mocked `adb`; no real phone was connected and no auth, voice, UI or battery data was gathered.
-- AGP 8.13 API support max 36.1; keep target/compile SDK 36 and test runtime API 37 on a real LineageOS build before claiming compatibility.
+- After build #2, compile SDK 37 with AGP 9.1.1 and Gradle 9.3.1; target SDK remains 36. Re-run manual cloud build, then test Android 17 runtime on a real LineageOS device before claiming compatibility.
 - Check that manual source packaging rejects unsigned/debug/no-signoff APKs, and that `aapt dump badging` is used for APK metadata.
 
 

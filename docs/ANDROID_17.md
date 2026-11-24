@@ -7,8 +7,8 @@
 ## SDK/toolchain compatibility
 
 - Android 17 = **API 37**. Android 17 was publicly released in June 2026. [Android official release](https://developer.android.com/blog/posts/android-17-is-here).
-- This project intentionally retains `compileSdk = 36` and `targetSdk = 36` for the current candidate. An Android 17 runtime can normally install apps targeting earlier APIs; running is **not yet tested**.
-- AGP **8.13** lists its maximum supported API as **36.1** ([AGP 8.13 notes](https://developer.android.com/build/releases/agp-8-13-0-release-notes)). Do **not** change `compileSdk = 37` alone. When changing to target API 37, migrate Android SDK Platform 37, build-tools, AGP **9.4.0** (or another verified API-37-compatible stable release) (and a compatible Gradle/JDK/Kotlin configuration) as a coordinated, separately verified upgrade. [AGP 9.4 support](https://developer.android.com/build/releases/agp-9-4-0-release-notes).
+- After the manual GitHub build #2 failure, this project uses `compileSdk = 37` with AGP 9.1.1 and retains `targetSdk = 36` pending device QA. An Android 17 runtime can normally install apps targeting earlier APIs; running is **not yet tested**.
+- The build toolchain has been migrated to **AGP 9.1.1**, **Gradle 9.3.1**, and Android SDK Platform 37 after actual GitHub Actions AAR metadata errors. These versions support SDK 37 according to [AGP 9.1 release notes](https://developer.android.com/build/releases/agp-9-1-0-release-notes); actual compilation and physical Android 17 compatibility remain unverified.
 - Android 17 adds changes to audio focus/background playback and, when targeting API 37, certificate transparency and mandatory large-screen resizability. This app does not start a background audio service. Validate Character.AI's browser-controlled audio/voice features while foregrounded. [All apps](https://developer.android.com/about/versions/17/behavior-changes-all), [Target API 37](https://developer.android.com/about/versions/17/behavior-changes-17).
 - Manifest marks the Activity as resizeable and does not lock orientation; device rotation, IME insets, split screen, and edge-to-edge padding require on-device tests.
 

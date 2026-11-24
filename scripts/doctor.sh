@@ -10,7 +10,7 @@ else
   echo 'JAVA_FOUND=NO'; fail=1
 fi
 expected_jar='81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f'
-expected_dist='20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78'
+expected_dist='b266d5ff6b90eada6dc3b20cb090e3731302e553a27c5d3e4df1f0d76beaff06'
 wrapper='gradle/wrapper/gradle-wrapper.jar'
 props='gradle/wrapper/gradle-wrapper.properties'
 if [[ -f "$wrapper" ]]; then
@@ -27,7 +27,7 @@ if [[ -f "$wrapper" ]]; then
     echo 'GRADLE_WRAPPER_SHA256=FAIL_OR_UNAVAILABLE'; fail=1
   fi
   if [[ -f "$props" ]] && \
-      grep -Fxq 'distributionUrl=https\://services.gradle.org/distributions/gradle-8.13-bin.zip' "$props" && \
+      grep -Fxq 'distributionUrl=https\://services.gradle.org/distributions/gradle-9.3.1-bin.zip' "$props" && \
       grep -Fxq "distributionSha256Sum=$expected_dist" "$props"; then
     echo 'GRADLE_DISTRIBUTION_PIN=PASS'
   else
@@ -40,20 +40,20 @@ elif command -v gradle >/dev/null 2>&1; then
   else
     raw_version=''
   fi
-  gradle_version="$(printf '%s\n' "$raw_version" | sed -nE 's/^Gradle ([0-9]+\.[0-9]+)$/\1/p' | head -1)"
-  if [[ "$gradle_version" == '8.13' ]]; then
-    echo 'GRADLE_VERSION=8.13_VERIFIED'
+  gradle_version="$(printf '%s\n' "$raw_version" | sed -nE 's/^Gradle ([0-9]+(\.[0-9]+)+)$/\1/p' | head -1)"
+  if [[ "$gradle_version" == '9.3.1' ]]; then
+    echo 'GRADLE_VERSION=9.3.1_VERIFIED'
   else
-    echo 'GRADLE_VERSION=UNSUPPORTED_EXPECT_8.13'; fail=1
+    echo 'GRADLE_VERSION=UNSUPPORTED_EXPECT_9.3.1'; fail=1
   fi
 else
   echo 'GRADLE_FOUND=NO'; fail=1
 fi
 sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-${HOME}/Android/Sdk}}"
-if [[ -f "${sdk}/platforms/android-36/android.jar" ]]; then
-  echo 'SDK_36_FOUND=YES'
+if [[ -f "${sdk}/platforms/android-37/android.jar" ]]; then
+  echo 'SDK_37_FOUND=YES'
 else
-  echo 'SDK_36_FOUND=NO'; fail=1
+  echo 'SDK_37_FOUND=NO'; fail=1
 fi
 if command -v adb >/dev/null 2>&1; then
   echo 'ADB_FOUND=YES'

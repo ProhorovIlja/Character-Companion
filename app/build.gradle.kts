@@ -1,11 +1,10 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
 }
 
 android {
     namespace = "dev.caicompanion.app"
-    compileSdk = 36
+    compileSdk = 37
     defaultConfig {
         applicationId = "dev.caicompanion.app"
         minSdk = 29
@@ -25,7 +24,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
+    // AGP 9.1 provides built-in Kotlin; JVM target follows Java 17 compileOptions.
     buildTypes {
         release {
             isMinifyEnabled = true

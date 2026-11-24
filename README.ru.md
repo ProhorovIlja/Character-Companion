@@ -1,3 +1,5 @@
+**Исправление после GitHub Actions №2 (24.11.2026):** настоящий runner дошёл до `:app:checkGeckoDebugAarMetadata`. GeckoView 156 требует compile SDK 37, AndroidX Core 1.19 требует AGP 9.1+. Сборка обновлена до **AGP 9.1.1 / Gradle 9.3.1 / compileSdk 37**, Kotlin теперь встроен в AGP. **targetSdk оставлен 36** до проверки на Android 17. Существует только разрешённая пользователем ручная сборка (`workflow_dispatch`), **APK пока не создан**. [Подробности](docs/BUILD_FIX_RUN2_SDK37.md).
+
 **Последняя ревизия v0.42.0-source (24.11.2026)** — Android 0.33.0-rc1: временная совместимость с авторизацией Character.AI. На страницах входа и регистрации блокировка запросов WebView и защита GeckoView приостанавливаются, а при переходе в обычный чат восстанавливаются. Для модального окна без смены адреса удерживайте индикатор защиты или откройте «Совместимость входа» в настройках; после входа выключите временный режим. Исключения не сохраняют пароли и не устраняют запрет Google/Apple на OAuth во встроенных браузерах. APK не собран: здесь нет Android SDK/Gradle. [Изменения](docs/RELEASE_NOTES_v0.42.0-source.md). Без CI и автоматизаций.
 
 **Текущая ревизия v0.41.0-source (24.11.2026):** Android 0.32.0-rc1 — распознанная речь вставляется в месте курсора или заменяет выделенный фрагмент, с защитой от повреждения эмодзи и других Unicode-символов. Экран голосового черновика прокручивается при открытой клавиатуре и в горизонтальной ориентации; при повороте сохраняется выделение (только в памяти). Проверены 99 Python-тестов и Kotlin/JVM-проверки. **APK и Windows EXE пока не собраны и не проверены на устройстве.** [Описание](docs/RELEASE_NOTES_v0.41.0-source.md). Без автоматизаций и CI.
@@ -66,7 +68,7 @@
 
 - **Историческое состояние до загрузки второго архива:** `Character+AI_+Chat,+Talk,+Text_1.17.4_APKPure.xapk` занимает 278 738 234 байта, а Google Drive отклоняет загрузки больше 268 435 456 байт. Нельзя считать, что официальный APK уже разобран или изучен.
 - Добавлены самостоятельные утилиты `tools/split_xapk.py` и `tools/inspect_xapk.py`: безопасное деление исходного XAPK на последовательные части по 190 МиБ и статический анализ APK-модулей, разрешений, ABI, DEX и SHA-256 **без запуска чужого кода**. Проверены на синтетических архивах. Инструкции: `docs/XAPK_AUDIT.md`.
-- Для Android 17 (API 37), включая Pixel 8a на LineageOS, добавлены ручная диагностика `scripts/device-android17-preflight.sh` и план испытаний `docs/ANDROID_17.md`. Пока оставлен target/compile SDK 36: AGP 8.13 не поддерживает сборку под SDK 37 без обновления всей цепочки.
+- Для Android 17 (API 37), включая Pixel 8a на LineageOS, добавлены ручная диагностика `scripts/device-android17-preflight.sh` и план испытаний `docs/ANDROID_17.md`. Сейчас compileSdk=37 и AGP 9.1.1, но targetSdk=36 оставлен до аппаратных тестов; нужна успешная сборка.
 - Activity явно допускает изменение размеров; исправлен выбор `aapt` в проверке пакета перед выпуском. APK не собран и устройство не проверено; предупреждения Google Play Protect при ручной установке гарантированно убрать нельзя. Фоновых задач и CI нет.
 
 ## Что нового в v0.10.0-rc1 (без APK)
@@ -143,7 +145,7 @@
 
 ## Сборка
 
-Нужны Android Studio, **SDK Platform 36**, **JDK 17**, **Gradle 8.13**, **AGP 8.13.0**, **Kotlin 2.2.0**. Клонируйте весь репозиторий GitHub (включая проверенный Gradle Wrapper), откройте корень в Android Studio, выполните Sync и `Build → Build APK(s)` либо запустите вручную `bash scripts/build-apk.sh`. В облегчённом ZIP нет `gradle-wrapper.jar`; альтернативно нужен установленный Gradle 8.13. APK появляется в `app/build/outputs/apk/debug/app-debug.apk` **только после успешной сборки**. Приложение рассчитано на Android 10 и выше.
+Нужны Android Studio, **SDK Platform 37**, **JDK 17**, **Gradle 9.3.1**, **AGP 9.1.1** со встроенным Kotlin. Клонируйте весь репозиторий GitHub (включая проверенный Gradle Wrapper), откройте корень в Android Studio, выполните Sync и `Build → Build APK(s)` либо запустите вручную `bash scripts/build-apk.sh`. В облегчённом ZIP нет `gradle-wrapper.jar`; альтернативно нужен установленный Gradle 9.3.1. APK появляются в `app/build/outputs/apk/gecko/debug/app-gecko-debug.apk` и `app/build/outputs/apk/legacy/debug/app-legacy-debug.apk` **только после успешной сборки**. Приложение рассчитано на Android 10 и выше.
 
 Ручная проверка инструментов: `bash scripts/doctor.sh` (ничего не устанавливает и не запускает автоматически). Локальные тесты без SDK: `bash scripts/test-offline.sh`. Список обязательных проверок на телефоне — [docs/QA.md](docs/QA.md). Исследования — [docs/RESEARCH.md](docs/RESEARCH.md); ограничения и безопасность — [docs/SECURITY.md](docs/SECURITY.md), изменения — [docs/CHANGELOG.md](docs/CHANGELOG.md).
 

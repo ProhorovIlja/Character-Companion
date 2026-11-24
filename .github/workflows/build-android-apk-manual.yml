@@ -31,14 +31,14 @@ jobs:
           packages: 'platform-tools'
           log-accepted-android-sdk-licenses: 'false'
 
-      - name: Install Android 36 platform and build tools
+      - name: Install Android 37 platform and build tools
         shell: bash
         run: |
           set -euo pipefail
-          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0'
+          sdkmanager --install 'platforms;android-37' 'build-tools;36.0.0'
           sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
-          if [[ -z "$sdk_root" || ! -s "$sdk_root/platforms/android-36/android.jar" ]]; then
-            echo 'Android SDK platform 36 was not installed correctly.' >&2
+          if [[ -z "$sdk_root" || ! -s "$sdk_root/platforms/android-37/android.jar" ]]; then
+            echo 'Android SDK platform 37 was not installed correctly.' >&2
             exit 1
           fi
           test -x "$sdk_root/build-tools/36.0.0/apksigner"
@@ -83,7 +83,7 @@ jobs:
             printf 'COMMIT=%s\n' "$GITHUB_SHA"
             printf 'RUN_ID=%s\n' "$GITHUB_RUN_ID"
             printf 'TRIGGER=workflow_dispatch_ONLY\n'
-            printf 'ANDROID_COMPILE_SDK=36\n'
+            printf 'ANDROID_COMPILE_SDK=37\n'
             printf 'BUILD_TYPE=DEBUG_NOT_PRODUCTION\n'
             printf 'DEVICE_TESTED=NO\n'
             printf 'APK_SIGNATURE=VERIFIED_DEBUG_KEY\n'

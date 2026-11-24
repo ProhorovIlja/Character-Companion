@@ -36,7 +36,7 @@ bash scripts/build-apk.sh gecko  # ARM64 Android GeckoView debug preview
 bash scripts/build-apk.sh legacy # Existing WebView fallback
 ```
 
-These are **manual commands**; no GitHub Actions, background jobs, schedules, or automatic downloads are configured by the project. The Gecko AAR must be resolved from `https://maven.mozilla.org/maven2/` and its binary integrity and provenance checked by the build operator. An official Android SDK, JDK 17+, Gradle 8.13 and actual Android 17 device are needed. This development environment does not include the Android SDK or Gradle distribution and **did not compile any APK**.
+These are **manual commands**; no GitHub Actions, background jobs, schedules, or automatic downloads are configured by the project. The Gecko AAR must be resolved from `https://maven.mozilla.org/maven2/` and its binary integrity and provenance checked by the build operator. An official Android SDK, JDK 17+, Gradle 9.3.1, Android SDK 37 and an actual Android 17 device are needed. This development environment does not include the Android SDK or Gradle distribution and **did not compile any APK**.
 
 ## Security and compatibility boundaries
 
@@ -45,7 +45,7 @@ These are **manual commands**; no GitHub Actions, background jobs, schedules, or
 - Microphone/camera are off by default. The user first enables media requests, then Android permission is checked, then each Gecko media request gets its own visible prompt; no location, notifications or local-network permission is auto-approved.
 - As of v0.24.0-source Gecko implements explicit SAF file selection and bounded, user-confirmed first-party downloads and basic JS prompts. It still lacks complete fullscreen video, cross-origin CDN download handling, session restore across engine crashes, full settings parity and seamless OAuth. Its toolbar includes an explicit way into the established native tools / legacy browser.
 - Native Gecko profile is separate from WebView cookies. No raw cookie export/import, account token injection, private Character.AI API, or copied proprietary XAPK code.
-- The current API 37 / Android 17 runtime is a **test target**; build still uses compile/target SDK 36 with AGP 8.13 and must not be represented as API-37-targeted.
+- The current API 37 / Android 17 runtime is a **test target**; build now uses compile SDK 37, target SDK 36 and AGP 9.1.1 and must not be represented as API-37-targeted.
 - Pixel 8a uses `akita`, not Pixel 8 `shiba`. Both MindTheGapps and Morphe microG may be present; they are different applications, not proof that Google OAuth works in Gecko.
 
 ## Manual acceptance plan before promoting Gecko to stable

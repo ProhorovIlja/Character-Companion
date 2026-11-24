@@ -17,9 +17,9 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $wrapperJar = Join-Path $root 'gradle\wrapper\gradle-wrapper.jar'
 $wrapperBat = Join-Path $root 'gradlew.bat'
 # Full GitHub clones contain the verified wrapper. Lightweight source ZIPs do not,
-# so they require a preinstalled Gradle 8.13; do not download or install silently.
+# so they require a preinstalled Gradle 9.3.1; do not download or install silently.
 $expectedJar = '81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f'
-$expectedDist = '20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78'
+$expectedDist = 'b266d5ff6b90eada6dc3b20cb090e3731302e553a27c5d3e4df1f0d76beaff06'
 $gradleCommand = $null
 if (Test-Path -LiteralPath $wrapperJar -PathType Leaf) {
     if (-not (Test-Path -LiteralPath $wrapperBat -PathType Leaf)) {
@@ -34,23 +34,23 @@ if (Test-Path -LiteralPath $wrapperJar -PathType Leaf) {
         Fail 'Gradle Wrapper distribution properties are missing.'
     }
     $lines = @(Get-Content -LiteralPath $props)
-    if (($lines -cnotcontains 'distributionUrl=https\://services.gradle.org/distributions/gradle-8.13-bin.zip') -or
+    if (($lines -cnotcontains 'distributionUrl=https\://services.gradle.org/distributions/gradle-9.3.1-bin.zip') -or
         ($lines -cnotcontains "distributionSha256Sum=$expectedDist")) {
-        Fail 'Gradle 8.13 distribution URL/checksum pin is invalid.'
+        Fail 'Gradle 9.3.1 distribution URL/checksum pin is invalid.'
     }
     $gradleCommand = $wrapperBat
     Write-Output 'GRADLE_PROVIDER=VERIFIED_WRAPPER'
 } else {
     $candidate = Get-Command 'gradle' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($null -eq $candidate) {
-        Fail 'Missing Gradle Wrapper JAR and Gradle 8.13. Clone full GitHub repo or install Gradle 8.13 locally.'
+        Fail 'Missing Gradle Wrapper JAR and Gradle 9.3.1. Clone full GitHub repo or install Gradle 9.3.1 locally.'
     }
     $gradleCommand = $candidate.Source
     $versionText = (& $gradleCommand '--version' 2>&1) -join "`n"
-    if (($LASTEXITCODE -ne 0) -or ($versionText -notmatch '(?m)^Gradle 8\.13\s*$')) {
-        Fail 'Installed Gradle version is not 8.13. Refusing an unverified toolchain.'
+    if (($LASTEXITCODE -ne 0) -or ($versionText -notmatch '(?m)^Gradle 9\.3\.1\s*$')) {
+        Fail 'Installed Gradle version is not 9.3.1. Refusing an unverified toolchain.'
     }
-    Write-Output 'GRADLE_PROVIDER=LOCAL_GRADLE_8.13'
+    Write-Output 'GRADLE_PROVIDER=LOCAL_GRADLE_9.3.1'
 }
 $javaExe = if ($env:JAVA_HOME) { Join-Path $env:JAVA_HOME 'bin\java.exe' } else { 'java.exe' }
 if (-not (Get-Command $javaExe -ErrorAction SilentlyContinue)) {
@@ -59,8 +59,8 @@ if (-not (Get-Command $javaExe -ErrorAction SilentlyContinue)) {
 $sdk = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else {
     Join-Path $env:LOCALAPPDATA 'Android\Sdk'
 }
-if (-not (Test-Path -LiteralPath (Join-Path $sdk 'platforms\android-36\android.jar') -PathType Leaf)) {
-    Fail "Android SDK platform 36 not found at '$sdk'. Install that platform first. Android 17 is a separate runtime test target."
+if (-not (Test-Path -LiteralPath (Join-Path $sdk 'platforms\android-37\android.jar') -PathType Leaf)) {
+    Fail "Android SDK platform 37 not found at '$sdk'. Install that platform first. Android 17 runtime testing is still required."
 }
 $task = if ($Flavor -eq 'gecko') { ':app:assembleGeckoDebug' } else { ':app:assembleLegacyDebug' }
 $apk = Join-Path $root "app\build\outputs\apk\$Flavor\debug\app-$Flavor-debug.apk"

@@ -53,7 +53,7 @@ A separate **manual, read-only** `bash scripts/device-android17-preflight.sh` re
 3. **Preserve Android's system bars, cutout, font scaling, gesture navigation and IME insets.** Test at different display/text sizes and landscape.
 4. **Avoid embedding arbitrary native libraries**. If Rust/C++/WebRTC is needed in the future, compile the necessary ABIs and validate 16-KiB ELF alignment and all transitive `.so` dependencies. Android 17 can enforce stricter 16-KiB compatibility. Kotlin/Java-only app code does not require an NDK just because the official Character.AI app uses native libraries.
 5. **No guarantee against Play Protect prompts.** A consistent release signing key, minimal permissions, provenance, SHA-256 and appropriate distribution help establish trust but cannot turn off the platform's independent checks.
-6. **Current compile/target SDK = 36** with AGP 8.13. Compatibility with Android 17 is a runtime goal, not a claimed verified result; moving to compile SDK 37 requires a compatible AGP (Google documents AGP 9.1.1+ for API 37.0). Do not change the whole build chain without a successful Android build.
+6. **Current compile SDK = 37**, **target SDK = 36**, AGP **9.1.1** after the GitHub run #2 AAR metadata failure. Android 17 runtime compatibility has not been verified; a successful GitHub build and physical device tests are still necessary.
 7. **Watch RAM and battery on an actual device.** The native hub uses lazy WebView startup; no measured battery / memory claims until on-device profiling. Verify process recovery and browser back navigation.
 8. Official Character.AI 1.17.4 XAPK was statically audited; its React Native/Hermes/WebRTC inventory is not an open API and its proprietary resources must not be copied into this project.
 
