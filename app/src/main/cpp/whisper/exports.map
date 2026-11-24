@@ -1,0 +1,4 @@
+{
+  global: Java_dev_caicompanion_app_EmbeddedWhisper_nativeTranscribeV1;
+  local: *;
+};
