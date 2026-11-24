@@ -325,7 +325,8 @@ internal sealed class ChatWindow : Window
             if (busy)
             {
                 e.Cancel = true; closeRequested = true; operation?.Cancel();
-                if (recorder != null && !speechFinishing) _ = EndDictationAsync(false, true);
+                if (recorder != null && !speechFinishing)
+                    Dispatcher.InvokeAsync(async () => await EndDictationAsync(false, true));
                 status.Text = "Finishing the active operation before closing…";
                 return;
             }
@@ -760,7 +761,7 @@ internal sealed class ChatWindow : Window
                     transcript + (after.Length > 0 && !char.IsWhiteSpace(after[0]) ? " " : "");
                 string next = before + insert + after;
                 if (next.Length > draft.MaxLength || string.IsNullOrWhiteSpace(next) ||
-                    next.Any(c => char.IsControl(c) && c != '\\r' && c != '\\n' && c != '\\t'))
+                    next.Any(c => char.IsControl(c) && c != '\r' && c != '\n' && c != '\t'))
                 { status.Text = "Transcript rejected: size or invalid text. Draft preserved."; return; }
                 draft.Text = next;
                 draft.Select(before.Length + insert.Length, 0);
@@ -772,8 +773,8 @@ internal sealed class ChatWindow : Window
         catch (Exception) { status.Text = "Local transcription failed. Draft preserved."; }
         finally
         {
-            capture.Dispose();
-            MicrophoneRecorder.EraseTemporaryRecording(wav ?? capture.FilePath);
+            try { capture.Dispose(); }
+            finally { MicrophoneRecorder.EraseTemporaryRecording(wav ?? capture.FilePath); }
             recorder = null;
             speechFinishing = false;
             recordingDraft = speechExePath = speechModelPath = "";
