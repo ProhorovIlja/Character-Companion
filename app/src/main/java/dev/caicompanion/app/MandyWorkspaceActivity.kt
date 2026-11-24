@@ -57,6 +57,8 @@ class MandyWorkspaceActivity : Activity() {
     private lateinit var historyScroll: ScrollView
     private lateinit var status: TextView
     private var current: Snapshot? = null
+    // Explicitly approved model for this exact selection; never persisted or reused across characters.
+    private var approvedModel: Pair<NativeChatWorkspace.Ticket, String>? = null
     private var editor: EditText? = null
     private var busy = false
     private val stopped = AtomicBoolean(false)
@@ -198,9 +200,10 @@ class MandyWorkspaceActivity : Activity() {
                 if (!alive()) return@runOnUiThread
                 busy = false
                 result.onSuccess {
+                    if (approvedModel?.first != it.ticket || it.models.none { model -> model.sha256 == approvedModel?.second }) approvedModel = null
                     current = it
                     render(it)
-                    status.text = if (BuildConfig.MANDY_EMBEDDED_PREVIEW) "Experimental local inference • select a trusted model per send" else "Local workspace • embedded build unavailable"
+                    status.text = if (BuildConfig.MANDY_EMBEDDED_PREVIEW) "Local workspace · experimental inference" else "Local workspace • embedded build unavailable"
                     afterSuccess(it)
                 }.onFailure {
                     // Preserve the visible editor; do not reset or overwrite damaged files.
@@ -372,7 +375,7 @@ class MandyWorkspaceActivity : Activity() {
             panel.addView(label("Local model required for Send", 12f))
         // Scroll only when displaying a fresh snapshot, not on every token.
         val scroll = historyScroll
-        scroll.post { if (alive() && historyScroll === scroll) scroll.fullScroll(View.FOCUS_DOWN) }
+        scroll.post { if (alive() && historyScroll === scroll) scroll.scrollTo(0, (messages.height - scroll.height).coerceAtLeast(0)) }
     }
 
     private fun showWorkspaceSettings(s: Snapshot) {
@@ -386,6 +389,10 @@ class MandyWorkspaceActivity : Activity() {
             options += ("Performance · " + performancePreset().label) to { choosePerformancePreset() }
             options += "Release loaded model" to { saveAnd { resident.close() } }
             options += "Refresh model inventory" to { saveAnd {} }
+            if (approvedModel != null) options += "Forget approved chat model" to {
+                approvedModel = null
+                status.text = "Model approval cleared. Choose a model on the next Send."
+            }
         }
         options += "Create character" to { editProfile(null) }
         val profile = s.ticket?.let { t -> s.profiles.first { it.id == t.key.character } }
@@ -468,14 +475,25 @@ class MandyWorkspaceActivity : Activity() {
         val ticket = s.ticket ?: return
         val draft = editor?.text?.toString() ?: return
         if (s.draft.pending == null && draft.isBlank()) { editor?.error = "Enter a message"; return }
+        if (!resumed || busy || !alive() || current?.ticket != ticket || current !== s) return
         val preset = performancePreset()
+        val approved = approvedModel?.takeIf { it.first == ticket && s.models.any { model -> model.sha256 == it.second } }
+        if (approved != null) {
+            generate(ticket, draft, approved.second, s.draft.pending != null, mode, preset)
+            return
+        }
         val labels = s.models.map { it.sha256 + "\nBytes: " + it.bytes }.toTypedArray()
         AlertDialog.Builder(this).setTitle("Choose a trusted local model").setItems(labels) { _, index ->
             val model = s.models[index]
             AlertDialog.Builder(this).setTitle("Experimental inference")
-                .setMessage("Only continue if you trust the publisher of this file. Real model compatibility is not yet verified. This may be slow or fail. No network fallback.\nPreset: " + preset.label + "\nSHA-256: " + model.sha256)
+                .setMessage("Approve this model for the current conversation selection? Only use models from trusted publishers. The model is verified by digest before use; no network fallback. Clear approval in Settings.\nPreset: " + preset.label + "\nSHA-256: " + model.sha256)
                 .setNegativeButton(android.R.string.cancel, null)
-                .setPositiveButton("Generate locally") { _, _ -> generate(ticket, draft, model.sha256, s.draft.pending != null, mode, preset) }.show()
+                .setPositiveButton("Approve and send") { _, _ ->
+                    if (resumed && !busy && alive() && current === s && current?.ticket == ticket && editor?.text?.toString() == draft) {
+                        approvedModel = ticket to model.sha256
+                        generate(ticket, draft, model.sha256, s.draft.pending != null, mode, preset)
+                    }
+                }.show()
         }.setNegativeButton(android.R.string.cancel, null).show()
     }
     private fun generate(ticket: NativeChatWorkspace.Ticket, draft: String, sha: String, retry: Boolean, mode: String, preset: InferencePreset) {
@@ -486,6 +504,8 @@ class MandyWorkspaceActivity : Activity() {
         suspendInputs(panel, states)
         val preview = label("Verifying and loading model…")
         messages.addView(preview)
+        val previewScroll = historyScroll
+        previewScroll.post { if (alive() && historyScroll === previewScroll && busy) previewScroll.scrollTo(0, (messages.height - previewScroll.height).coerceAtLeast(0)) }
         cancelGeneration.visibility = View.VISIBLE
         cancelGeneration.isEnabled = true
         status.text = "Experimental generation"
@@ -508,7 +528,14 @@ class MandyWorkspaceActivity : Activity() {
                             lastUpdate = now
                             val visibleText = text.toString()
                             runOnUiThread {
-                                if (alive() && busy && current?.ticket == origin && !stopped.get()) preview.text = visibleText
+                                if (alive() && busy && current?.ticket == origin && !stopped.get() && preview.parent === messages) {
+                                    val nearBottom = !previewScroll.canScrollVertically(1)
+                                    preview.text = visibleText
+                                    if (nearBottom) previewScroll.post {
+                                        if (alive() && busy && current?.ticket == origin && preview.parent === messages && !stopped.get())
+                                            previewScroll.scrollTo(0, (messages.height - previewScroll.height).coerceAtLeast(0))
+                                    }
+                                }
                             }
                         }
                     }
@@ -575,7 +602,7 @@ class MandyWorkspaceActivity : Activity() {
         AlertDialog.Builder(this).setTitle("Trusted offline speech model").setItems(labels) { _, index ->
             val model = s.speechModels[index]
             AlertDialog.Builder(this).setTitle("Experimental offline dictation")
-                .setMessage("Use only a trusted multilingual model. The microphone and recognition remain local. The result must be reviewed in the draft; speech detection is not validated. The loaded chat model will be released before recording.\nSHA-256: " + model.sha256)
+                .setMessage("Use only a trusted multilingual model. The microphone and recognition remain local. Speech detection is not validated. Stop keeps an editable transcript; Stop and send explicitly requests a chat response, so use it only if you accept transcription errors. The loaded chat model will be released before recording.\nSHA-256: " + model.sha256)
                 .setNegativeButton(android.R.string.cancel, null)
                 .setPositiveButton("Choose language") { _, _ ->
                     val languages = MandyLanguage.entries
@@ -600,7 +627,7 @@ class MandyWorkspaceActivity : Activity() {
         val draft = field.text.toString()
         val start = field.selectionStart.takeIf { it >= 0 } ?: draft.length
         val end = field.selectionEnd.takeIf { it >= 0 } ?: start
-        val canSend = offline == null && BuildConfig.MANDY_EMBEDDED_PREVIEW && s.draft.pending == null && s.models.isNotEmpty()
+        val canSend = BuildConfig.MANDY_EMBEDDED_PREVIEW && s.draft.pending == null && s.models.isNotEmpty()
         val token = runCatching { dictation.begin(ticket, draft, start, end, canSend) }.getOrElse {
             status.text = "Draft is invalid for dictation"; return
         }
@@ -718,7 +745,7 @@ class MandyWorkspaceActivity : Activity() {
         val token = speechToken ?: return
         if (!resumed || !stopSpeech.isEnabled || (send && !sendSpeech.isEnabled)) return
         val offline = offlineSpeech
-        if (offline != null && (send || !offline.requestStop())) return
+        if (offline != null && !offline.requestStop()) return
         if (!dictation.stop(token, send)) return
         stopSpeech.isEnabled = false; sendSpeech.isEnabled = false
         status.text = "Transcribing…"
