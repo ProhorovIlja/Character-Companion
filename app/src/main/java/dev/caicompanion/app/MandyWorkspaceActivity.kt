@@ -461,9 +461,21 @@ class MandyWorkspaceActivity : Activity() {
             } else chooseSpeechLanguage(s)
         })
         val canSend = BuildConfig.MANDY_EMBEDDED_PREVIEW && s.models.isNotEmpty()
-        actions.addView(chatAction(if (s.draft.pending == null) "send" else "retry",
+        val sendAction = chatAction(if (s.draft.pending == null) "send" else "retry",
             if (!canSend) "Send unavailable: local model required" else if (s.draft.pending == null) "Send message" else "Retry pending message",
-            canSend) { chooseModel(s) })
+            canSend) { chooseModel(s) }
+        fun updateSendAction() {
+            val enabled = canSend && !busy && (s.draft.pending != null || field.text.isNotBlank())
+            sendAction.isEnabled = enabled
+            sendAction.alpha = if (enabled) 1f else .42f
+        }
+        field.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(text: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(text: CharSequence?, start: Int, before: Int, count: Int) { updateSendAction() }
+            override fun afterTextChanged(text: android.text.Editable?) = Unit
+        })
+        updateSendAction()
+        actions.addView(sendAction)
         normalActions = actions
         composer.addView(actions)
         composer.addView(cancelGeneration, LinearLayout.LayoutParams(-1, -2))
