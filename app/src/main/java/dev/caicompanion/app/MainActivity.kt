@@ -871,8 +871,10 @@ class MainActivity : Activity() {
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             val normalized = OfflineBookmarkEditor.normalize(
                 titleInput.text.toString(), urlInput.text.toString())
-            if (normalized == null || !store.addBookmark(normalized.first, normalized.second)) {
+            if (normalized == null) {
                 urlInput.error = getString(R.string.hub_bookmark_invalid)
+            } else if (!store.addBookmark(normalized.first, normalized.second)) {
+                urlInput.error = getString(R.string.library_full_pinned)
             } else {
                 dialog.dismiss()
                 onSaved()
@@ -928,20 +930,25 @@ class MainActivity : Activity() {
             setBackgroundResource(R.drawable.settings_action)
         }
         layout.addView(sort)
+        val favorites = android.widget.CheckBox(this).apply {
+            setText(R.string.library_favorites_only)
+            setTextColor(TEXT)
+        }
+        layout.addView(favorites)
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         layout.addView(list)
         var index = NativeLibrarySearch.Index(store.listBookmarks(), store.pinnedBookmarks())
         var rendered: List<Pair<String, String>>? = null
         var renderedPins = emptySet<String>()
         fun refresh(query: String) {
-            val saved = index.filter(query, order = store.libraryOrder)
+            val saved = index.filter(query, order = store.libraryOrder, favoritesOnly = favorites.isChecked)
             val pins = saved.map { it.second }.filter(index::isPinned).toSet()
             if (saved == rendered && pins == renderedPins) return
             rendered = saved
             renderedPins = pins
             list.removeAllViews()
             if (saved.isEmpty()) {
-                list.addView(infoLabel(getString(R.string.hub_empty)))
+                list.addView(infoLabel(getString(if (favorites.isChecked) R.string.library_favorites_empty else R.string.hub_empty)))
                 return
             }
             for ((title, url) in saved) {
@@ -986,6 +993,10 @@ class MainActivity : Activity() {
                     refresh(search.text.toString())
                     dialog.dismiss()
                 }.setNegativeButton(R.string.cancel, null).show()
+        }
+        favorites.setOnCheckedChangeListener { _, _ ->
+            rendered = null
+            refresh(search.text.toString())
         }
         refreshNativeBookmarks = {
             index = NativeLibrarySearch.Index(store.listBookmarks(), store.pinnedBookmarks())
@@ -1108,7 +1119,8 @@ class MainActivity : Activity() {
             .setItems(options.toTypedArray()) { _, selected ->
                 when (selected) {
                     0 -> { if (url == null) showToast(getString(R.string.hub_bookmark_invalid))
-                        else if (store.addBookmark(webView.title ?: "Character.AI", url)) showToast(getString(R.string.bookmark_saved)) }
+                        else if (store.addBookmark(webView.title ?: "Character.AI", url)) showToast(getString(R.string.bookmark_saved))
+                        else showToast(getString(R.string.library_full_pinned)) }
                     1 -> { if (url == null) showToast(getString(R.string.hub_bookmark_invalid))
                         else { store.removeBookmark(url); showToast(getString(R.string.bookmark_removed)) } }
                     else -> saved.getOrNull(selected - 2)?.second?.let(::openFirstPartyPage)

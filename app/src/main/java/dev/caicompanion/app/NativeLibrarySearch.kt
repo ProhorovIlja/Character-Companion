@@ -19,6 +19,25 @@ object NativeLibrarySearch {
         return pins.mapNotNull(UrlPolicy::sanitizeBookmark).filter { it in allowed }.toSet()
     }
 
+    /** Replace an existing bookmark in place; when full, evict only the oldest unpinned entry. */
+    fun save(bookmarks: List<Pair<String, String>>, pins: Collection<String>,
+             item: Pair<String, String>): List<Pair<String, String>>? {
+        val next = bookmarks.toMutableList()
+        val existing = next.indexOfFirst { it.second == item.second }
+        if (existing >= 0) {
+            next[existing] = item
+            return next
+        }
+        val protected = validPins(bookmarks, pins)
+        while (next.size >= 100) {
+            val evict = next.indexOfFirst { it.second !in protected }
+            if (evict < 0) return null
+            next.removeAt(evict)
+        }
+        next.add(item)
+        return next
+    }
+
     class Index(bookmarks: List<Pair<String, String>>, pins: Collection<String> = emptySet()) {
         private data class Entry(val title: String, val url: String, val searchable: String, val titleKey: String)
         private val entries = bookmarks.mapNotNull { (rawTitle, rawUrl) ->
@@ -37,7 +56,7 @@ object NativeLibrarySearch {
         private val newest = prioritize(entries.asReversed())
         private val alphabetical = prioritize(entries.sortedWith(compareBy<Entry> { it.titleKey }.thenBy { it.url }))
 
-        fun filter(input: String, limit: Int = 100, order: Order = Order.SAVED): List<Pair<String, String>> {
+        fun filter(input: String, limit: Int = 100, order: Order = Order.SAVED, favoritesOnly: Boolean = false): List<Pair<String, String>> {
             val cap = limit.coerceIn(0, 100)
             if (cap == 0) return emptyList()
             val terms = fold(input.take(80)).trim().split(whitespace)
@@ -50,6 +69,7 @@ object NativeLibrarySearch {
                 Order.TITLE -> alphabetical
             }
             for (entry in ordered) {
+                if (favoritesOnly && entry.url !in pinned) continue
                 // Keep aliases searchable; deduplicate only after matching.
                 if (terms.all { entry.searchable.contains(it) } && seen.add(entry.url)) {
                     matched.add(entry.title to entry.url)

@@ -185,6 +185,18 @@ fun main() {
     check(pinnedLibrary.filter("", order = NativeLibrarySearch.Order.TITLE).first().first == "Zebra")
     check(pinnedLibrary.filter("", order = NativeLibrarySearch.Order.NEWEST).first().first == "Zebra")
     check(pinnedLibrary.filter("Alpha").single().first == "Alpha")
+    check(pinnedLibrary.filter("", favoritesOnly = true).map { it.first } == listOf("Zebra"))
+    check(pinnedLibrary.filter("Alpha", favoritesOnly = true).isEmpty())
+    check(pinnedLibrary.filter("Zebra", favoritesOnly = true).single().first == "Zebra")
+    check(NativeLibrarySearch.save(pinList, setOf(pinList[0].second), "New title" to pinList[0].second) ==
+        listOf("New title" to pinList[0].second, pinList[1]))
+    val fullLibrary = (0..99).map { "Item $it" to "https://character.ai/chat/$it" }
+    val allPins = fullLibrary.map { it.second }.toSet()
+    val newItem = "New" to "https://character.ai/chat/new"
+    check(NativeLibrarySearch.save(fullLibrary, allPins, newItem) == null)
+    val retainedLibrary = NativeLibrarySearch.save(fullLibrary, allPins - fullLibrary[1].second, newItem)!!
+    check(retainedLibrary.size == 100 && retainedLibrary.first() == fullLibrary.first())
+    check(fullLibrary[1] !in retainedLibrary && retainedLibrary.last() == newItem)
     check(NativeLibrarySearch.validPins(pinList, listOf("https://character.ai/chat/a", "https://character.ai/chat/c")) == setOf("https://character.ai/chat/a"))
     val orderedLibrary = NativeLibrarySearch.Index(listOf(
         "Zebra" to "https://character.ai/chat/a",

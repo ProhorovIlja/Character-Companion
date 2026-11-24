@@ -116,8 +116,7 @@ class SettingsStore(context: Context) {
     fun addBookmark(title: String, url: String): Boolean {
         val normalized = OfflineBookmarkEditor.normalize(title, url) ?: return false
         synchronized(historyLock) {
-            val data = listBookmarks().filterNot { it.second == normalized.second }.takeLast(99).toMutableList()
-            data.add(normalized)
+            val data = NativeLibrarySearch.save(listBookmarks(), rawPins(), normalized) ?: return false
             writeBookmarks(data)
         }
         return true

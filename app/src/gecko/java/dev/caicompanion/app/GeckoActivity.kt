@@ -290,7 +290,9 @@ class GeckoActivity : Activity() {
                 onSaved()
                 Toast.makeText(this, R.string.bookmark_saved, Toast.LENGTH_SHORT).show()
             } else {
-                (if (fixedUrl == null) link else title).error = getString(R.string.hub_bookmark_invalid)
+                (if (fixedUrl == null) link else title).error = getString(
+                    if (OfflineBookmarkEditor.normalize(title.text.toString(), url) == null)
+                        R.string.hub_bookmark_invalid else R.string.library_full_pinned)
             }
         }
     }
@@ -318,6 +320,11 @@ class GeckoActivity : Activity() {
         val sort = Button(this).apply { isAllCaps = false }
         layout.addView(search)
         layout.addView(sort)
+        val favorites = android.widget.CheckBox(this).apply {
+            setText(R.string.library_favorites_only)
+            setTextColor(fg)
+        }
+        layout.addView(favorites)
         layout.addView(empty)
         layout.addView(list, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, dp(300)))
@@ -325,7 +332,7 @@ class GeckoActivity : Activity() {
         var index = NativeLibrarySearch.Index(settings.listBookmarks(), settings.pinnedBookmarks())
         var visiblePins = emptySet<String>()
         val searchOnly: () -> Unit = {
-            val next = index.filter(search.text.toString(), order = settings.libraryOrder)
+            val next = index.filter(search.text.toString(), order = settings.libraryOrder, favoritesOnly = favorites.isChecked)
             val pins = next.map { it.second }.filter(index::isPinned).toSet()
             if (next != visible || pins != visiblePins) {
                 visible = next
@@ -337,6 +344,7 @@ class GeckoActivity : Activity() {
                 })
                 adapter.notifyDataSetChanged()
             }
+            empty.setText(if (favorites.isChecked) R.string.library_favorites_empty else R.string.hub_empty)
             empty.visibility = if (visible.isEmpty()) View.VISIBLE else View.GONE
         }
         fun updateSortLabel() {
@@ -352,6 +360,7 @@ class GeckoActivity : Activity() {
                     dialog.dismiss()
                 }.setNegativeButton(R.string.cancel, null).show()
         }
+        favorites.setOnCheckedChangeListener { _, _ -> searchOnly() }
         val refresh: () -> Unit = {
             index = NativeLibrarySearch.Index(settings.listBookmarks(), settings.pinnedBookmarks())
             searchOnly()
