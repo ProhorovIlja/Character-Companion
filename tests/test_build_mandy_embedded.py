@@ -122,13 +122,16 @@ class BuildGate(unittest.TestCase):
         out = scratch / 'whisper-output'
         out.mkdir(parents=True)
         (out / 'libmandy_whisper.so').write_bytes(elf())
-        with patch.object(build.subprocess, 'run') as runner:
+        with patch.object(build.subprocess, 'run') as runner, \
+             patch.object(build, 'ndk_tools', return_value=('nm', 'readelf')), \
+             patch.object(build, 'audit_linkage') as linkage:
             stage, sha = build.build_whisper(self.root, sdk, self.root / 'checkout', scratch, '')
         self.assertEqual(runner.call_count, 2)
         self.assertIn('-DANDROID_STL=c++_static', runner.call_args_list[0].args[0])
         self.assertIn('-DCMAKE_BUILD_TYPE=Release', runner.call_args_list[0].args[0])
         self.assertEqual(runner.call_args_list[1].args[0][-2:], ['--target', 'mandy_whisper'])
         self.assertEqual(sha, build.digest(stage / 'arm64-v8a/libmandy_whisper.so'))
+        linkage.assert_called_once_with(stage / 'arm64-v8a/libmandy_whisper.so', 'nm', 'readelf')
 
     def test_missing_checkout(self):
         with self.assertRaises(ValueError):

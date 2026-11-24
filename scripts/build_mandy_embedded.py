@@ -11,6 +11,7 @@ import tempfile
 import zipfile
 
 from check_apk_native import audit, check_elf
+from check_whisper_linkage import audit_linkage, ndk_tools
 
 PIN = 'dbaf582af41941ebbfc4384fb9fa1b40dff7a510'
 WRAPPER_SHA = '7a9ce74cff467ca1bf60a4fcd9f05185acceda4d0f382434d393e17864262c5d'
@@ -81,8 +82,11 @@ def build_whisper(root, sdk, checkout, scratch, suffix):
                     '-DANDROID_PLATFORM=android-29', '-DANDROID_STL=c++_static', '-DCMAKE_BUILD_TYPE=Release',
                     '-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + str(out), '-DMANDY_WHISPER_DIR=' + str(checkout)], check=True)
     subprocess.run([executable, '--build', str(build), '--target', 'mandy_whisper'], check=True)
+    binary = out / 'libmandy_whisper.so'
     stage = scratch / 'jni'
-    return stage, stage_whisper(out / 'libmandy_whisper.so', stage)
+    sha = stage_whisper(binary, stage)
+    audit_linkage(stage / 'arm64-v8a/libmandy_whisper.so', *ndk_tools(sdk))
+    return stage, sha
 
 
 def check_package(apk, whisper_sha=None):
@@ -139,6 +143,7 @@ def main():
         if whisper is not None:
             check_whisper_checkout(whisper)
             check_whisper_toolchain(sdk, suffix)
+            ndk_tools(sdk)
         print('PREFLIGHT=PASSED', flush=True)
         if not args.build:
             return 0

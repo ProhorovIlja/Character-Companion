@@ -1,0 +1,13 @@
+# Native Whisper linkage gate
+
+The optional manual combined Android build now locates llvm-nm and llvm-readelf in the pinned NDK and checks the staged ARM64 Whisper shared library before invoking Gradle. The previous architecture/PT_LOAD alignment check and APK digest verification remain unchanged. No source download, new runtime dependency, workflow invocation or background task.
+
+The linkage gate expects only the V2 JNI entry point as a defined dynamic text symbol, the exact libmandy_whisper.so SONAME, no RPATH/RUNPATH or text relocations, and no duplicate or non-allowlisted DT_NEEDED dependencies. The initial CPU-only isolated-library allowlist is libc.so, libm.so, libdl.so, liblog.so and libandroid.so. This is intentionally conservative; inspect any future legitimate additional dependency before changing the list. In particular, the standalone c++_static build must not unexpectedly import libc++_shared.so, libggml.so or libwhisper.so. Existing library bytes are hashed through packaging; the new gate is a static check, not proof of correct C++ runtime isolation or successful co-loading. No change to the existing llama binary or app UI. The actual NDK LLVM tool output and real upstream Whisper binary remain unvalidated.
+
+Manual regression from repository root:
+    python -m unittest discover -s tests -p test_check_whisper_linkage.py
+    python -m unittest discover -s tests -p test_build_mandy_embedded.py
+
+Validation: 21 unittest methods passed, 14 previous build-gate methods and seven new linkage-gate methods. One new test cross-linked real ARM64 ELF fixtures with host Clang/LLD, verified their existing 16 KiB alignment and inspected them with GNU nm/readelf. The test accepted one isolated library and rejected an additional exported GGML-like symbol, a shared GGML-like dependency and an embedded runtime search path. The fixtures are tiny synthetic libraries, not Android/Whisper runtime artifacts. No fixture binary is checked in or distributed. The host test skips when the necessary Linux tools are missing. Exact four Python source blob hashes checked. No actual SDK/NDK, APK, device test, runtime benchmark or Windows change.
+
+Research: https://llvm.org/docs/CommandGuide/llvm-nm.html ; https://llvm.org/docs/CommandGuide/llvm-readelf.html ; https://developer.android.com/ndk/guides/cpp-support ; https://developer.android.com/ndk/guides/stable_apis ; https://developer.android.com/guide/practices/page-sizes . The Android C++ guidance warns about multiple static C++ runtimes; the restricted JNI boundary reduces exposure but does not guarantee safety. Prefer actual combined-load testing and measure footprint before selecting final native architecture. No external implementation code copied.
