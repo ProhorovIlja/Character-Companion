@@ -7,7 +7,19 @@ plugins {
 val companionSdkMinor = providers.gradleProperty("companionSdkMinor").orElse("2").get().toInt()
 require(companionSdkMinor in setOf(0, 2)) { "Only Android SDK 37.0 and 37.2 are supported" }
 
+// Embedded preview is explicitly enabled with a local pinned source checkout.
+val mandyLlamaDir = providers.gradleProperty("mandyLlamaDir").orNull
+
 android {
+    if (mandyLlamaDir != null) {
+        ndkVersion = "29.0.13113456"
+        externalNativeBuild {
+            cmake {
+                path = file("src/main/cpp/mandy/CMakeLists.txt")
+                version = "3.31.6"
+            }
+        }
+    }
     namespace = "dev.caicompanion.app"
     // Explicit minor API selection: GeckoView = 37.2; legacy WebView = 37.0.
     compileSdk {
@@ -21,6 +33,15 @@ android {
         targetSdk = 36
         versionCode = 38
         versionName = "0.38.0-rc1"
+        if (mandyLlamaDir != null) {
+            ndk { abiFilters.add("arm64-v8a") }
+            externalNativeBuild {
+                cmake {
+                    arguments += "-DMANDY_LLAMA_DIR=" + rootProject.file(mandyLlamaDir).absolutePath
+                    targets += "mandy_llama"
+                }
+            }
+        }
     }
     flavorDimensions += "browserEngine"
     productFlavors {
