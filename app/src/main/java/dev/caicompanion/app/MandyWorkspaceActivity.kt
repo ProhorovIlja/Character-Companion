@@ -488,6 +488,27 @@ class MandyWorkspaceActivity : Activity() {
             check(edit.commit())
         }
     }
+    private fun encodePalette(p: Map<String, Int>): String {
+        require(paletteError(p) == null)
+        val colors = org.json.JSONObject()
+        colorRoles.forEach { colors.put(it.key, colorHex(p.getValue(it.key))) }
+        return org.json.JSONObject().put("schema", 1).put("name", "Custom").put("colors", colors).toString(2)
+    }
+    private fun decodePalette(raw: String): Map<String, Int>? = runCatching {
+        require(raw.length in 1..2048)
+        val root = org.json.JSONObject(raw)
+        require(root.opt("schema") == 1 && root.keys().asSequence().toSet() == setOf("schema", "name", "colors"))
+        require(root.opt("name") is String && root.getString("name").length in 1..80)
+        val colors = root.getJSONObject("colors")
+        require(colors.keys().asSequence().toSet() == colorRoles.map { it.key }.toSet())
+        val p = colorRoles.associate { role ->
+            val value = colors.opt(role.key) as? String ?: error("Invalid color")
+            require(value.matches(Regex("#[0-9a-fA-F]{6}")))
+            role.key to android.graphics.Color.parseColor(value)
+        }
+        require(paletteError(p) == null)
+        p
+    }.getOrNull()
     private fun editPalette() {
         val saved = savedPalette()
         val fields = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(8), dp(16), dp(8)) }
@@ -500,6 +521,42 @@ class MandyWorkspaceActivity : Activity() {
         }
         val warning = label("Use #RRGGBB. Text and action contrast is checked before applying.", 13f)
         fields.addView(warning)
+        fun candidate(): Map<String, Int>? {
+            val p = mutableMapOf<String, Int>()
+            for ((role, field) in editors) {
+                val value = field.text.toString().trim()
+                if (!value.matches(Regex("#[0-9a-fA-F]{6}"))) {
+                    field.error = "Enter #RRGGBB"; return null
+                }
+                p[role.key] = android.graphics.Color.parseColor(value)
+            }
+            val error = paletteError(p)
+            if (error != null) { warning.text = error; return null }
+            return p
+        }
+        fields.addView(button("Copy theme JSON") {
+            val p = candidate()
+            if (p != null) {
+                val clipboard = getSystemService(android.content.ClipboardManager::class.java)
+                if (clipboard != null) {
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Mandy theme", encodePalette(p)))
+                    warning.text = "Theme copied. No chat or account data included."
+                }
+            }
+        })
+        fields.addView(button("Import theme JSON") {
+            val source = input("Paste theme JSON", 2048)
+            val importer = AlertDialog.Builder(this).setTitle("Import theme").setView(source)
+                .setNegativeButton("Cancel", null).setPositiveButton("Load fields", null).create()
+            importer.show()
+            importer.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val p = decodePalette(source.text.toString())
+                if (p == null) { source.error = "Invalid theme or insufficient contrast"; return@setOnClickListener }
+                editors.forEach { (role, field) -> field.setText(colorHex(p.getValue(role.key))) }
+                warning.text = "Theme loaded into fields. Apply to save."
+                importer.dismiss()
+            }
+        })
         val dialog = AlertDialog.Builder(this).setTitle("Custom colors")
             .setView(ScrollView(this).apply { addView(fields) })
             .setNegativeButton("Cancel", null).setNeutralButton("Reset fields", null)
@@ -513,16 +570,7 @@ class MandyWorkspaceActivity : Activity() {
             warning.text = "Preset colors restored to fields. Apply to save."
         }
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-            val p = mutableMapOf<String, Int>()
-            for ((role, field) in editors) {
-                val value = field.text.toString().trim()
-                if (!value.matches(Regex("#[0-9a-fA-F]{6}"))) {
-                    field.error = "Enter #RRGGBB"; return@setOnClickListener
-                }
-                p[role.key] = android.graphics.Color.parseColor(value)
-            }
-            val error = paletteError(p)
-            if (error != null) { warning.text = error; return@setOnClickListener }
+            val p = candidate() ?: return@setOnClickListener
             dialog.dismiss()
             applyAppearance(p.toMap())
         }
