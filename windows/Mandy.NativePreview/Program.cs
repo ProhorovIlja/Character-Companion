@@ -901,6 +901,7 @@ internal sealed class ChatWindow : Window
         UpdateControls();
         string? wav = null;
         bool sendRequested = false;
+        bool transcriptInserted = false;
         try
         {
             if (discard)
@@ -925,6 +926,7 @@ internal sealed class ChatWindow : Window
                     next.Any(c => char.IsControl(c) && c != '\r' && c != '\n' && c != '\t'))
                 { status.Text = "Transcript rejected: size or invalid text. Draft preserved."; return; }
                 draft.Text = next;
+                transcriptInserted = true;
                 draft.Select(before.Length + insert.Length, 0);
                 // Keep is an explicit save request. Persist before considering Send.
                 await Task.Run(() => workspace!.SaveDraft(next));
@@ -934,8 +936,8 @@ internal sealed class ChatWindow : Window
                 status.Text = "Dictation saved and ready to review.";
             }
         }
-        catch (OperationCanceledException) { status.Text = "Dictation cancelled. Draft preserved."; }
-        catch (Exception) { status.Text = "Local transcription failed. Draft preserved."; }
+        catch (OperationCanceledException) { status.Text = transcriptInserted ? "Send cancelled. Transcript retained in draft." : "Dictation cancelled. Draft preserved."; }
+        catch (Exception) { status.Text = transcriptInserted ? "Transcript retained in composer; draft save failed." : "Local transcription failed. Draft preserved."; }
         finally
         {
             try { capture.Dispose(); }
