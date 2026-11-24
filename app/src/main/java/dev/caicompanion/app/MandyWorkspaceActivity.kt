@@ -316,14 +316,14 @@ class MandyWorkspaceActivity : Activity() {
             requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 940)
             return
         }
-        val languages = VoiceRecognitionOptions.languages
-        val names = languages.map { tag -> tag?.let { java.util.Locale.forLanguageTag(it).getDisplayName(resources.configuration.locales[0]) } ?: "Device language" }
+        val languages = MandyLanguage.entries
+        val names = languages.map { it.displayName }
         AlertDialog.Builder(this).setTitle("On-device dictation language").setItems(names.toTypedArray()) { _, index ->
             beginSpeech(s, languages[index])
         }.setNegativeButton(android.R.string.cancel, null).show()
     }
 
-    private fun beginSpeech(s: Snapshot, language: String?) {
+    private fun beginSpeech(s: Snapshot, language: MandyLanguage) {
         val ticket = s.ticket ?: return
         val field = editor ?: return
         if (!resumed || busy || current?.ticket != ticket || Build.VERSION.SDK_INT < 31 ||
@@ -395,7 +395,7 @@ class MandyWorkspaceActivity : Activity() {
                 putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
-                if (language != null) putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, language.tag)
             }
             engine.startListening(intent)
         } catch (_: Exception) {
