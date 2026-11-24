@@ -546,7 +546,7 @@ internal sealed class ChatWindow : Window
         field.MinHeight = 27; panel.Children.Add(field);
         return panel;
     }
-    private static FrameworkElement Buttons(params Button[] buttons)
+    private static WrapPanel Buttons(params Button[] buttons)
     {
         var panel = new WrapPanel { Margin = new Thickness(0,5,0,5) };
         foreach (var button in buttons)
