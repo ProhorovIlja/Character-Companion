@@ -46,7 +46,7 @@ object RoleplayToolkitUi {
         val slots = RoleplayToolkit.Slot.entries
         val labels = slots.map { activity.getString(title(it)) } + listOf(
             activity.getString(R.string.roleplay_context), activity.getString(R.string.roleplay_web_search),
-            activity.getString(R.string.roleplay_dice))
+            activity.getString(R.string.roleplay_dice), activity.getString(R.string.memory_bank_title))
         showPrivate(activity, AlertDialog.Builder(activity).setTitle(R.string.roleplay_title)
             .setItems(labels.toTypedArray()) { _, index ->
                 if (active(activity)) {
@@ -56,6 +56,7 @@ object RoleplayToolkitUi {
                         0 -> context(activity)
                         1 -> search(activity)
                         2 -> dice(activity)
+                        3 -> memoryBank(activity)
                     }
                 }
             }.setNegativeButton(R.string.close, null).create())
@@ -224,6 +225,122 @@ object RoleplayToolkitUi {
                         }
                     }
                 }.setNegativeButton(R.string.cancel, null).create())
+        }
+    }
+
+    private fun memoryBank(activity: Activity) {
+        val entries = runCatching { MemoryBankStore.load(activity) }.getOrElse {
+            toast(activity, R.string.roleplay_failed)
+            return
+        }
+        val profiles = MemoryBank.profiles(entries)
+        val labels = profiles + activity.getString(R.string.memory_bank_new)
+        showPrivate(activity, AlertDialog.Builder(activity).setTitle(R.string.memory_bank_title)
+            .setItems(labels.toTypedArray()) { _, index ->
+                if (active(activity)) {
+                    val profile = profiles.getOrNull(index)
+                    if (profile != null) profileMenu(activity, entries, profile)
+                    else {
+                        val input = privateEditor(activity, MemoryBank.MAX_PROFILE, true)
+                        val dialog = AlertDialog.Builder(activity).setTitle(R.string.memory_bank_profile)
+                            .setMessage(R.string.memory_bank_profile_help).setView(input)
+                            .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.confirm, null).create()
+                        showPrivate(activity, dialog)
+                        if (dialog.isShowing) dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                            val name = input.text.toString().trim()
+                            if (!MemoryBank.validProfile(name)) input.error = activity.getString(R.string.roleplay_invalid)
+                            else { dialog.dismiss(); profileMenu(activity, entries, name) }
+                        }
+                    }
+                }
+            }.setNegativeButton(R.string.close, null).create())
+    }
+
+    private fun profileMenu(activity: Activity, entries: List<MemoryBank.Entry>, profile: String) {
+        val items = MemoryBank.forProfile(entries, profile)
+        val labels = listOf(activity.getString(R.string.memory_bank_add), activity.getString(R.string.memory_bank_recall)) +
+            items.map { it.title }
+        showPrivate(activity, AlertDialog.Builder(activity).setTitle(profile)
+            .setItems(labels.toTypedArray()) { _, index ->
+                if (active(activity)) when (index) {
+                    0 -> memoryEdit(activity, entries, profile, null)
+                    1 -> memoryRecall(activity, entries, profile)
+                    else -> items.getOrNull(index - 2)?.let { entry ->
+                        showPrivate(activity, AlertDialog.Builder(activity).setTitle(entry.title)
+                            .setItems(arrayOf(activity.getString(R.string.character_draft_edit),
+                                activity.getString(R.string.character_draft_copy), activity.getString(R.string.character_draft_library_delete))) { _, action ->
+                                if (active(activity)) when (action) {
+                                    0 -> memoryEdit(activity, entries, profile, entry)
+                                    1 -> copy(activity, entry.body)
+                                    2 -> showPrivate(activity, AlertDialog.Builder(activity).setMessage(R.string.memory_bank_delete)
+                                        .setNegativeButton(R.string.cancel, null)
+                                        .setPositiveButton(R.string.confirm) { _, _ ->
+                                            if (active(activity)) toast(activity,
+                                                if (runCatching { MemoryBankStore.remove(activity, entry) }.isSuccess)
+                                                    R.string.roleplay_saved else R.string.roleplay_failed)
+                                        }.create())
+                                }
+                            }.setNegativeButton(R.string.close, null).create())
+                    }
+                }
+            }.setNegativeButton(R.string.close, null).create())
+    }
+
+    private fun memoryEdit(activity: Activity, entries: List<MemoryBank.Entry>, profile: String, existing: MemoryBank.Entry?) {
+        val title = privateEditor(activity, MemoryBank.MAX_TITLE, true).apply {
+            setHint(R.string.memory_bank_entry_title)
+            setText(existing?.title.orEmpty())
+            isEnabled = existing == null
+        }
+        val body = privateEditor(activity, MemoryBank.MAX_BODY).apply {
+            setHint(R.string.memory_bank_entry_body)
+            setText(existing?.body.orEmpty())
+        }
+        val content = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(title); addView(body)
+        }
+        val dialog = AlertDialog.Builder(activity).setTitle(profile)
+            .setMessage(R.string.memory_bank_edit_help).setView(content)
+            .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.roleplay_save, null).create()
+        showPrivate(activity, dialog)
+        if (!dialog.isShowing) return
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            if (!active(activity)) return@setOnClickListener
+            val entry = MemoryBank.Entry(profile, title.text.toString(), body.text.toString())
+            val next = MemoryBank.put(entries, entry)
+            if (next == null || (existing == null && next.size <= entries.size)) {
+                body.error = activity.getString(R.string.memory_bank_invalid)
+            } else if (runCatching { MemoryBankStore.put(activity, entries, entry) }.isSuccess) {
+                toast(activity, R.string.roleplay_saved); dialog.dismiss()
+            } else body.error = activity.getString(R.string.roleplay_failed)
+        }
+    }
+
+    private fun memoryRecall(activity: Activity, entries: List<MemoryBank.Entry>, profile: String) {
+        val input = privateEditor(activity, 512, true)
+        input.setHint(R.string.roleplay_query_hint)
+        val dialog = AlertDialog.Builder(activity).setTitle(R.string.memory_bank_recall)
+            .setMessage(R.string.memory_bank_recall_help).setView(input)
+            .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.confirm, null).create()
+        showPrivate(activity, dialog)
+        if (!dialog.isShowing) return
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            if (!active(activity)) return@setOnClickListener
+            val result = MemoryBank.recall(entries, profile, input.text.toString())
+            if (result == null || result.entries.isEmpty()) input.error = activity.getString(R.string.memory_bank_no_match)
+            else {
+                val packet = CharacterContext.compose(mapOf(RoleplayToolkit.Slot.MEMORY to result.text))
+                if (packet == null) input.error = activity.getString(R.string.roleplay_context_invalid)
+                else {
+                    dialog.dismiss()
+                    showPrivate(activity, AlertDialog.Builder(activity).setTitle(profile)
+                        .setMessage(activity.getString(R.string.memory_bank_recall_count, result.entries.size, result.omitted))
+                        .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.confirm) { _, _ ->
+                            if (active(activity)) previewContext(activity, packet)
+                        }.create())
+                }
+            }
         }
     }
 

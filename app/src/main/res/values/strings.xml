@@ -436,4 +436,18 @@
     <string name="roleplay_context_review">Review and edit before copying. Paste into the intended chat manually. The response depends on the model.</string>
     <string name="roleplay_query_hint">Enter a search query</string>
     <string name="roleplay_search_privacy">The selected search provider receives only this query. Local notes are not automatically added. Open results and copy relevant findings into the context.</string>
+    <string name="memory_bank_title">Character memory bank</string>
+    <string name="memory_bank_new">New profile</string>
+    <string name="memory_bank_profile">Profile name</string>
+    <string name="memory_bank_profile_help">Choose a unique character or story name. Names are matched without regard to case.</string>
+    <string name="memory_bank_add">Add memory</string>
+    <string name="memory_bank_recall">Recall memories</string>
+    <string name="memory_bank_entry_title">Topic</string>
+    <string name="memory_bank_entry_body">Fact, event or recap</string>
+    <string name="memory_bank_edit_help">Local save. Up to 96 total records, 2,000 characters per record. Existing titles cannot be changed.</string>
+    <string name="memory_bank_invalid">Check text, unique topic and available capacity.</string>
+    <string name="memory_bank_delete">Delete this memory?</string>
+    <string name="memory_bank_recall_help">Enter names, places or a topic. Exact word matching within the selected profile only.</string>
+    <string name="memory_bank_no_match">No matches or invalid query</string>
+    <string name="memory_bank_recall_count">Included: %1$d. Over budget: %2$d. Review context before copying.</string>
 </resources>

@@ -436,4 +436,18 @@
     <string name="roleplay_context_review">Проверьте и при необходимости измените текст перед копированием. Вставьте его в нужный чат вручную. Ответ зависит от модели.</string>
     <string name="roleplay_query_hint">Введите поисковый запрос</string>
     <string name="roleplay_search_privacy">Выбранный поисковый сервис получит только этот запрос. Локальные заметки не добавляются автоматически. Откройте результаты и скопируйте нужные сведения в контекст.</string>
+    <string name="memory_bank_title">Память персонажей</string>
+    <string name="memory_bank_new">Новый профиль</string>
+    <string name="memory_bank_profile">Имя профиля</string>
+    <string name="memory_bank_profile_help">Выберите уникальное имя персонажа или истории. Профили с одинаковыми именами объединяются без учёта регистра.</string>
+    <string name="memory_bank_add">Добавить воспоминание</string>
+    <string name="memory_bank_recall">Найти воспоминания</string>
+    <string name="memory_bank_entry_title">Тема</string>
+    <string name="memory_bank_entry_body">Факт, событие или сводка</string>
+    <string name="memory_bank_edit_help">Локальное сохранение. До 96 записей всего, до 2000 символов в записи. Заголовок существующей записи не меняется.</string>
+    <string name="memory_bank_invalid">Проверьте текст, уникальность темы и свободное место.</string>
+    <string name="memory_bank_delete">Удалить это воспоминание?</string>
+    <string name="memory_bank_recall_help">Введите имена, места или тему. Поиск только в выбранном профиле, по совпадению слов.</string>
+    <string name="memory_bank_no_match">Нет совпадений или запрос некорректен</string>
+    <string name="memory_bank_recall_count">Включено: %1$d. Не поместилось: %2$d. Проверьте контекст перед копированием.</string>
 </resources>
