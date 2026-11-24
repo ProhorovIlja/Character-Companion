@@ -2,7 +2,9 @@ package dev.caicompanion.app
 
 import android.content.Context
 import android.database.Cursor
+import android.database.DatabaseErrorHandler
 import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteDatabaseCorruptException
 import android.database.sqlite.SQLiteOpenHelper
 import java.io.IOException
 
@@ -11,10 +13,25 @@ class AndroidConversationStore(context: Context, private val account: String) :
     SQLiteOpenHelper(context.applicationContext, "mandy_history_v1.db", null, 1), NativeConversation.History {
     init {
         NativeConversation.canonicalId(account)
+        // Configure every connection before the first open. The literal FULL is
+        // supported by the API 28 builder, unlike newer named constants.
+        setOpenParams(SQLiteDatabase.OpenParams.Builder()
+            .setErrorHandler(DatabaseErrorHandler {
+                // Android's default handler may delete the database and sidecars.
+                // Fail closed instead; never reset a damaged conversation store.
+                throw SQLiteDatabaseCorruptException("Conversation history is damaged; recovery required")
+            })
+            .setSynchronousMode("FULL")
+            .build())
         setWriteAheadLoggingEnabled(true)
     }
     override fun onConfigure(db: SQLiteDatabase) { db.setForeignKeyConstraintsEnabled(true) }
     override fun onCreate(db: SQLiteDatabase) {
+        // Refuse to initialize an unrelated unversioned database. Android may
+        // have created android_metadata while configuring its connection.
+        db.rawQuery("SELECT 1 FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' AND name != 'android_metadata' LIMIT 1", null).use {
+            check(!it.moveToFirst()) { "Refusing to initialize nonempty history database" }
+        }
         db.execSQL("CREATE TABLE vault (singleton INTEGER PRIMARY KEY CHECK(singleton=1), account TEXT NOT NULL, clock INTEGER NOT NULL)")
         db.execSQL("CREATE TABLE chats (id TEXT PRIMARY KEY, character TEXT NOT NULL, UNIQUE(id, character))")
         db.execSQL("CREATE TABLE messages (id TEXT PRIMARY KEY, device TEXT NOT NULL, character TEXT NOT NULL, chat TEXT NOT NULL, clock INTEGER NOT NULL, role TEXT NOT NULL, mode TEXT NOT NULL, text TEXT NOT NULL, FOREIGN KEY(chat, character) REFERENCES chats(id, character))")
