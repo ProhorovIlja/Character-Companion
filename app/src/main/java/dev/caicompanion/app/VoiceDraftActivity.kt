@@ -74,6 +74,8 @@ class VoiceDraftActivity : Activity() {
     private lateinit var cancelListenButton: Button
     private lateinit var undoSpeechButton: Button
     private var lastSpeechEdit: VoiceDraftPolicy.SpeechUndo? = null
+    private lateinit var alternativesButton: Button
+    private var lastChoice: VoiceAlternatives.Choice? = null
     private val recognitionGuard = VoiceRecognitionGuard()
     // Only an explicit save action creates a document. Never save a transcript to Bundle.
     private var pendingSaveText: String? = null
@@ -81,7 +83,7 @@ class VoiceDraftActivity : Activity() {
         val text: String, val pendingSave: String?, val languageIndex: Int,
         val selectionStart: Int, val selectionEnd: Int,
         val allowInsert: Boolean, val systemPending: Boolean, val permissionPending: Boolean,
-        val speechUndo: VoiceDraftPolicy.SpeechUndo?
+        val speechUndo: VoiceDraftPolicy.SpeechUndo?, val choice: VoiceAlternatives.Choice?
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -172,6 +174,7 @@ class VoiceDraftActivity : Activity() {
             editor.setSelection(restored.first, restored.last)
             pendingSaveText = retained.pendingSave
             lastSpeechEdit = retained.speechUndo?.takeIf { it.available(editor.text.toString()) }
+            lastChoice = retained.choice?.takeIf { it.matches(editor.text.toString()) }
             languageSpinner.setSelection(VoiceRecognitionOptions.index(retained.languageIndex))
         }
         // A fixed minimum editor viewport permits natural outer scrolling even under
@@ -208,11 +211,19 @@ class VoiceDraftActivity : Activity() {
             setOnClickListener { undoSpeech() }
         }
         root.addView(undoSpeechButton)
+        alternativesButton = Button(this).apply {
+            setText(R.string.voice_alternatives)
+            isAllCaps = false
+            setOnClickListener { showAlternatives() }
+        }
+        root.addView(alternativesButton)
         editor.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
             override fun afterTextChanged(s: Editable?) {
-                if (lastSpeechEdit?.available(s.toString()) != true) lastSpeechEdit = null
+                val current = s.toString()
+                if (lastSpeechEdit?.available(current) != true) lastSpeechEdit = null
+                if (lastChoice?.matches(current) != true) lastChoice = null
                 updateUndoSpeech()
             }
         })
@@ -537,18 +548,40 @@ class VoiceDraftActivity : Activity() {
         val original = editor.text.toString()
         val start = editor.selectionStart.takeIf { it >= 0 } ?: original.length
         val end = editor.selectionEnd.takeIf { it >= 0 } ?: start
-        val edit = VoiceRecognitionOptions.edit(original, alternatives, start, end)
-        if (edit == null) status.setText(R.string.voice_empty_or_full)
-        else {
-            editor.setText(edit.text)
-            editor.setSelection(edit.caret)
-            lastSpeechEdit = VoiceDraftPolicy.SpeechUndo(original, edit.text, start, end)
-            updateUndoSpeech()
-            status.setText(R.string.voice_ready)
-        }
+        val choice = VoiceAlternatives.Choice.build(original, alternatives, start, end)
+        if (choice == null) status.setText(R.string.voice_empty_or_full)
+        else applyChoice(choice)
+    }
+
+    private fun applyChoice(choice: VoiceAlternatives.Choice) {
+        editor.setText(choice.edit.text)
+        editor.setSelection(choice.edit.caret)
+        lastChoice = choice
+        lastSpeechEdit = choice.undo()
+        updateUndoSpeech()
+        status.setText(R.string.voice_ready)
+    }
+
+    private fun showAlternatives() {
+        if (!draftActionReady() || !resumed) return
+        val before = lastChoice ?: return
+        if (before.options.size < 2 || !before.matches(editor.text.toString())) return
+        val labels = before.options.map { VoiceAlternatives.label(it.words) }.toTypedArray()
+        AlertDialog.Builder(this).setTitle(R.string.voice_alternatives)
+            .setSingleChoiceItems(labels, before.selected) { dialog, index ->
+                dialog.dismiss()
+                if (resumed && draftActionReady() && lastChoice === before) {
+                    before.choose(editor.text.toString(), index)?.let(::applyChoice)
+                }
+            }.setNegativeButton(android.R.string.cancel, null).show()
     }
 
     private fun updateUndoSpeech() {
+        if (::alternativesButton.isInitialized) {
+            alternativesButton.visibility = if (lastChoice?.let {
+                it.options.size > 1 && it.matches(editor.text.toString())
+            } == true) View.VISIBLE else View.GONE
+        }
         if (::undoSpeechButton.isInitialized) {
             undoSpeechButton.visibility = if (lastSpeechEdit?.available(editor.text.toString()) == true)
                 View.VISIBLE else View.GONE
@@ -559,6 +592,7 @@ class VoiceDraftActivity : Activity() {
         if (!draftActionReady()) return
         val restored = lastSpeechEdit?.restore(editor.text.toString()) ?: return
         lastSpeechEdit = null
+        lastChoice = null
         editor.setText(restored.first)
         editor.setSelection(restored.second.first, restored.second.last)
         updateUndoSpeech()
@@ -683,7 +717,7 @@ class VoiceDraftActivity : Activity() {
     override fun onRetainNonConfigurationInstance(): Any =
         RetainedDraft(editor.text.toString(), pendingSaveText, languageSpinner.selectedItemPosition,
             editor.selectionStart, editor.selectionEnd, allowInsert, systemRecognitionPending, permissionPending,
-            lastSpeechEdit)
+            lastSpeechEdit, lastChoice)
 
     override fun onResume() { super.onResume(); resumed = true }
 
