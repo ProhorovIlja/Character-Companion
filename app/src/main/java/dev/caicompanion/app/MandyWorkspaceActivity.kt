@@ -109,8 +109,10 @@ class MandyWorkspaceActivity : Activity() {
     private fun modelLibrary() = NativeModelLibrary(applicationContext.noBackupFilesDir.toPath().resolve("mandy-models-v1"))
     private fun dp(n: Int) = (n * resources.displayMetrics.density + .5f).toInt()
     private fun alive() = !isFinishing && !isDestroyed
+    private fun appearancePrefs() = getSharedPreferences("mandy_appearance_v1", MODE_PRIVATE)
+    private fun amoled() = appearancePrefs().getBoolean("amoled", true)
     override fun onCreate(savedInstanceState: Bundle?) {
-        ShellAppearance.apply(this)
+        setTheme(if (amoled()) R.style.AppTheme_MandyAmoled else R.style.AppTheme_MandyGraphite)
         super.onCreate(savedInstanceState)
         if (SettingsStore(this).protectScreen) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         val root = LinearLayout(this).apply {
@@ -423,8 +425,26 @@ class MandyWorkspaceActivity : Activity() {
         scroll.post { if (alive() && historyScroll === scroll) scroll.scrollTo(0, (messages.height - scroll.height).coerceAtLeast(0)) }
     }
 
+    private fun chooseAppearance() {
+        val old = amoled()
+        AlertDialog.Builder(this).setTitle("Appearance")
+            .setSingleChoiceItems(arrayOf("Graphite dark", "Material AMOLED"), if (old) 1 else 0) { dialog, index ->
+                dialog.dismiss()
+                val selected = index == 1
+                if (selected != old && !busy && alive()) {
+                    val ticket = current?.ticket
+                    val draft = editor?.text?.toString()
+                    // Explicit theme change saves the draft first. Never recreate after a failed save.
+                    work(afterSuccess = { if (alive()) recreate() }) {
+                        if (ticket != null && draft != null) workspace.edit(ticket, draft)
+                        check(appearancePrefs().edit().putBoolean("amoled", selected).commit())
+                    }
+                }
+            }.setNegativeButton(android.R.string.cancel, null).show()
+    }
     private fun showWorkspaceSettings(s: Snapshot) {
         val options = mutableListOf<Pair<String, () -> Unit>>()
+        options += ("Appearance · " + if (amoled()) "Material AMOLED" else "Graphite dark") to { chooseAppearance() }
         options += "AI models" to {
             if (editor != null && editor?.text?.toString() != current?.draft?.draft)
                 status.text = "Save the current draft before opening models."
@@ -558,6 +578,8 @@ class MandyWorkspaceActivity : Activity() {
             var saved = false
             val text = StringBuilder()
             var lastUpdate = 0L
+            // One queued preview at most; slow UI drops intermediate snapshots, not durable text.
+            val previewQueued = AtomicBoolean(false)
             var metrics: GenerationMetrics? = null
             var preparation: ModelPreparation? = null
             val result = runCatching {
@@ -569,18 +591,20 @@ class MandyWorkspaceActivity : Activity() {
                         onPreparation = { preparation = it }) { origin, part ->
                         text.append(part)
                         val now = System.nanoTime()
-                        if (now - lastUpdate >= 100_000_000L) {
+                        if (now - lastUpdate >= 100_000_000L && previewQueued.compareAndSet(false, true)) {
                             lastUpdate = now
                             val visibleText = text.toString()
                             runOnUiThread {
-                                if (alive() && busy && current?.ticket == origin && !stopped.get() && preview.parent === messages) {
-                                    val nearBottom = !previewScroll.canScrollVertically(1)
-                                    preview.text = visibleText
-                                    if (nearBottom) previewScroll.post {
-                                        if (alive() && busy && current?.ticket == origin && preview.parent === messages && !stopped.get())
-                                            previewScroll.scrollTo(0, (messages.height - previewScroll.height).coerceAtLeast(0))
+                                try {
+                                    if (alive() && busy && current?.ticket == origin && !stopped.get() && preview.parent === messages) {
+                                        val nearBottom = !previewScroll.canScrollVertically(1)
+                                        preview.text = visibleText
+                                        if (nearBottom) previewScroll.post {
+                                            if (alive() && busy && current?.ticket == origin && preview.parent === messages && !stopped.get())
+                                                previewScroll.scrollTo(0, (messages.height - previewScroll.height).coerceAtLeast(0))
+                                        }
                                     }
-                                }
+                                } finally { previewQueued.set(false) }
                             }
                         }
                     }
