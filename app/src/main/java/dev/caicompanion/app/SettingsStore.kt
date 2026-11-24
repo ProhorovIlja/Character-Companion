@@ -6,6 +6,8 @@ import org.json.JSONObject
 
 /** Stores only browser shell configuration and user bookmarks, never messages or credentials. */
 class SettingsStore(context: Context) {
+    // All instances share the same preferences file. Serialize history writes against opt-out/import.
+    companion object { private val historyLock = Any() }
     private val prefs = context.getSharedPreferences("character_companion_v2", Context.MODE_PRIVATE)
     // Explicit local mode preference only; never contains account or session data.
     var browserSessionPreferred: Boolean
@@ -43,12 +45,25 @@ class SettingsStore(context: Context) {
         set(v) = prefs.edit().putBoolean("desktop_mode", v).apply()
     var resumePage: Boolean
         get() = prefs.getBoolean("resume_page", false)
-        set(v) = prefs.edit().putBoolean("resume_page", v).apply()
+        set(v) {
+            synchronized(historyLock) {
+                val edit = prefs.edit().putBoolean("resume_page", v)
+                if (!v) edit.remove("last_visited")
+                edit.apply()
+            }
+        }
     var lastVisited: String
-        get() = UrlPolicy.sanitizeBookmark(prefs.getString("last_visited", "")).orEmpty()
+        get() = synchronized(historyLock) {
+            if (!resumePage) "" else UrlPolicy.sanitizeBookmark(prefs.getString("last_visited", "")).orEmpty()
+        }
         set(v) {
             val sanitized = UrlPolicy.sanitizeBookmark(v).orEmpty()
-            prefs.edit().putString("last_visited", sanitized).apply()
+            synchronized(historyLock) {
+                val edit = prefs.edit()
+                if (!resumePage || sanitized.isEmpty()) edit.remove("last_visited")
+                else edit.putString("last_visited", sanitized)
+                edit.apply()
+            }
         }
     var compactChrome: Boolean
         get() = prefs.getBoolean("compact_chrome", false)
@@ -152,7 +167,9 @@ class SettingsStore(context: Context) {
         saved.takeLast(100).forEach { (title, url) ->
             bookmarkArray.put(JSONObject().put("title", title).put("url", url))
         }
-        prefs.edit()
+        synchronized(historyLock) {
+            prefs.edit()
+            .remove("last_visited") // Settings backups contain no navigation history.
             .putBoolean("start_in_native_hub", parsed.optBoolean("startInHub", false))
             .putBoolean("blocking", parsed.optBoolean("blocking", true))
             .putBoolean("protect_screen", parsed.optBoolean("protectScreen", false))
@@ -170,6 +187,7 @@ class SettingsStore(context: Context) {
             .putString("exclude_rules", parsed.optString("excludeRules").take(12_000))
             .putString("bookmarks", bookmarkArray.toString())
             .apply()
+        }
         return true
     }
 }

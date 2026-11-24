@@ -263,6 +263,18 @@ fun main() {
     check(UrlPolicy.safeShareUrl("https://character.ai/login?token=secret") == null)
     check(UrlPolicy.safeShareUrl("https://character.ai/%6fAuth%2fcallback?code=secret") == null)
     check(UrlPolicy.safeShareUrl("https://character.ai/account") == null)
+    // Account routes must not be shared, bookmarked or restored even on first-party domains.
+    for (route in listOf("signup", "en-US/sign-up", "log-in", "register", "registration",
+        "email-verification/code", "forgot-password/code", "magic-link/code", "oauth2",
+        "login;matrix", "login%3Bmatrix", "%256cogin", "chat/%E2%80%AEhello")) {
+        check(UrlPolicy.sanitizeBookmark("https://character.ai/$route") == null)
+    }
+    for (host in listOf("auth.character.ai", "ACCOUNTS.character.ai", "foo.auth.c.ai")) {
+        check(UrlPolicy.sanitizeBookmark("https://$host/ordinary-path") == null)
+        check(UrlPolicy.isInternal("https://$host/login"))
+    }
+    check(UrlPolicy.isInternal("https://accounts.google.com/"))
+    check(UrlPolicy.safeBookmark("https://foo.c.ai/"))
     check(UrlPolicy.sanitizeBookmark("https://character.ai/chat/public") == "https://character.ai/chat/public")
     check(UrlPolicy.isIdentityUrl("https://accounts.google.com/o/oauth2/auth"))
     check(!UrlPolicy.isIdentityUrl("https://accounts.google.com.evil.org"))

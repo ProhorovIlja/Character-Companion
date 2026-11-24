@@ -11,7 +11,11 @@ object UrlPolicy {
     // Login and account routes must never become shareable, bookmarkable or resumable.
     private val sensitivePathParts = setOf("oauth", "authorize", "auth", "login", "signin",
         "sign-in", "callback", "verify", "token", "session", "logout", "reset-password",
-        "account", "settings", "api", "password")
+        "account", "settings", "api", "password", "oauth2", "log-in", "signup",
+        "sign-up", "register", "registration", "verification", "email-verification",
+        "forgot-password", "recover-password", "reset", "magic-link", "sso")
+    private val identitySubdomains = setOf("auth", "oauth", "oauth2", "account", "accounts",
+        "login", "signin", "sso", "identity")
     private val bookmarkQueryKeys = setOf("char", "id")
     private val bookmarkValue = Regex("^[A-Za-z0-9_-]{1,128}$")
 
@@ -54,6 +58,10 @@ object UrlPolicy {
     fun sanitizeBookmark(url: String?): String? {
         val uri = parsedHttps(url) ?: return null
         if (!HostBlocker.isServiceHost(uri.host) || (url?.length ?: 0) > 4096) return null
+        // Service-owned identity subdomains can contain credentials in otherwise ordinary paths.
+        val host = uri.host.lowercase(Locale.ROOT)
+        val serviceRoot = if (HostBlocker.isDomain(host, "character.ai")) "character.ai" else "c.ai"
+        if (host != serviceRoot && host.removeSuffix(".$serviceRoot").split('.').any { it in identitySubdomains }) return null
         var decodedPath = uri.path.orEmpty()
         // Decode layered escapes: %252Fauth%252Fcallback must never bypass path checks.
         // URLDecoder treats '+' as a space; preserve literal '+' for path inspection.
@@ -63,7 +71,7 @@ object UrlPolicy {
         }
         // Deeply nested percent-escapes can hide paths even after repeated decoding.
         if (Regex("%[0-9a-fA-F]{2}").containsMatchIn(decodedPath)) return null
-        if (decodedPath.length > 1500 || decodedPath.any { it.isISOControl() || it == '\\' } ||
+        if (decodedPath.length > 1500 || decodedPath.any { it.isISOControl() || it == '\\' || it == ';' || Character.getType(it) == Character.FORMAT.toInt() } ||
             decodedPath.split('/').any {
                 val segment = it.lowercase(Locale.ROOT)
                 segment in sensitivePathParts || segment == "." || segment == ".."
@@ -75,7 +83,6 @@ object UrlPolicy {
                 key in bookmarkQueryKeys && bookmarkValue.matches(value)
             }
         }
-        val host = uri.host.lowercase(Locale.ROOT)
         val port = if (uri.port == 443) ":443" else ""
         val path = uri.rawPath.orEmpty().ifEmpty { "/" }
         return "https://$host$port$path" + if (query.isNullOrEmpty()) "" else "?$query"

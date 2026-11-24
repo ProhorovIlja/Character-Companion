@@ -191,7 +191,11 @@ class Structure(unittest.TestCase):
         self.assertIn('prefs.edit()\n            .putBoolean("blocking"', store)
         self.assertIn('OfflineBookmarkEditor.normalize(obj.optString("title"), u)', store)
         self.assertIn('put("bookmarks", sanitizedBookmarkArray())', store)
-        self.assertIn('get() = UrlPolicy.sanitizeBookmark(prefs.getString("last_visited", "")).orEmpty()', store)
+        self.assertIn('if (!resumePage) "" else UrlPolicy.sanitizeBookmark(prefs.getString("last_visited", "")).orEmpty()', store)
+        self.assertIn('if (!v) edit.remove("last_visited")', store)
+        self.assertIn('if (!resumePage || sanitized.isEmpty()) edit.remove("last_visited")', store)
+        self.assertIn('.remove("last_visited") // Settings backups contain no navigation history.', store)
+        self.assertGreaterEqual(store.count('synchronized(historyLock)'), 4)
 
     def test_translations_cover_default_strings(self):
         en=ET.parse(ROOT/'app/src/main/res/values/strings.xml').getroot()
