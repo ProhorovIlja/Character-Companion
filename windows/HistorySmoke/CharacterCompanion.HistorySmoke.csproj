@@ -9,5 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.15" />
     <Compile Include="../CharacterCompanion.Windows/Intelligence/LocalHistory.cs" Link="LocalHistory.cs" />
+    <Compile Include="../CharacterCompanion.Windows/Intelligence/LocalInferenceClient.cs" Link="LocalInferenceClient.cs" />
+    <Compile Include="../CharacterCompanion.Windows/Intelligence/LocalChatTurn.cs" Link="LocalChatTurn.cs" />
   </ItemGroup>
 </Project>

@@ -47,6 +47,43 @@ try
         c.ExecuteNonQuery();
     }
     Reject<InvalidDataException>(() => { using var wrong = new LocalHistory(path,account); });
-    Console.WriteLine($"PASS {checks} native history checks");
+    // Exercise real SQLite + injected synthetic inference. No network or real model.
+    var turnPath = Path.Combine(dir,"turn.db");
+    var request = new LocalChatTurn.Request(account,device,character,chat,id,"Привет","Bilingual character");
+    int calls = 0;
+    var turn = new LocalChatTurn(turnPath, (messages, preview, stop) =>
+    {
+        Interlocked.Increment(ref calls);
+        Check(messages[0].Role == "system" && messages[^1].Content == "Привет");
+        preview?.Invoke("Hello");
+        return Task.FromResult("Hello 🌙");
+    });
+    var previews = new List<string>();
+    var result = await turn.SendAsync(request, previews.Add);
+    Check(result.Text == "Hello 🌙" && result.Clock == 2 && previews.SequenceEqual(new[] { "Hello" }));
+    Check(await turn.SendAsync(request) == result && calls == 1);
+    var next = request with { MessageId = Guid.NewGuid().ToString(), Text = "Again" };
+    var failed = new LocalChatTurn(turnPath, (_, _, _) => Task.FromException<string>(new IOException("fixture failure")));
+    try { await failed.SendAsync(next); Check(false); } catch (IOException) { Check(true); }
+    using (var h = new LocalHistory(turnPath, account))
+        Check(h.Find(next.MessageId)?.Text == "Again" && h.Find(LocalHistory.ReplyId(next.MessageId)) == null);
+    using (var stop = new CancellationTokenSource())
+    {
+        var cancelled = new LocalChatTurn(turnPath, (_, _, _) => { stop.Cancel(); return Task.FromResult("Discard"); });
+        try { await cancelled.SendAsync(next, cancellationToken: stop.Token); Check(false); }
+        catch (OperationCanceledException) { Check(true); }
+    }
+    using (var h = new LocalHistory(turnPath, account))
+        Check(h.Find(LocalHistory.ReplyId(next.MessageId)) == null);
+    var advanced = new LocalChatTurn(turnPath, (_, _, _) =>
+    {
+        using var h = new LocalHistory(turnPath, account);
+        h.AppendUser(Guid.NewGuid().ToString(),device,character,chat,"text","Concurrent");
+        return Task.FromResult("Stale");
+    });
+    try { await advanced.SendAsync(next); Check(false); } catch (InvalidDataException) { Check(true); }
+    using (var h = new LocalHistory(turnPath, account))
+        Check(h.Find(LocalHistory.ReplyId(next.MessageId)) == null);
+    Console.WriteLine($"PASS {checks} native history and turn checks");
 }
 finally { Directory.Delete(dir, true); }
