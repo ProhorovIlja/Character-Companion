@@ -1,4 +1,6 @@
-**New primary direction (2026-11-24):** independent private Android + Windows AI companion, local-first with encrypted Drive continuity planned and GitHub releases. Existing Character.AI shells remain optional compatibility paths. Initial portable text-history reference and tests are in shared/continuity.py; native runtime and cloud sync are not implemented. [Architecture and delivery gates](docs/UNIFIED_COMPANION.md).
+# Mandy AI — Independent Personal Companion
+
+**Current product direction (2026-11-24):** private, local-first Android + Windows conversational AI with multiple characters, individual memories and voices, and contextual search during user-initiated turns. Existing Character.AI shells are optional legacy compatibility paths. See [product decision and navigation](docs/MANDY_AI_PRODUCT.md), [architecture](docs/UNIFIED_COMPANION.md), [history reference](docs/HISTORY_STORE.md), and [conversation reference](docs/INDEPENDENT_CONVERSATION.md). Native model integration, cloud sync and new APK/EXE builds are not completed. Repository name and installed application identities remain unchanged for compatibility.
 
 **0.38.0-rc1 (source):** foreground-only sign-in compatibility, stale navigation protection, exact route fingerprints, accurate Gecko tracker-protection labels, and coherent filter counters. Android build and hardware QA pending.
 
