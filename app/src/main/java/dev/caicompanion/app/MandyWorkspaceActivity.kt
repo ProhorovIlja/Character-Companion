@@ -303,12 +303,13 @@ class MandyWorkspaceActivity : Activity() {
             var saved = false
             val text = StringBuilder()
             var lastUpdate = 0L
+            var metrics: GenerationMetrics? = null
             val result = runCatching {
                 workspace.edit(ticket, draft)
                 saved = true
                 if (!retry) workspace.prepare(ticket, mode)
                 AndroidConversationStore(applicationContext, account).use { history ->
-                    EmbeddedChatTurn.sendWithMemory(workspace, ticket, library, history, modelLibrary(), sha, memory, stopped::get, admit = { admitModel(it, preset.contextTokens) }, preset = preset, resident = resident) { origin, part ->
+                    EmbeddedChatTurn.sendWithMemory(workspace, ticket, library, history, modelLibrary(), sha, memory, stopped::get, admit = { admitModel(it, preset.contextTokens) }, preset = preset, resident = resident, onMetrics = { metrics = it }) { origin, part ->
                         text.append(part)
                         val now = System.nanoTime()
                         if (now - lastUpdate >= 100_000_000L) {
@@ -335,7 +336,12 @@ class MandyWorkspaceActivity : Activity() {
                 }
                 status.text = when {
                     saved && refreshed == null -> "Reload workspace before continuing. Saved data was not reset."
-                    result.isSuccess -> "Reply saved"
+                    result.isSuccess -> metrics?.let { m ->
+                        "Reply saved · " + m.promptTokens + " input / " + m.outputTokens + " output tokens · " +
+                            m.retainedMessages + " messages · " + m.fittingAttempts + " fitting attempts\n" +
+                            "Fit " + m.fitNanos / 1_000_000 + " ms · context " + m.contextNanos / 1_000_000 +
+                            " ms · prefill " + m.prefillNanos / 1_000_000 + " ms · generation " + m.generationNanos / 1_000_000 + " ms"
+                    } ?: "Reply saved"
                     stopped.get() -> "Stopped • check saved draft or pending message"
                     result.exceptionOrNull() is ModelAdmission.Denied -> admissionMessage(result.exceptionOrNull() as ModelAdmission.Denied) + " • pending message retained"
                     else -> "Generation failed • check saved draft or retry state"

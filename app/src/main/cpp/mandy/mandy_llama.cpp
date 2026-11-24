@@ -2,6 +2,7 @@
 #include "llama.h"
 #include <algorithm>
 #include <cstdint>
+#include <chrono>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
@@ -94,8 +95,8 @@ extern "C" JNIEXPORT void JNICALL
 Java_dev_caicompanion_app_EmbeddedLlama_nativeClose(JNIEnv *, jobject, jlong handle) {
     if (handle) llama_model_free(reinterpret_cast<llama_model *>(static_cast<intptr_t>(handle)));
 }
-extern "C" JNIEXPORT void JNICALL
-Java_dev_caicompanion_app_EmbeddedLlama_nativeGenerateV2(JNIEnv * env, jobject, jlong handle,
+extern "C" JNIEXPORT jlongArray JNICALL
+Java_dev_caicompanion_app_EmbeddedLlama_nativeGenerateV3(JNIEnv * env, jobject, jlong handle,
         jobjectArray roles, jobjectArray contents, jint context_tokens, jint output_tokens, jint seed, jint threads, jobject sink) {
     try {
         auto * model = reinterpret_cast<llama_model *>(static_cast<intptr_t>(handle));
@@ -123,11 +124,15 @@ Java_dev_caicompanion_app_EmbeddedLlama_nativeGenerateV2(JNIEnv * env, jobject, 
         require(vocab != nullptr);
         std::vector<char> prompt(MAX_PROMPT_BYTES);
         std::vector<llama_token> tokens(context_tokens);
+        using Clock = std::chrono::steady_clock;
+        const auto fit_start = Clock::now();
+        int attempts = 0, retained = count;
         int prompt_tokens = 0;
         // Test the full prompt first, then search user-boundary suffixes for a larger fit.
         // Token counts need not be monotonic for every template; only use actually tested tokens.
         auto fits = [&](int first) {
             cb.check();
+            ++attempts;
             std::vector<llama_chat_message> chat;
             chat.reserve(count - first + 1);
             chat.push_back({role[0].c_str(), content[0].c_str()});
@@ -148,17 +153,19 @@ Java_dev_caicompanion_app_EmbeddedLlama_nativeGenerateV2(JNIEnv * env, jobject, 
                 const size_t mid = lo + (hi - lo) / 2;
                 if (fits(starts[mid])) {
                     best.assign(tokens.begin(), tokens.begin() + prompt_tokens);
+                    retained = count - starts[mid] + 1;
                     hi = mid;
                 } else {
                     lo = mid + 1;
                 }
             }
-            if (best.empty()) { fail(env, "Character context and latest message exceed model context"); return; }
+            if (best.empty()) { fail(env, "Character context and latest message exceed model context"); return nullptr; }
             // A later failed probe may have overwritten the scratch buffer.
             prompt_tokens = static_cast<int>(best.size());
             tokens.swap(best);
         }
         cb.check();
+        const auto fit_end = Clock::now();
         auto params = llama_context_default_params();
         params.n_ctx = context_tokens;
         params.n_batch = 256;
@@ -170,12 +177,14 @@ Java_dev_caicompanion_app_EmbeddedLlama_nativeGenerateV2(JNIEnv * env, jobject, 
         params.op_offload = false;
         Context ctx(llama_init_from_model(model, params), llama_free);
         require(ctx && llama_n_ctx(ctx.get()) >= static_cast<uint32_t>(prompt_tokens + output_tokens));
+        const auto init_end = Clock::now();
         for (int offset = 0; offset < prompt_tokens;) {
             cb.check();
             int batch = std::min(128, prompt_tokens - offset);
             require(llama_decode(ctx.get(), llama_batch_get_one(tokens.data() + offset, batch)) == 0);
             offset += batch;
         }
+        const auto prefill_end = Clock::now();
         Sampler sampler(llama_sampler_chain_init(llama_sampler_chain_default_params()), llama_sampler_free);
         require(sampler != nullptr);
         auto add = [&](llama_sampler * component) {
@@ -190,7 +199,18 @@ Java_dev_caicompanion_app_EmbeddedLlama_nativeGenerateV2(JNIEnv * env, jobject, 
         for (int i = 0; i < output_tokens; ++i) {
             cb.check();
             llama_token token = llama_sampler_sample(sampler.get(), ctx.get(), -1);
-            if (llama_vocab_is_eog(vocab, token)) { cb.check(); return; }
+            if (llama_vocab_is_eog(vocab, token)) {
+                cb.check();
+                const auto end = Clock::now();
+                auto ns = [](auto duration) { return static_cast<jlong>(std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count()); };
+                const jlong values[] = {prompt_tokens, i, retained, attempts, ns(fit_end - fit_start),
+                    ns(init_end - fit_end), ns(prefill_end - init_end), ns(end - prefill_end)};
+                jlongArray result = env->NewLongArray(8);
+                require(result != nullptr);
+                env->SetLongArrayRegion(result, 0, 8, values);
+                require(!env->ExceptionCheck());
+                return result;
+            }
             int len = llama_token_to_piece(vocab, token, piece.data(), piece.size(), 0, false);
             if (len < 0) {
                 require(len >= -65536);
@@ -204,4 +224,5 @@ Java_dev_caicompanion_app_EmbeddedLlama_nativeGenerateV2(JNIEnv * env, jobject, 
         }
         fail(env, "Output token limit reached before model completion");
     } catch (...) { fail(env, "Local generation failed or cancelled"); }
+    return nullptr;
 }

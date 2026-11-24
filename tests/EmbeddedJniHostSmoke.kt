@@ -20,8 +20,11 @@ fun main() {
         bad { EmbeddedLlama.open(library, model.sha256, cancelled = { true }) }
         val engine = EmbeddedLlama.open(library, model.sha256)
         engine.use {
+            var metrics: GenerationMetrics? = null
             val fragments = StringBuilder()
-            verify(it.generate(messages("normal"), onText = { part -> fragments.append(part) }) == "Hello 🌙" && fragments.toString() == "Hello 🌙")
+            verify(it.generate(messages("normal"), onMetrics = { stats -> metrics = stats }, onText = { part -> fragments.append(part) }) == "Hello 🌙" && fragments.toString() == "Hello 🌙")
+            verify(metrics?.let { m -> m.promptTokens == 1 && m.outputTokens == 3 && m.retainedMessages == 2 && m.fittingAttempts == 1 } == true)
+            verify(metrics?.let { m -> listOf(m.fitNanos,m.contextNanos,m.prefillNanos,m.generationNanos).all { n -> n >= 0L } } == true)
             verify(it.generate(messages("unicode-input", "Мэнди 🌙"), onText = {}) == "Hello 🌙")
             verify(it.generate(messages("profile-low"), contextTokens = 2048, outputTokens = 256, threads = 2, onText = {}) == "Hello 🌙")
             verify(it.generate(messages("profile-quality"), contextTokens = 6144, outputTokens = 768, threads = 6, onText = {}) == "Hello 🌙")
@@ -41,7 +44,13 @@ fun main() {
             }
             val many = listOf(NativeConversation.Message("system", "Мэнди 🌙")) +
                 List(199) { n -> NativeConversation.Message("user", "message-$n") } + NativeConversation.Message("user", "fit-many")
-            verify(it.generate(many, contextTokens = 512, outputTokens = 256, onText = {}) == "x".repeat(300))
+            verify(it.generate(many, contextTokens = 512, outputTokens = 256, onMetrics = { stats -> metrics = stats }, onText = {}) == "x".repeat(300))
+            verify(metrics?.let { m -> m.retainedMessages == 77 && m.fittingAttempts in 2..9 && m.promptTokens == 1 && m.outputTokens == 1 } == true)
+            metrics = null
+            bad { it.generate(messages("limit"), outputTokens = 2, onMetrics = { stats -> metrics = stats }, onText = {}) }
+            verify(metrics == null)
+            bad { it.generate(messages("bad-utf8"), onMetrics = { stats -> metrics = stats }, onText = {}) }
+            verify(metrics == null)
             val required = runCatching { it.generate(fitting("fit-required"), contextTokens = 512, outputTokens = 256, onText = { error("unexpected output") }) }.exceptionOrNull()
             verify(required is java.io.IOException && required.message == "Character context and latest message exceed model context")
             var probes = 0
