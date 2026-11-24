@@ -387,12 +387,16 @@ class MainActivity : Activity() {
             val safeUrl = url ?: return@DownloadListener
             when (DownloadPolicy.classify(safeUrl)) {
                 DownloadPolicy.Kind.REJECT -> showToast(getString(R.string.download_url_rejected))
-                DownloadPolicy.Kind.BROWSER_ONLY -> AlertDialog.Builder(this)
-                    .setTitle(R.string.download_confirm_title)
-                    .setMessage(R.string.download_browser_only_message)
-                    .setNegativeButton(R.string.cancel, null)
-                    .setPositiveButton(R.string.open_browser) { _, _ -> openExternal(safeUrl) }
-                    .show()
+                DownloadPolicy.Kind.BROWSER_ONLY -> {
+                    val target = ExternalBrowserPolicy.target(safeUrl) ?: return@DownloadListener
+                    AlertDialog.Builder(this)
+                        .setTitle(R.string.download_confirm_title)
+                        .setMessage(if (target != safeUrl) R.string.gecko_external_sensitive
+                            else R.string.download_browser_only_message)
+                        .setNegativeButton(R.string.cancel, null)
+                        .setPositiveButton(R.string.open_browser) { _, _ -> openExternal(target) }
+                        .show()
+                }
                 DownloadPolicy.Kind.SAFE_SYSTEM -> {
                     val name = SafeFilename.from(URLUtil.guessFileName(safeUrl, disposition, mime))
                     val host = Uri.parse(safeUrl).host ?: return@DownloadListener
@@ -626,13 +630,14 @@ class MainActivity : Activity() {
     }
 
     private fun confirmExternalNavigation(url: String) {
-        if (!UrlPolicy.isHttps(url)) return
-        val host = Uri.parse(url).host ?: return
+        val target = ExternalBrowserPolicy.target(url) ?: return
+        val host = Uri.parse(target).host ?: return
         AlertDialog.Builder(this)
             .setTitle(R.string.external_link_title)
-            .setMessage(getString(R.string.external_link_message, host))
+            .setMessage(if (target != url) getString(R.string.gecko_external_sensitive)
+                else getString(R.string.external_link_message, host))
             .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.open_browser) { _, _ -> openExternal(url) }
+            .setPositiveButton(R.string.open_browser) { _, _ -> openExternal(target) }
             .show()
     }
 
@@ -657,9 +662,9 @@ class MainActivity : Activity() {
     }
 
     private fun openExternal(url: String) {
-        if (!UrlPolicy.isHttps(url)) return
+        val target = ExternalBrowserPolicy.target(url) ?: return
         try {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE)
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(target)).addCategory(Intent.CATEGORY_BROWSABLE)
             startActivity(intent)
         } catch (_: ActivityNotFoundException) { showToast(getString(R.string.error_browser)) }
           catch (_: SecurityException) { showToast(getString(R.string.error_browser)) }

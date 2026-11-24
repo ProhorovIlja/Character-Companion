@@ -24,7 +24,9 @@ object ExternalBrowserPolicy {
     private val sensitivePaths = setOf(
         "oauth", "authorize", "authorization", "auth", "login", "signin",
         "sign-in", "callback", "verify", "token", "session", "logout",
-        "reset-password", "password", "account", "api"
+        "reset-password", "password", "account", "api", "oauth2", "log-in",
+        "signup", "sign-up", "register", "registration", "verification",
+        "email-verification", "forgot-password", "recover-password", "magic-link", "sso"
     )
 
     private fun decodeLimited(raw: String): String? {
@@ -45,10 +47,14 @@ object ExternalBrowserPolicy {
         // Some Character.AI deployments use hosted identity providers rather than
         // accounts.google.com. Never transfer their transient login URLs.
         if (UrlPolicy.isIdentityUrl(raw) || HostBlocker.isDomain(host, "auth0.com")) return HOME
+        // Honor the same first-party sensitive-route/identity-host policy as bookmarks.
+        // Do not strip ordinary download query parameters here; inspect them below.
+        if (HostBlocker.isServiceHost(host) && UrlPolicy.sanitizeBookmark(raw) == null) return HOME
         val path = decodeLimited(uri.rawPath.orEmpty()) ?: return HOME
-        if (path.split('/').any { it.lowercase(Locale.ROOT) in sensitivePaths }) return HOME
+        if (path.any { it.isISOControl() || it == '\\' || Character.getType(it) == Character.FORMAT.toInt() }) return HOME
+        if (path.split('/', ';').any { it.lowercase(Locale.ROOT) in sensitivePaths }) return HOME
         val query = uri.rawQuery.orEmpty()
-        for (entry in query.split('&')) {
+        for (entry in query.split('&', ';')) {
             if (entry.isEmpty()) continue
             val key = decodeLimited(entry.substringBefore('=')) ?: return HOME
             if (key.lowercase(Locale.ROOT) in sensitiveKeys) return HOME
@@ -57,12 +63,13 @@ object ExternalBrowserPolicy {
         // parameter such as ?payload=https%3A%2F%2Fhost%2F%3Fcode%3Dsecret.
         // Inspect a bounded, recursively decoded query without persisting its value.
         val expanded = decodeLimited(query) ?: return HOME
+        if (expanded.any { it.isISOControl() || Character.getType(it) == Character.FORMAT.toInt() }) return HOME
         // Encoded nested URLs can hide authentication endpoints even without a
         // code/state parameter, and their final redirects cannot be inspected.
         // Do not hand third-party URL wrappers to the system browser; users can
         // open a public destination directly instead.
         if (Regex("(?i)https?://").containsMatchIn(expanded)) return HOME
-        val embeddedKey = Regex("(?:^|[?&#])([a-zA-Z_][a-zA-Z0-9_-]{0,63})=")
+        val embeddedKey = Regex("(?:^|[?&#;])([a-zA-Z_][a-zA-Z0-9_-]{0,63})=")
         if (embeddedKey.findAll(expanded).any {
             it.groupValues[1].lowercase(Locale.ROOT) in sensitiveKeys
         }) return HOME

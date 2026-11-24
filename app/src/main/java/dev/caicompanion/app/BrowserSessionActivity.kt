@@ -77,6 +77,10 @@ class BrowserSessionActivity : Activity() {
             setPadding(0, dp(16), 0, dp(16))
         })
         column.addView(action(R.string.browser_mode_continue) { openTab() })
+        column.addView(action(R.string.browser_mode_home) {
+            destination = BrowserSessionPolicy.HOME
+            openTab()
+        })
         column.addView(action(R.string.voice_title) {
             startActivity(Intent(this, VoiceDraftActivity::class.java))
         })
@@ -107,7 +111,7 @@ class BrowserSessionActivity : Activity() {
     private fun consumeLaunch(incoming: Intent?, allowOpen: Boolean) {
         val supplied = incoming?.getStringExtra(EXTRA_PAGE)
         destination = BrowserSessionPolicy.safeTabUrl(supplied ?: if (!allowOpen)
-            lastNonConfigurationInstance as? String else null)
+            lastNonConfigurationInstance as? String ?: destination else destination)
         val openNow = allowOpen && incoming?.getBooleanExtra(EXTRA_OPEN, false) == true
         setIntent(Intent(this, BrowserSessionActivity::class.java))
         if (openNow) openTab()
@@ -120,8 +124,10 @@ class BrowserSessionActivity : Activity() {
         // Pin the preferred Custom Tabs provider so an installed app link handler
         // cannot consume the first-party URL before the browser session opens.
         val pinned = store.browserSessionProvider.takeIf { it.isNotBlank() }
-        val provider = if (pinned == null) CustomTabsClient.getPackageName(this, null)
+        val provider = try {
+            if (pinned == null) CustomTabsClient.getPackageName(this, null)
             else CustomTabsClient.getPackageName(this, listOf(pinned), true)?.takeIf { it == pinned }
+        } catch (_: RuntimeException) { null }
         if (provider == null) {
             Toast.makeText(this, if (pinned == null) R.string.browser_mode_no_provider
                 else R.string.browser_mode_provider_unavailable, Toast.LENGTH_LONG).show()
@@ -139,6 +145,8 @@ class BrowserSessionActivity : Activity() {
         } catch (_: ActivityNotFoundException) {
             Toast.makeText(this, R.string.browser_mode_no_provider, Toast.LENGTH_LONG).show()
         } catch (_: SecurityException) {
+            Toast.makeText(this, R.string.browser_mode_no_provider, Toast.LENGTH_LONG).show()
+        } catch (_: RuntimeException) {
             Toast.makeText(this, R.string.browser_mode_no_provider, Toast.LENGTH_LONG).show()
         }
         return false

@@ -30,6 +30,15 @@ class BrowserSessionModeTests(unittest.TestCase):
         self.assertIn('putExtra(EXTRA_PAGE, BrowserSessionPolicy.safeTabUrl(page))', MODE)
         for forbidden in ('CookieManager', 'addJavascriptInterface', 'getCookie(', 'Authorization: Bearer', 'setUserAgentString', 'AuthTabIntent'):
             self.assertNotIn(forbidden, MODE)
+    def test_external_handoff_uses_same_policy_in_both_engines(self):
+        self.assertIn('val target = ExternalBrowserPolicy.target(url) ?: return', MAIN)
+        self.assertIn('val target = ExternalBrowserPolicy.target(url) ?: return', GECKO)
+        external = MAIN.split('private fun openExternal(url: String)', 1)[1].split('\n    }', 1)[0]
+        self.assertIn('Uri.parse(target)', external)
+        self.assertNotIn('Uri.parse(url)', external)
+        self.assertIn('else destination)', MODE)
+        self.assertIn('action(R.string.browser_mode_home)', MODE)
+
     def test_no_loop_or_automatic_success_claim(self):
         self.assertIn('allowOpen = savedInstanceState == null', MODE)
         self.assertIn('setIntent(Intent(this, BrowserSessionActivity::class.java))', MODE)

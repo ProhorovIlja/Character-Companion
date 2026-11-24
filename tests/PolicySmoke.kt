@@ -673,6 +673,17 @@ fun main() {
     check(ExternalBrowserPolicy.target("https://appleid.apple.com/auth/authorize") == ExternalBrowserPolicy.HOME)
     check(ExternalBrowserPolicy.target("https://character.ai/callback?code=SECRET") == ExternalBrowserPolicy.HOME)
     check(ExternalBrowserPolicy.target("https://character.ai/login") == ExternalBrowserPolicy.HOME)
+    for (url in listOf("https://auth.character.ai/ordinary", "https://character.ai/en-US/signup",
+        "https://character.ai/login%3Bsession", "https://example.org/oauth2",
+        "https://example.org/login;foo", "https://example.org/path?a=1;code=secret",
+        "https://example.org/path?payload=one%3Bstate%3Dsecret",
+        "https://example.org/path?payload=%0aheader", "https://example.org/path/%E2%80%AEfile")) {
+        check(ExternalBrowserPolicy.target(url) == ExternalBrowserPolicy.HOME)
+    }
+    check(ExternalBrowserPolicy.target("https://character.ai/chat/abc?char=123") ==
+        "https://character.ai/chat/abc?char=123")
+    check(ExternalBrowserPolicy.target("https://example.org/file.zip?download=1") ==
+        "https://example.org/file.zip?download=1")
     check(ExternalBrowserPolicy.target("https://example.org/other?code=SECRET") == ExternalBrowserPolicy.HOME)
     check(ExternalBrowserPolicy.target("https://example.org/other?%63ode=SECRET") == ExternalBrowserPolicy.HOME)
     check(ExternalBrowserPolicy.target("https://example.org/other?%2563ode=SECRET") == ExternalBrowserPolicy.HOME)
