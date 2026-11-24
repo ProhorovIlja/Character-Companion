@@ -10,6 +10,7 @@ object RuleListParser {
     const val MAX_LINES = 100_000
     const val MAX_DOMAINS = 40_000
     private val whitespace = Regex("\\s+")
+    private val sinkAddresses = setOf("0.0.0.0", "127.0.0.1", "::1")
 
     data class Rules(
         val blocked: Set<String> = emptySet(),
@@ -41,23 +42,22 @@ object RuleListParser {
             if (line.length > 512) { unsupported++; continue }
             val isAllow = line.startsWith("@@")
             val entry = if (isAllow) line.removePrefix("@@") else line
-            val domain = when {
-                entry.startsWith("||") && entry.endsWith("^") -> entry.removePrefix("||").dropLast(1)
+            val domains = when {
+                entry.startsWith("||") && entry.endsWith("^") -> listOf(entry.removePrefix("||").dropLast(1))
                 !isAllow && entry.any { it.isWhitespace() } -> {
-                    val fields = entry.split(whitespace)
-                    if (fields.size == 2 && fields[0] in setOf("0.0.0.0", "127.0.0.1", "::1"))
-                        fields[1] else ""
+                    val fields = entry.substringBefore('#').trim().split(whitespace)
+                    if (fields.size >= 2 && fields[0] in sinkAddresses) fields.drop(1) else emptyList()
                 }
                 !isAllow && !entry.any { it == '|' || it == '^' || it == '*' || it == '$' ||
-                    it == '/' || it == '#' || it == '@' || it == ':' || it == ' ' } -> entry
-                else -> ""
+                    it == '/' || it == '#' || it == '@' || it == ':' || it == ' ' } -> listOf(entry)
+                else -> emptyList()
             }
-            val normalized = HostBlocker.normalizeRule(domain)
-            if (normalized == null || HostBlocker.isCriticalHost(normalized)) {
-                unsupported++
-                continue
-            }
-            if (isAllow) allowed.add(normalized) else blocked.add(normalized)
+            val normalized = domains.mapNotNull(HostBlocker::normalizeRule)
+            // Reject malformed rows atomically; do not silently broaden unsupported syntax.
+            if (normalized.isEmpty() || normalized.size != domains.size) { unsupported++; continue }
+            val usable = normalized.filterNot(HostBlocker::isCriticalHost)
+            if (usable.size != normalized.size) unsupported++
+            if (isAllow) allowed.addAll(usable) else blocked.addAll(usable)
             if (blocked.size + allowed.size > MAX_DOMAINS) return null
         }
         if (blocked.isEmpty() && allowed.isEmpty()) return null
