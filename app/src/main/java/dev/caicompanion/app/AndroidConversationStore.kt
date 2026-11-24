@@ -110,7 +110,7 @@ class AndroidConversationStore(context: Context, private val account: String) :
      * Do not use a previous export cursor as a permanent sync watermark: imported older
      * events may precede it. Caller must serialize export with writes for complete traversal.
      */
-    fun exportEncryptedPage(key: ByteArray, after: Pair<Long, String>? = null): EncryptedPage? {
+    private fun exportRows(db: SQLiteDatabase, after: Pair<Long, String>?): List<NativeConversation.Event> {
         val args = mutableListOf<String>()
         var sql = "SELECT $columns FROM messages"
         if (after != null) {
@@ -121,11 +121,49 @@ class AndroidConversationStore(context: Context, private val account: String) :
         }
         // 64 x maximum 16,000 UTF-16 units plus JSON overhead remains under 4 MiB.
         sql += " ORDER BY clock ASC,id ASC LIMIT 64"
-        val rows = readableDatabase.rawQuery(sql, args.toTypedArray()).use { c ->
+        return db.rawQuery(sql, args.toTypedArray()).use { c ->
             buildList { while (c.moveToNext()) add(event(c)) }
         }
+    }
+
+    fun exportEncryptedPage(key: ByteArray, after: Pair<Long, String>? = null): EncryptedPage? {
+        val rows = exportRows(readableDatabase, after)
         val last = rows.lastOrNull() ?: return null
         return EncryptedPage(EncryptedHistoryEnvelope.seal(key, account, HistoryWire.encode(rows)), last.clock to last.id)
+    }
+
+    data class SnapshotImport(val snapshot: String, val inserted: Int)
+
+    /** Foreground, local staged ciphertext only. All pages merge or the transaction rolls back. */
+    fun importSnapshot(historyKey: ByteArray, manifestKey: ByteArray, manifest: ByteArray,
+                       chunks: Sequence<ByteArray>): SnapshotImport = write { db ->
+        var count = 0
+        val snapshot = HistorySnapshot.import(historyKey, manifestKey, account, manifest, chunks) { rows ->
+            for (row in rows) {
+                val existing = find(db, row.id)
+                if (existing == null) { insert(db, row); count++ }
+                else require(existing == row) { "Conflicting message ID" }
+            }
+        }
+        SnapshotImport(snapshot, count)
+    }
+
+    /** Hold one transaction over the traversal. stage writes only unpublished local ciphertext.
+     * Caller must discard staging on any failure and publish only after this method returns.
+     * No network I/O or reentrant database operations in stage.
+     */
+    fun exportSnapshot(historyKey: ByteArray, manifestKey: ByteArray, snapshot: String,
+                       stage: (ByteArray) -> Unit): ByteArray = write { db ->
+        val pages = sequence {
+            var after: Pair<Long, String>? = null
+            while (true) {
+                val rows = exportRows(db, after)
+                val last = rows.lastOrNull() ?: break
+                yield(rows)
+                after = last.clock to last.id
+            }
+        }
+        HistorySnapshot.export(historyKey, manifestKey, account, snapshot, pages, stage)
     }
 
     override fun commitReply(user: NativeConversation.Event, id: String, text: String): NativeConversation.Event = write { db ->

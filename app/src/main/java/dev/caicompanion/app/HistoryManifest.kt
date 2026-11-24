@@ -33,7 +33,12 @@ object HistoryManifest {
         return body.array() + mac(key, body.array(), binding)
     }
     /** No mutation: verifies the full ordered sequence before reporting success. */
-    fun verify(key: ByteArray, account: String, manifest: ByteArray, chunks: Sequence<ByteArray>): String {
+    fun verify(key: ByteArray, account: String, manifest: ByteArray, chunks: Sequence<ByteArray>): String =
+        consumeVerified(key, account, manifest, chunks) {}
+
+    /** Consumer must use one transaction; a late failure can follow earlier callbacks. */
+    internal fun consumeVerified(key: ByteArray, account: String, manifest: ByteArray, chunks: Sequence<ByteArray>,
+                                 consume: (ByteArray) -> Unit): String {
         val binding = binding(key, account)
         require(manifest.size in 80..MAX_BYTES && manifest.copyOfRange(0, 8).contentEquals(magic))
         val body = manifest.copyOfRange(0, manifest.size - 32)
@@ -47,7 +52,12 @@ object HistoryManifest {
         repeat(count) {
             val expected = ByteArray(36).also { buf.get(it) }
             require(ByteBuffer.wrap(expected).int in 37..EncryptedHistoryEnvelope.MAX_ENVELOPE)
-            require(input.hasNext() && MessageDigest.isEqual(expected, descriptor(input.next()))) { "Missing or modified chunk" }
+            require(input.hasNext()) { "Missing chunk" }
+            val supplied = input.next()
+            require(supplied.size in 37..EncryptedHistoryEnvelope.MAX_ENVELOPE)
+            val chunk = supplied.copyOf()
+            require(MessageDigest.isEqual(expected, descriptor(chunk))) { "Modified chunk" }
+            consume(chunk)
         }
         require(!input.hasNext()) { "Extra chunk" }
         return snapshot
