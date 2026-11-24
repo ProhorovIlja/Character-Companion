@@ -170,6 +170,7 @@ fun main() {
     verifyUpdateProgress()
     verifyLoginCompatibility()
     verifyBrowserRestore()
+    verifyLoginRoutes()
     verifyVoiceDraft()
     verifyVoiceRecognitionOptions()
     // A pending SAF operation may finish only for its original HTTPS page.

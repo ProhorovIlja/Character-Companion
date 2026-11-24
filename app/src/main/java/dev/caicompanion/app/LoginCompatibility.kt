@@ -29,9 +29,13 @@ object LoginCompatibilityPolicy {
     fun isLoginPage(url: String?): Boolean {
         val parsed = firstPartyUri(url) ?: return false
         val route = parsed.rawPath.orEmpty().lowercase(Locale.ROOT)
+        // Never bypass on ambiguous paths that a browser or server may normalize differently.
+        if (route.any { it == '%' || it == ';' || it == '\\' || it.isISOControl() ||
+                Character.getType(it) == Character.FORMAT.toInt() }) return false
         // Only a leading auth route (optionally locale-prefixed) is a login page.
         // A chat path containing a segment named login must not pause protection.
         val parts = route.split('/').filter { it.isNotEmpty() }
+        if (parts.any { it == "." || it == ".." }) return false
         val first = parts.firstOrNull() ?: return false
         val auth = if (localeSegment.matches(first)) parts.getOrNull(1) else first
         return auth in loginSegments
