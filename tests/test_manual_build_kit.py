@@ -61,6 +61,16 @@ cp "$MOCK_OUTPUT" app/build/outputs/apk/legacy/debug/app-legacy-debug.apk
         self.setup_gradle('9.7.0',exit_code=1)
         self.assertNotEqual(self.run_helper('doctor.sh').returncode,0)
 
+    def test_flavor_specific_sdk_preflight(self):
+        self.assertEqual(self.run_helper('doctor.sh','legacy').returncode,0)
+        missing=self.run_helper('doctor.sh','gecko')
+        self.assertNotEqual(missing.returncode,0)
+        self.assertIn('SDK_PLATFORM_MISSING=37.2',missing.stdout)
+        platform=Path(self.env['ANDROID_HOME'])/'platforms/android-37.2'
+        platform.mkdir(parents=True)
+        (platform/'android.jar').write_bytes(b'fixture')
+        self.assertEqual(self.run_helper('doctor.sh','gecko').returncode,0)
+
     def test_stale_apk_cannot_be_reused(self):
         apk=self.root/'app/build/outputs/apk/legacy/debug/app-legacy-debug.apk'
         apk.parent.mkdir(parents=True)

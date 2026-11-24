@@ -2,13 +2,17 @@ plugins {
     id("com.android.application")
 }
 
+// GeckoView 159 requires API 37.2. Keep WebView independently buildable on 37.0.
+// Manual helpers explicitly select the matching SDK for each flavor.
+val companionSdkMinor = providers.gradleProperty("companionSdkMinor").orElse("2").get().toInt()
+require(companionSdkMinor in setOf(0, 2)) { "Only Android SDK 37.0 and 37.2 are supported" }
+
 android {
     namespace = "dev.caicompanion.app"
-    // Android 17 SDK installs under platforms/android-37.0, not android-37.
-    // Pin minor API level 0 to avoid resolving another installed 37.x release.
+    // Explicit minor API selection: GeckoView = 37.2; legacy WebView = 37.0.
     compileSdk {
         version = release(37) {
-            minorApiLevel = 0
+            minorApiLevel = companionSdkMinor
         }
     }
     defaultConfig {

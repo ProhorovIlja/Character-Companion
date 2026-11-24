@@ -5,20 +5,20 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 FLAVOR="${1:-}"
 case "$FLAVOR" in
-  gecko) TASK=':app:assembleGeckoDebug'; APK='app/build/outputs/apk/gecko/debug/app-gecko-debug.apk' ;;
-  legacy) TASK=':app:assembleLegacyDebug'; APK='app/build/outputs/apk/legacy/debug/app-legacy-debug.apk' ;;
+  gecko) SDK_MINOR=2; TASK=':app:assembleGeckoDebug'; APK='app/build/outputs/apk/gecko/debug/app-gecko-debug.apk' ;;
+  legacy) SDK_MINOR=0; TASK=':app:assembleLegacyDebug'; APK='app/build/outputs/apk/legacy/debug/app-legacy-debug.apk' ;;
   *) echo 'Usage: bash scripts/build-apk.sh gecko|legacy (manual foreground build)' >&2; exit 2 ;;
 esac
-bash scripts/doctor.sh
+bash scripts/doctor.sh "$FLAVOR"
 if [[ ! -f gradle/wrapper/gradle-wrapper.jar ]] && ! command -v gradle >/dev/null 2>&1; then
   echo 'Gradle 9.7.0 is required for lightweight source archives.' >&2; exit 1
 fi
 # Refuse stale output; report success only for the current invocation.
 rm -f -- "$APK"
 if [[ -f gradle/wrapper/gradle-wrapper.jar ]]; then
-  sh ./gradlew --no-daemon "$TASK"
+  sh ./gradlew --no-daemon "$TASK" "-PcompanionSdkMinor=$SDK_MINOR"
 else
-  gradle --no-daemon "$TASK"
+  gradle --no-daemon "$TASK" "-PcompanionSdkMinor=$SDK_MINOR"
 fi
 if [[ ! -s "$APK" ]]; then
   echo 'Build did not produce the expected nonempty flavor-specific APK.' >&2; exit 1

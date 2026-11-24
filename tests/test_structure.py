@@ -148,7 +148,7 @@ class Structure(unittest.TestCase):
         self.assertIn('android:resizeableActivity="true"', manifest)
         # AGP 9.3.1 compiles against SDK37; targetSdk stays 36 until device QA.
         self.assertIn('version = release(37)', build)
-        self.assertIn('minorApiLevel = 0', build)
+        self.assertIn('minorApiLevel = companionSdkMinor', build)
         self.assertIn('targetSdk = 36', build)
         root = (ROOT/'build.gradle.kts').read_text()
         self.assertIn('version "9.3.1"', root)

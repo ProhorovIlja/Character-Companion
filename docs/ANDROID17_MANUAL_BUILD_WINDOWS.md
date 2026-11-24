@@ -1,3 +1,7 @@
+# SDK selection after build #7
+
+GeckoView 159 requires `platforms;android-37.2`; WebView remains on the verified `platforms;android-37.0`. Install the selected platform with SDK Manager. The manual build helpers pass `-PcompanionSdkMinor=2` or `=0` respectively. Direct Gradle commands default to 37.2; for a legacy-only build pass `-PcompanionSdkMinor=0`. Both use targetSdk 36.
+
 # Manual Android build from Windows 10/11 — Pixel 8a (`akita`), Android 17
 
 This is a **one-time user-initiated command sequence**, not a CI workflow, scheduled task, unattended operation or background monitor. The current sources are an experimental client for Character.AI, not an official application.

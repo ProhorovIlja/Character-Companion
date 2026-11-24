@@ -10,7 +10,9 @@ class ToolchainCompatibilityTests(unittest.TestCase):
         props=(ROOT/'gradle/wrapper/gradle-wrapper.properties').read_text()
         self.assertIn('version "9.3.1"',root)
         self.assertIn('version = release(37)',app)
-        self.assertIn('minorApiLevel = 0',app)
+        self.assertIn('minorApiLevel = companionSdkMinor',app)
+        self.assertIn('gradleProperty("companionSdkMinor").orElse("2")',app)
+        self.assertIn('companionSdkMinor in setOf(0, 2)',app)
         self.assertIn('targetSdk = 36',app)
         self.assertNotIn('org.jetbrains.kotlin.android',root+app)
         self.assertNotIn('kotlinOptions',app)
@@ -19,14 +21,18 @@ class ToolchainCompatibilityTests(unittest.TestCase):
 
     def test_build_helpers_require_android37(self):
         for path in ('scripts/doctor.sh','scripts/build-apk-windows.ps1'):
-            self.assertIn('android-37',(ROOT/path).read_text())
+            self.assertIn('37.',(ROOT/path).read_text())
         workflow=(ROOT/'.github/workflows/build-android-apk-manual.yml').read_text()
         self.assertIn('bash scripts/install-android37-sdk.sh',workflow)
         installer=(ROOT/'scripts/install-android37-sdk.sh').read_text()
-        self.assertIn("'platforms;android-37.0'", installer)
-        self.assertIn('platforms/android-37.0/android.jar', installer)
+        self.assertIn('"platforms;android-$sdk_version"', installer)
+        self.assertIn('legacy) sdk_version=37.0',installer)
+        self.assertIn('gecko) sdk_version=37.2',installer)
+        self.assertIn('bash scripts/install-android37-sdk.sh gecko',workflow)
+        self.assertIn('platforms/android-$sdk_version/android.jar', installer)
         self.assertNotIn("'platforms;android-37'", installer)
-        self.assertIn('ANDROID_COMPILE_SDK=37',workflow)
+        self.assertIn('ANDROID_COMPILE_SDK_GECKO=37.2',workflow)
+        self.assertIn('ANDROID_COMPILE_SDK_LEGACY=37.0',workflow)
         self.assertIn('workflow_dispatch:',workflow)
         for trigger in ('push:', 'pull_request:', 'schedule:', 'workflow_run:'):
             self.assertNotIn('\n  '+trigger,workflow)

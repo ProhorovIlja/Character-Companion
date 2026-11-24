@@ -59,9 +59,12 @@ if (-not (Get-Command $javaExe -ErrorAction SilentlyContinue)) {
 $sdk = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else {
     Join-Path $env:LOCALAPPDATA 'Android\Sdk'
 }
-if (-not (Test-Path -LiteralPath (Join-Path $sdk 'platforms\android-37.0\android.jar') -PathType Leaf)) {
-    Fail "Android SDK platform 37.0 not found at '$sdk'. Install that platform first. Android 17 runtime testing is still required."
+$sdkMinor = if ($Flavor -eq 'gecko') { 2 } else { 0 }
+$sdkPlatform = "android-37.$sdkMinor"
+if (-not (Test-Path -LiteralPath (Join-Path $sdk "platforms\$sdkPlatform\android.jar") -PathType Leaf)) {
+    Fail "Android SDK platform $sdkPlatform not found at '$sdk'. Install that platform first. Android 17 runtime testing is still required."
 }
+$env:ANDROID_HOME = $sdk
 $task = if ($Flavor -eq 'gecko') { ':app:assembleGeckoDebug' } else { ':app:assembleLegacyDebug' }
 $apk = Join-Path $root "app\build\outputs\apk\$Flavor\debug\app-$Flavor-debug.apk"
 Write-Output "BUILD_FLAVOR=$Flavor"
@@ -71,7 +74,7 @@ Write-Output "TASK=$task"
 if (Test-Path -LiteralPath $apk -PathType Leaf) { Remove-Item -LiteralPath $apk -Force }
 Push-Location $root
 try {
-    & $gradleCommand '--no-daemon' $task
+    & $gradleCommand '--no-daemon' $task "-PcompanionSdkMinor=$sdkMinor"
     $result = $LASTEXITCODE
 } finally { Pop-Location }
 if ($result -ne 0) { Fail "Gradle failed with exit code $result. No verified APK created." }

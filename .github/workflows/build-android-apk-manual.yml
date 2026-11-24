@@ -33,11 +33,11 @@ jobs:
 
       - name: Install Android 37.0 platform and build tools
         shell: bash
-        run: bash scripts/install-android37-sdk.sh
+        run: bash scripts/install-android37-sdk.sh legacy
 
       - name: Verify pinned Gradle wrapper and build prerequisites
         shell: bash
-        run: bash scripts/doctor.sh
+        run: bash scripts/doctor.sh legacy
 
       - name: Run repository Python regression tests
         shell: bash
@@ -49,6 +49,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          bash scripts/install-android37-sdk.sh gecko
           bash scripts/build-apk.sh gecko
           bash scripts/verify-debug-apk.sh gecko
 
@@ -83,7 +84,7 @@ jobs:
             printf 'COMMIT=%s\n' "$GITHUB_SHA"
             printf 'RUN_ID=%s\n' "$GITHUB_RUN_ID"
             printf 'TRIGGER=workflow_dispatch_ONLY\n'
-            printf 'ANDROID_COMPILE_SDK=37\n'
+            printf 'ANDROID_COMPILE_SDK_GECKO=37.2\nANDROID_COMPILE_SDK_LEGACY=37.0\n'
             printf 'BUILD_TYPE=DEBUG_NOT_PRODUCTION\n'
             printf 'DEVICE_TESTED=NO\n'
             printf 'GECKO_OUTCOME=%s\nLEGACY_OUTCOME=%s\n' "$GECKO_OUTCOME" "$LEGACY_OUTCOME"

@@ -3,6 +3,11 @@
 set -u
 cd "$(dirname "$0")/.."
 fail=0
+case "${1:-legacy}" in
+  legacy) sdk_version=37.0 ;;
+  gecko) sdk_version=37.2 ;;
+  *) echo 'Expected gecko or legacy' >&2; exit 2 ;;
+esac
 if command -v java >/dev/null 2>&1; then
   echo 'JAVA_FOUND=YES'
   java -version 2>&1 | head -1
@@ -50,10 +55,10 @@ else
   echo 'GRADLE_FOUND=NO'; fail=1
 fi
 sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-${HOME}/Android/Sdk}}"
-if [[ -f "${sdk}/platforms/android-37.0/android.jar" ]]; then
-  echo 'SDK_37_FOUND=YES'
+if [[ -f "${sdk}/platforms/android-${sdk_version}/android.jar" ]]; then
+  printf 'SDK_37_FOUND=YES\nSDK_PLATFORM=%s\n' "$sdk_version"
 else
-  echo 'SDK_37_FOUND=NO'; fail=1
+  printf 'SDK_37_FOUND=NO\nSDK_PLATFORM_MISSING=%s\n' "$sdk_version"; fail=1
 fi
 if command -v adb >/dev/null 2>&1; then
   echo 'ADB_FOUND=YES'

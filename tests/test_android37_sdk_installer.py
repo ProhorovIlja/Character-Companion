@@ -1,4 +1,4 @@
-"""Foreground-only tests of the 37.0 SDK installer, using a fake sdkmanager."""
+"""Foreground-only tests of the flavor-specific 37.x SDK installer, using a fake sdkmanager."""
 from pathlib import Path
 import os
 import subprocess
@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/install-android37-sdk.sh"
 
 class Android37SdkInstallerTest(unittest.TestCase):
-    def run_sdk(self, *, valid_sdk=True, valid_tools=True, sdk_set=True):
+    def run_sdk(self, *, valid_sdk=True, valid_tools=True, sdk_set=True, flavor="legacy", installed_version=None):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             sdk = root / "sdk"
@@ -21,7 +21,8 @@ printf '%s\n' "$@" >> "$SDK_ARGS_FILE"
 """)
             fake.chmod(0o755)
             if valid_sdk:
-                jar = sdk/'platforms/android-37.0/android.jar'
+                version = installed_version or ("37.2" if flavor == "gecko" else "37.0")
+                jar = sdk/f'platforms/android-{version}/android.jar' 
                 jar.parent.mkdir(parents=True)
                 jar.write_bytes(b'test-not-a-real-SDK')
             if valid_tools:
@@ -39,7 +40,7 @@ printf '%s\n' "$@" >> "$SDK_ARGS_FILE"
             else:
                 env.pop('ANDROID_HOME',None)
                 env.pop('ANDROID_SDK_ROOT',None)
-            r = subprocess.run(['bash',str(SCRIPT)],env=env,text=True,capture_output=True)
+            r = subprocess.run(['bash',str(SCRIPT),flavor],env=env,text=True,capture_output=True)
             args = (root/'args.txt').read_text().splitlines() if (root/'args.txt').exists() else []
             return r, args
 
@@ -48,6 +49,22 @@ printf '%s\n' "$@" >> "$SDK_ARGS_FILE"
         self.assertEqual(r.returncode,0,r.stdout+r.stderr)
         self.assertEqual(args,['--install','platforms;android-37.0','build-tools;36.0.0'])
         self.assertIn('ANDROID_SDK_PLATFORM=37.0_INSTALLED',r.stdout)
+
+    def test_gecko_requires_exact_37_2_package(self):
+        r,args = self.run_sdk(flavor="gecko")
+        self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+        self.assertEqual(args,['--install','platforms;android-37.2','build-tools;36.0.0'])
+        self.assertIn('ANDROID_SDK_PLATFORM=37.2_INSTALLED',r.stdout)
+
+    def test_gecko_refuses_legacy_platform(self):
+        r,args = self.run_sdk(flavor="gecko", installed_version="37.0")
+        self.assertNotEqual(r.returncode,0)
+        self.assertIn('Android SDK platform 37.2 missing',r.stderr)
+
+    def test_invalid_flavor_does_not_install(self):
+        r,args = self.run_sdk(flavor="invalid")
+        self.assertNotEqual(r.returncode,0)
+        self.assertEqual(args,[])
 
     def test_missing_api_37_0_is_refused(self):
         r,args = self.run_sdk(valid_sdk=False)
