@@ -2,29 +2,34 @@
 <resources>
     <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#C6A97A</item>
+        <item name="android:colorAccent">#A8B8FF</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:statusBarColor">#13141A</item>
-        <item name="android:navigationBarColor">#13141A</item>
+        <item name="android:statusBarColor">#14161D</item>
+        <item name="android:navigationBarColor">#14161D</item>
         <item name="android:windowActionModeOverlay">true</item>
-        <item name="android:windowBackground">#111219</item>
+        <item name="android:windowBackground">#111319</item>
     </style>
     <style name="NavButton">
         <item name="android:layout_width">48dp</item>
         <item name="android:layout_height">48dp</item>
         <item name="android:gravity">center</item>
-        <item name="android:textColor">#E3D9CA</item>
-        <item name="android:textSize">26sp</item>
-        <item name="android:background">@drawable/pill_background</item>
-        <item name="android:layout_marginEnd">3dp</item>
+        <item name="android:textColor">#E4E7F0</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:background">?android:attr/selectableItemBackground</item>
+        <item name="android:layout_marginEnd">0dp</item>
     </style>
     <style name="FooterButton">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">match_parent</item>
         <item name="android:layout_weight">1</item>
         <item name="android:gravity">center</item>
-        <item name="android:textSize">13sp</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:background">?android:attr/selectableItemBackground</item>
+        <item name="android:paddingTop">7dp</item>
+        <item name="android:paddingBottom">6dp</item>
+        <item name="android:drawablePadding">3dp</item>
+        <item name="android:focusable">true</item>
         <item name="android:lineSpacingExtra">2dp</item>
-        <item name="android:textColor">#D4C7B5</item>
+        <item name="android:textColor">#DDE1EC</item>
     </style>
 </resources>

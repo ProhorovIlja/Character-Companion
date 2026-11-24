@@ -48,6 +48,8 @@ class VoiceDraftActivity : Activity() {
     private lateinit var languageSpinner: Spinner
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
+    private var finishingRecognition = false
+    private lateinit var cancelListenButton: Button
     private val recognitionGuard = VoiceRecognitionGuard()
     // Only an explicit save action creates a document. Never save a transcript to Bundle.
     private var pendingSaveText: String? = null
@@ -72,7 +74,7 @@ class VoiceDraftActivity : Activity() {
         }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(17, 18, 25))
+            setBackgroundColor(Color.rgb(17, 19, 25))
             setPadding(dp(14), dp(10), dp(14), dp(10))
             setOnApplyWindowInsetsListener { view, insets ->
                 if (Build.VERSION.SDK_INT >= 30) {
@@ -90,12 +92,12 @@ class VoiceDraftActivity : Activity() {
         root.addView(TextView(this).apply {
             text = getString(R.string.voice_title)
             textSize = 21f
-            setTextColor(Color.rgb(201, 169, 113))
+            setTextColor(Color.rgb(168, 184, 255))
         })
         root.addView(TextView(this).apply {
             text = getString(R.string.voice_privacy)
             textSize = 12f
-            setTextColor(Color.rgb(200, 195, 190))
+            setTextColor(Color.rgb(171, 178, 195))
         })
         languageSpinner = Spinner(this)
         val languageNames = listOf(getString(R.string.voice_lang_device),
@@ -106,7 +108,7 @@ class VoiceDraftActivity : Activity() {
         root.addView(languageSpinner)
         editor = EditText(this).apply {
             hint = getString(R.string.voice_hint)
-            setTextColor(Color.rgb(235, 225, 211))
+            setTextColor(Color.rgb(228, 231, 240))
             setHintTextColor(Color.rgb(175, 170, 165))
             gravity = Gravity.TOP or Gravity.START
             inputType = android.text.InputType.TYPE_CLASS_TEXT or
@@ -133,16 +135,22 @@ class VoiceDraftActivity : Activity() {
         root.addView(editor, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, dp(196)))
         status = TextView(this).apply {
-            setTextColor(Color.rgb(200, 195, 190))
+            setTextColor(Color.rgb(171, 178, 195))
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
         status.setText(R.string.voice_idle)
         root.addView(status)
         listenButton = Button(this).apply {
             setText(R.string.voice_start_local)
-            setOnClickListener { if (listening) stopListening() else startOnDevice() }
+            setOnClickListener { if (listening) requestFinalTranscript() else startOnDevice() }
         }
         root.addView(listenButton)
+        cancelListenButton = Button(this).apply {
+            setText(R.string.voice_stop)
+            visibility = View.GONE
+            setOnClickListener { stopListening() }
+        }
+        root.addView(cancelListenButton)
         root.addView(Button(this).apply {
             setText(R.string.voice_system)
             setOnClickListener { confirmSystemRecognizer() }
@@ -232,12 +240,27 @@ class VoiceDraftActivity : Activity() {
                 override fun onEvent(eventType: Int, params: Bundle?) {}
             })
             listening = true
-            listenButton.setText(R.string.voice_stop)
+            finishingRecognition = false
+            cancelListenButton.visibility = View.VISIBLE
+            listenButton.setText(R.string.voice_finish)
             status.setText(R.string.voice_listening)
             created.startListening(requestIntent())
         } catch (_: RuntimeException) {
             finishListening()
             status.setText(R.string.voice_local_missing)
+        }
+    }
+
+    private fun requestFinalTranscript() {
+        if (!listening || finishingRecognition) return
+        val current = recognizer ?: return
+        finishingRecognition = true
+        listenButton.isEnabled = false
+        status.setText(R.string.voice_processing)
+        try { current.stopListening() }
+        catch (_: RuntimeException) {
+            finishListening()
+            status.setText(R.string.voice_error_service)
         }
     }
 
@@ -253,7 +276,12 @@ class VoiceDraftActivity : Activity() {
     private fun finishListening() {
         recognitionGuard.cancel()
         listening = false
-        if (::listenButton.isInitialized) listenButton.setText(R.string.voice_start_local)
+        finishingRecognition = false
+        if (::listenButton.isInitialized) {
+            listenButton.isEnabled = true
+            listenButton.setText(R.string.voice_start_local)
+        }
+        if (::cancelListenButton.isInitialized) cancelListenButton.visibility = View.GONE
         runCatching { recognizer?.destroy() }
         recognizer = null
     }

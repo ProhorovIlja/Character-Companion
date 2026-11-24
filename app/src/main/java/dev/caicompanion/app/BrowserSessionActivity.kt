@@ -41,8 +41,8 @@ class BrowserSessionActivity : Activity() {
 
     private lateinit var store: SettingsStore
     private var destination = BrowserSessionPolicy.HOME
-    private val fg = Color.rgb(235, 225, 211)
-    private val bg = Color.rgb(17, 18, 25)
+    private val fg = Color.rgb(228, 231, 240)
+    private val bg = Color.rgb(17, 19, 25)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,18 +66,19 @@ class BrowserSessionActivity : Activity() {
             text = getString(R.string.browser_mode_title); textSize = 24f; setTextColor(fg)
         })
         column.addView(TextView(this).apply {
-            text = getString(R.string.browser_mode_explanation); textSize = 15f; setTextColor(fg)
+            text = getString(R.string.browser_mode_summary); textSize = 15f; setTextColor(fg)
             setPadding(0, dp(16), 0, dp(16))
         })
         column.addView(action(R.string.browser_mode_continue) { openTab() })
-        column.addView(action(R.string.browser_mode_home) {
-            destination = BrowserSessionPolicy.HOME
-            openTab()
-        })
         column.addView(action(R.string.voice_title) {
             startActivity(Intent(this, VoiceDraftActivity::class.java))
         })
         column.addView(action(R.string.browser_mode_embedded) { returnToEmbedded() })
+        column.addView(action(R.string.shell_session_info) {
+            android.app.AlertDialog.Builder(this).setTitle(R.string.browser_mode_title)
+                .setMessage(R.string.browser_mode_explanation)
+                .setPositiveButton(R.string.close, null).show()
+        })
         // A restored Activity must not relaunch a browser or claim that sign-in succeeded.
         consumeLaunch(intent, allowOpen = savedInstanceState == null)
     }
@@ -133,6 +134,7 @@ class BrowserSessionActivity : Activity() {
     private fun action(label: Int, callback: () -> Unit): Button = Button(this).apply {
         setText(label); isAllCaps = false; setTextColor(fg)
         setBackgroundResource(R.drawable.settings_action)
+        minHeight = dp(52)
         setOnClickListener { callback() }
     }
 }

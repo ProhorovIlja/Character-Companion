@@ -217,4 +217,15 @@
     <string name="browser_mode_explanation">Sign in on the official Character.AI site in the browser tab and keep chatting there. Close the tab to return to this screen, then continue the same browser session. The embedded browser has a separate login. Character Companion filtering, screen protection and embedded voice controls do not apply to the browser tab. No account data is copied. Use the same default browser to retain its sign-in.</string>
     <string name="browser_mode_no_provider">No compatible Custom Tabs browser. Set a browser supporting Custom Tabs as your default, then try again.</string>
     <string name="browser_mode_restart">Embedded mode selected. Reopen Character Companion.</string>
+    <string name="shell_saved">Saved</string>
+    <string name="shell_voice">Voice</string>
+    <string name="shell_more">More</string>
+    <string name="shell_refresh_cache">Reload and clear cache</string>
+    <string name="shell_copy_link">Copy link</string>
+    <string name="shell_enable_shield">Enable privacy shield</string>
+    <string name="shell_disable_shield">Disable privacy shield</string>
+    <string name="shell_no_page">Open Character.AI in the embedded browser first.</string>
+    <string name="shell_session_info">How browser sign-in works</string>
+    <string name="browser_mode_summary">Continue chatting in your existing browser session. Your embedded browser uses a separate sign-in.</string>
+    <string name="voice_finish">Finish dictation</string>
 </resources>

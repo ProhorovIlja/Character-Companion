@@ -12,7 +12,7 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("browser_session_preferred", false)
         set(v) = prefs.edit().putBoolean("browser_session_preferred", v).apply()
     var startInHub: Boolean
-        get() = prefs.getBoolean("start_in_native_hub", true)
+        get() = prefs.getBoolean("start_in_native_hub", false)
         set(v) = prefs.edit().putBoolean("start_in_native_hub", v).apply()
     var protectScreen: Boolean
         get() = prefs.getBoolean("protect_screen", false)
@@ -150,7 +150,7 @@ class SettingsStore(context: Context) {
             bookmarkArray.put(JSONObject().put("title", title).put("url", url))
         }
         prefs.edit()
-            .putBoolean("start_in_native_hub", parsed.optBoolean("startInHub", true))
+            .putBoolean("start_in_native_hub", parsed.optBoolean("startInHub", false))
             .putBoolean("blocking", parsed.optBoolean("blocking", true))
             .putBoolean("protect_screen", parsed.optBoolean("protectScreen", false))
             .putBoolean("strict_blocking", parsed.optBoolean("strictBlocking", false))

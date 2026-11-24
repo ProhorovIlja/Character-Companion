@@ -69,9 +69,9 @@ class MainActivity : Activity() {
         private const val IMPORT_SETTINGS = 704
         private const val IMPORT_FILTER_LIST = 705
         private const val EXPORT_FILTER_LIST = 706
-        private val TEXT = Color.rgb(235, 225, 211)
-        private val MUTED = Color.rgb(177, 175, 189)
-        private val ACCENT = Color.rgb(201, 169, 113)
+        private val TEXT = Color.rgb(228, 231, 240)
+        private val MUTED = Color.rgb(171, 178, 195)
+        private val ACCENT = Color.rgb(168, 184, 255)
     }
 
     private lateinit var webView: WebView
@@ -550,32 +550,16 @@ class MainActivity : Activity() {
     }
 
     private fun bindControls() {
-        findViewById<View>(R.id.back).setOnClickListener { if (webView.canGoBack()) webView.goBack() }
-        findViewById<View>(R.id.forward).setOnClickListener { if (webView.canGoForward()) webView.goForward() }
-        findViewById<View>(R.id.reload).setOnClickListener { webView.reload() }
+        findViewById<View>(R.id.back).setOnClickListener { navigateBack() }
         findViewById<View>(R.id.home).setOnClickListener { openFirstPartyPage(HOME) }
         findViewById<View>(R.id.home).setOnLongClickListener { showNativeHub(); true }
-        findViewById<View>(R.id.open_browser).setOnClickListener {
-            openBrowserTab(BrowserSessionPolicy.safeTabUrl(webView.url))
-        }
-        findViewById<View>(R.id.open_browser).setOnLongClickListener {
-            openExternal(BrowserSessionPolicy.safeTabUrl(webView.url)); true
-        }
-        findViewById<View>(R.id.share).setOnClickListener { sharePage() }
-        findViewById<View>(R.id.share).setOnLongClickListener { copyPageLink(); true }
-        findViewById<View>(R.id.reload).setOnLongClickListener {
-            webView.clearCache(true); webView.reload(); showToast(getString(R.string.cache_refreshed)); true
-        }
         findViewById<View>(R.id.status_badge).setOnClickListener { showDiagnostics() }
         findViewById<View>(R.id.status_badge).setOnLongClickListener { toggleLoginProtection(); true }
         findViewById<View>(R.id.bookmarks).setOnClickListener { showBookmarks() }
-        findViewById<View>(R.id.filter).setOnClickListener {
-            store.blocking = !store.blocking
-            applySettings(reload = true)
-            showToast(if (store.blocking) getString(R.string.shield_enabled) else getString(R.string.shield_disabled))
+        findViewById<View>(R.id.voice).setOnClickListener {
+            startActivity(Intent(this, VoiceDraftActivity::class.java))
         }
-        findViewById<View>(R.id.filter).setOnLongClickListener { showFilterRules(); true }
-        findViewById<View>(R.id.settings).setOnClickListener { showSettings() }
+        findViewById<View>(R.id.more).setOnClickListener { showPageMenu(it) }
         findViewById<View>(R.id.error_retry).setOnClickListener {
             errorOverlay.visibility = View.GONE
             openFirstPartyPage(lastUrl)
@@ -583,6 +567,29 @@ class MainActivity : Activity() {
         findViewById<View>(R.id.error_open_browser).setOnClickListener {
             openBrowserTab(BrowserSessionPolicy.safeTabUrl(lastUrl))
         }
+    }
+
+    private fun showPageMenu(anchor: View) {
+        val ready = ::webView.isInitialized && !destroyed
+        ShellMenu.show(this, anchor, listOf(
+            ShellMenu.Action(R.string.settings) { showSettings() },
+            ShellMenu.Action(R.string.forward, ready && webView.canGoForward()) { webView.goForward() },
+            ShellMenu.Action(R.string.reload, ready) { webView.reload() },
+            ShellMenu.Action(R.string.shell_refresh_cache, ready) {
+                webView.clearCache(true); webView.reload(); showToast(getString(R.string.cache_refreshed))
+            },
+            ShellMenu.Action(R.string.share, ready) { sharePage() },
+            ShellMenu.Action(R.string.shell_copy_link, ready) { copyPageLink() },
+            ShellMenu.Action(if (store.blocking) R.string.shell_disable_shield else R.string.shell_enable_shield) {
+                store.blocking = !store.blocking; applySettings(reload = true)
+            },
+            ShellMenu.Action(R.string.login_compatibility_button) { toggleLoginProtection() },
+            ShellMenu.Action(R.string.filter_edit) { showFilterRules() },
+            ShellMenu.Action(R.string.diagnostics) { showDiagnostics() },
+            ShellMenu.Action(R.string.browser_mode_sign_in) { confirmBrowserSessionMode() },
+            ShellMenu.Action(R.string.open_browser, ready) { openBrowserTab(BrowserSessionPolicy.safeTabUrl(webView.url)) },
+            ShellMenu.Action(R.string.hub_open) { showNativeHub() }
+        ))
     }
 
     private fun confirmIdentityNavigation(url: String) {
@@ -725,17 +732,16 @@ class MainActivity : Activity() {
     private fun updateStatus() {
         val blocked = filter.blockedRequestCount.get()
         status.text = if (store.blocking && loginProtection.bypass) getString(R.string.shield_login)
-            else if (store.blocking && blocked > 0) "◈ $blocked"
+            else if (store.blocking && blocked > 0) "◈ ${if (blocked > 999) "999+" else blocked.toString()}"
             else if (store.blocking) getString(R.string.shield_on) else getString(R.string.shield_off)
         status.contentDescription = if (store.blocking && loginProtection.bypass)
             getString(R.string.login_compatibility_on)
             else if (store.blocking) getString(R.string.status_blocked_accessibility, blocked)
             else getString(R.string.shield_disabled)
-        findViewById<TextView>(R.id.filter).setTextColor(if (store.blocking) ACCENT else MUTED)
+        status.setTextColor(if (store.blocking && !loginProtection.bypass) ACCENT else MUTED)
     }
     private fun refreshBackForward() {
-        findViewById<View>(R.id.back).alpha = if (::webView.isInitialized && webView.canGoBack()) 1f else 0.35f
-        findViewById<View>(R.id.forward).alpha = if (::webView.isInitialized && webView.canGoForward()) 1f else 0.35f
+        findViewById<View>(R.id.back).alpha = if (::webView.isInitialized && webView.canGoBack()) 1f else 0.55f
     }
     private fun showError(message: String) {
         errorOverlay.visibility = View.VISIBLE
@@ -843,19 +849,15 @@ class MainActivity : Activity() {
         layout.addView(infoLabel(getString(R.string.hub_description)))
         addButton(layout, getString(R.string.hub_continue)) { openFirstPartyPage(lastUrl) }
         addButton(layout, getString(R.string.browser_mode_sign_in)) { confirmBrowserSessionMode() }
-        addButton(layout, getString(R.string.hub_open_browser)) {
-            openBrowserTab(BrowserSessionPolicy.HOME)
-        }
         // The manual editor works even before WebView's first navigation.
         var refreshNativeBookmarks: () -> Unit = {}
         addButton(layout, getString(R.string.hub_bookmark_manual_add)) {
             createOfflineBookmark { refreshNativeBookmarks() }
         }
-        addButton(layout, getString(R.string.hub_privacy)) { showPrivacyStats() }
         addButton(layout, getString(R.string.voice_title)) {
             startActivity(Intent(this, VoiceDraftActivity::class.java))
         }
-        addButton(layout, getString(R.string.device_compat_title)) { showDeviceCompatibility() }
+        addButton(layout, getString(R.string.settings)) { showSettings() }
         layout.addView(sectionLabel(getString(R.string.hub_library)))
         val search = EditText(this).apply {
             hint = getString(R.string.hub_search_hint)
@@ -1002,15 +1004,17 @@ class MainActivity : Activity() {
     }
 
     private fun showBookmarks() {
-        val url = UrlPolicy.sanitizeBookmark(webView.url) ?: HOME
+        val url = if (::webView.isInitialized) UrlPolicy.sanitizeBookmark(webView.url) else null
         val saved = store.listBookmarks()
         val options = mutableListOf(getString(R.string.bookmark_add), getString(R.string.bookmark_remove))
         options.addAll(saved.map { "☆ ${it.first}" })
         AlertDialog.Builder(this).setTitle(getString(R.string.bookmarks))
             .setItems(options.toTypedArray()) { _, selected ->
                 when (selected) {
-                    0 -> { if (store.addBookmark(webView.title ?: "Character.AI", url)) showToast(getString(R.string.bookmark_saved)) }
-                    1 -> { store.removeBookmark(url); showToast(getString(R.string.bookmark_removed)) }
+                    0 -> { if (url == null) showToast(getString(R.string.hub_bookmark_invalid))
+                        else if (store.addBookmark(webView.title ?: "Character.AI", url)) showToast(getString(R.string.bookmark_saved)) }
+                    1 -> { if (url == null) showToast(getString(R.string.hub_bookmark_invalid))
+                        else { store.removeBookmark(url); showToast(getString(R.string.bookmark_removed)) } }
                     else -> saved.getOrNull(selected - 2)?.second?.let(::openFirstPartyPage)
                 }
             }.setNegativeButton(R.string.cancel, null).show()
@@ -1056,110 +1060,126 @@ class MainActivity : Activity() {
     }
 
     private fun showSettings() {
-        val scroll = ScrollView(this).apply { setBackgroundColor(Color.rgb(21,22,30)) }
+        val categories = intArrayOf(R.string.section_profiles, R.string.section_browser_session, R.string.section_privacy, R.string.section_appearance, R.string.section_data, R.string.section_about)
+        AlertDialog.Builder(this).setTitle(R.string.settings)
+            .setItems(categories.map { getString(it) }.toTypedArray()) { _, index ->
+                showSettingsSection(categories[index])
+            }.setNegativeButton(R.string.close, null).show()
+    }
+
+    private fun showSettingsSection(section: Int) {
+        val scroll = ScrollView(this).apply { setBackgroundColor(Color.rgb(25, 28, 37)) }
         val layout = settingsColumn()
         scroll.addView(layout)
-        layout.addView(sectionLabel(getString(R.string.section_profiles)))
-        addButton(layout, getString(R.string.profile_title)) { showProfiles() }
-        layout.addView(infoLabel(getString(R.string.profile_desc)))
-        addButton(layout, getString(R.string.hub_open)) { showNativeHub() }
-        addToggle(layout, getString(R.string.hub_on_launch), getString(R.string.hub_on_launch_desc), store.startInHub) {
-            store.startInHub = it
+        if (section == R.string.section_profiles) {
+            addButton(layout, getString(R.string.profile_title)) { showProfiles() }
+            layout.addView(infoLabel(getString(R.string.profile_desc)))
+            addButton(layout, getString(R.string.hub_open)) { showNativeHub() }
+            addToggle(layout, getString(R.string.hub_on_launch), getString(R.string.hub_on_launch_desc), store.startInHub) {
+                store.startInHub = it
+            }
         }
-        layout.addView(sectionLabel(getString(R.string.section_browser_session)))
-        addButton(layout, getString(R.string.browser_mode_sign_in)) { confirmBrowserSessionMode() }
-        addButton(layout, getString(R.string.browser_session_open)) {
-            openBrowserTab(BrowserSessionPolicy.HOME)
+        if (section == R.string.section_browser_session) {
+            addButton(layout, getString(R.string.browser_mode_sign_in)) { confirmBrowserSessionMode() }
+            addButton(layout, getString(R.string.browser_session_open)) {
+                openBrowserTab(BrowserSessionPolicy.HOME)
+            }
+            layout.addView(infoLabel(getString(R.string.browser_session_desc)))
         }
-        layout.addView(infoLabel(getString(R.string.browser_session_desc)))
-        layout.addView(sectionLabel(getString(R.string.section_privacy)))
-        addToggle(layout, getString(R.string.toggle_protect_screen),
-            getString(R.string.toggle_protect_screen_desc), store.protectScreen) {
-            store.protectScreen = it; applySettings(reload = false)
+        if (section == R.string.section_privacy) {
+            addToggle(layout, getString(R.string.toggle_protect_screen),
+                getString(R.string.toggle_protect_screen_desc), store.protectScreen) {
+                store.protectScreen = it; applySettings(reload = false)
+            }
+            addToggle(layout, getString(R.string.toggle_filter), getString(R.string.toggle_filter_desc), store.blocking) {
+                store.blocking = it; applySettings(reload = true)
+            }
+            addToggle(layout, getString(R.string.toggle_strict), getString(R.string.toggle_strict_desc), store.strictBlocking) {
+                store.strictBlocking = it; applySettings(reload = true)
+            }
+            addToggle(layout, getString(R.string.toggle_cookies), getString(R.string.toggle_cookies_desc), store.cookies) {
+                store.cookies = it; applySettings(reload = true)
+            }
+            addToggle(layout, getString(R.string.toggle_media), getString(R.string.toggle_media_desc), store.mediaAllowed) {
+                store.mediaAllowed = it
+            }
+            addButton(layout, getString(R.string.login_compatibility_button)) { toggleLoginProtection() }
+            layout.addView(infoLabel(getString(R.string.login_compatibility_info)))
+            addButton(layout, getString(R.string.filter_edit)) { showFilterRules() }
+            addButton(layout, getString(R.string.import_filter_list)) { chooseFilterList() }
+            if (importedRules.size > 0) {
+                addButton(layout, getString(R.string.export_filter_list)) { exportFilterList() }
+            }
+            layout.addView(infoLabel(getString(R.string.filter_import_info, importedRules.size)))
+            if (importedRules.size > 0) {
+                addButton(layout, getString(R.string.clear_imported_filter)) { confirmClearImportedList() }
+            }
+            addButton(layout, getString(R.string.diagnostics)) { showDiagnostics() }
+            addButton(layout, getString(R.string.device_compat_title)) { showDeviceCompatibility() }
+            addButton(layout, getString(R.string.privacy_stats)) { showPrivacyStats() }
         }
-        addToggle(layout, getString(R.string.toggle_filter), getString(R.string.toggle_filter_desc), store.blocking) {
-            store.blocking = it; applySettings(reload = true)
+        if (section == R.string.section_appearance) {
+            addToggle(layout, getString(R.string.toggle_compact), getString(R.string.toggle_compact_desc), store.compactChrome) {
+                store.compactChrome = it; applySettings(reload = false)
+            }
+            addToggle(layout, getString(R.string.toggle_dark), getString(R.string.toggle_dark_desc), store.darkCanvas) {
+                store.darkCanvas = it; applySettings(reload = false)
+            }
+            addToggle(layout, getString(R.string.toggle_images), getString(R.string.toggle_images_desc), store.reduceImages) {
+                store.reduceImages = it; applySettings(reload = true)
+            }
+            addToggle(layout, getString(R.string.toggle_desktop), getString(R.string.toggle_desktop_desc), store.desktopMode) {
+                store.desktopMode = it; applySettings(reload = true)
+            }
+            addToggle(layout, getString(R.string.toggle_gesture), getString(R.string.toggle_gesture_desc), store.mediaRequiresGesture) {
+                store.mediaRequiresGesture = it; applySettings(reload = false)
+            }
+            addToggle(layout, getString(R.string.toggle_resume), getString(R.string.toggle_resume_desc), store.resumePage) {
+                store.resumePage = it
+                if (!it) store.lastVisited = ""
+            }
+            layout.addView(infoLabel(getString(R.string.text_scaling, store.textZoom)))
+            val zoomValue = TextView(this).apply { text = "${store.textZoom}%"; setTextColor(ACCENT) }
+            layout.addView(zoomValue)
+            val zoomBar = SeekBar(this).apply {
+                max = 100; this.progress = store.textZoom - 75
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                        zoomValue.text = "${progress + 75}%"
+                        if (fromUser) { store.textZoom = progress + 75; applySettings(reload = false) }
+                    }
+                    override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+                    override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+                })
+            }
+            layout.addView(zoomBar)
         }
-        addToggle(layout, getString(R.string.toggle_strict), getString(R.string.toggle_strict_desc), store.strictBlocking) {
-            store.strictBlocking = it; applySettings(reload = true)
+        if (section == R.string.section_data) {
+            addButton(layout, getString(R.string.export_settings)) { exportSettings() }
+            addButton(layout, getString(R.string.import_settings)) { importSettings() }
+            addButton(layout, getString(R.string.clear_cache)) { confirmClearCache() }
+            addButton(layout, getString(R.string.clear_data)) { confirmClearSiteData() }
+            addButton(layout, getString(R.string.voice_title)) {
+                startActivity(Intent(this, VoiceDraftActivity::class.java))
+            }
         }
-        addToggle(layout, getString(R.string.toggle_cookies), getString(R.string.toggle_cookies_desc), store.cookies) {
-            store.cookies = it; applySettings(reload = true)
+        if (section == R.string.section_about) {
+            layout.addView(infoLabel(getString(R.string.about_details, BuildConfig.VERSION_NAME,
+                filter.blockedRequestCount.get())))
         }
-        addToggle(layout, getString(R.string.toggle_media), getString(R.string.toggle_media_desc), store.mediaAllowed) {
-            store.mediaAllowed = it
-        }
-        addButton(layout, getString(R.string.login_compatibility_button)) { toggleLoginProtection() }
-        layout.addView(infoLabel(getString(R.string.login_compatibility_info)))
-        addButton(layout, getString(R.string.filter_edit)) { showFilterRules() }
-        addButton(layout, getString(R.string.import_filter_list)) { chooseFilterList() }
-        if (importedRules.size > 0) {
-            addButton(layout, getString(R.string.export_filter_list)) { exportFilterList() }
-        }
-        layout.addView(infoLabel(getString(R.string.filter_import_info, importedRules.size)))
-        if (importedRules.size > 0) {
-            addButton(layout, getString(R.string.clear_imported_filter)) { confirmClearImportedList() }
-        }
-        addButton(layout, getString(R.string.diagnostics)) { showDiagnostics() }
-        addButton(layout, getString(R.string.device_compat_title)) { showDeviceCompatibility() }
-        addButton(layout, getString(R.string.privacy_stats)) { showPrivacyStats() }
-        layout.addView(sectionLabel(getString(R.string.section_appearance)))
-        addToggle(layout, getString(R.string.toggle_compact), getString(R.string.toggle_compact_desc), store.compactChrome) {
-            store.compactChrome = it; applySettings(reload = false)
-        }
-        addToggle(layout, getString(R.string.toggle_dark), getString(R.string.toggle_dark_desc), store.darkCanvas) {
-            store.darkCanvas = it; applySettings(reload = false)
-        }
-        addToggle(layout, getString(R.string.toggle_images), getString(R.string.toggle_images_desc), store.reduceImages) {
-            store.reduceImages = it; applySettings(reload = true)
-        }
-        addToggle(layout, getString(R.string.toggle_desktop), getString(R.string.toggle_desktop_desc), store.desktopMode) {
-            store.desktopMode = it; applySettings(reload = true)
-        }
-        addToggle(layout, getString(R.string.toggle_gesture), getString(R.string.toggle_gesture_desc), store.mediaRequiresGesture) {
-            store.mediaRequiresGesture = it; applySettings(reload = false)
-        }
-        addToggle(layout, getString(R.string.toggle_resume), getString(R.string.toggle_resume_desc), store.resumePage) {
-            store.resumePage = it
-            if (!it) store.lastVisited = ""
-        }
-        layout.addView(infoLabel(getString(R.string.text_scaling, store.textZoom)))
-        val zoomValue = TextView(this).apply { text = "${store.textZoom}%"; setTextColor(ACCENT) }
-        layout.addView(zoomValue)
-        val zoomBar = SeekBar(this).apply {
-            max = 100; this.progress = store.textZoom - 75
-            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                    zoomValue.text = "${progress + 75}%"
-                    if (fromUser) { store.textZoom = progress + 75; applySettings(reload = false) }
-                }
-                override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-                override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-            })
-        }
-        layout.addView(zoomBar)
-        layout.addView(sectionLabel(getString(R.string.section_data)))
-        addButton(layout, getString(R.string.export_settings)) { exportSettings() }
-        addButton(layout, getString(R.string.import_settings)) { importSettings() }
-        addButton(layout, getString(R.string.clear_cache)) { confirmClearCache() }
-        addButton(layout, getString(R.string.clear_data)) { confirmClearSiteData() }
-        addButton(layout, getString(R.string.voice_title)) {
-            startActivity(Intent(this, VoiceDraftActivity::class.java))
-        }
-        layout.addView(sectionLabel(getString(R.string.section_about)))
-        layout.addView(infoLabel(getString(R.string.about_details, BuildConfig.VERSION_NAME,
-            filter.blockedRequestCount.get())))
-        AlertDialog.Builder(this).setView(scroll).setPositiveButton(R.string.close, null).show()
+        AlertDialog.Builder(this).setTitle(section).setView(scroll)
+            .setNeutralButton(R.string.settings) { _, _ -> showSettings() }
+            .setPositiveButton(R.string.close, null).show()
     }
 
     private fun settingsColumn(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(20), dp(18), dp(20), dp(22))
-        setBackgroundColor(Color.rgb(22,23,32))
+        setBackgroundColor(Color.rgb(25,28,37))
     }
     private fun sectionLabel(text: String): TextView = TextView(this).apply {
         this.text = text; setTextColor(ACCENT); textSize = 12f
-        typeface = Typeface.DEFAULT_BOLD; letterSpacing = .12f
+        typeface = Typeface.DEFAULT_BOLD; letterSpacing = .025f
         setPadding(0, dp(20), 0, dp(9))
     }
     private fun infoLabel(text: String): TextView = TextView(this).apply {
@@ -1191,12 +1211,14 @@ class MainActivity : Activity() {
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     private fun confirmClearCache() {
+        if (!::webView.isInitialized) { showToast(getString(R.string.shell_no_page)); return }
         AlertDialog.Builder(this).setMessage(getString(R.string.cache_clear_message))
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.confirm) { _, _ -> webView.clearCache(true); showToast(getString(R.string.cache_cleared)) }
             .show()
     }
     private fun confirmClearSiteData() {
+        if (!::webView.isInitialized) { showToast(getString(R.string.shell_no_page)); return }
         AlertDialog.Builder(this).setTitle(getString(R.string.data_clear_title))
             .setMessage(getString(R.string.data_clear_message))
             .setNegativeButton(R.string.cancel, null)

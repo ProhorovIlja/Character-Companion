@@ -217,4 +217,15 @@
     <string name="browser_mode_explanation">Войдите на официальном сайте Character.AI в браузерной вкладке и продолжайте общение там. Закройте вкладку, чтобы вернуться на этот экран, затем продолжите ту же сессию браузера. Во встроенном движке отдельный вход. Фильтрация Character Companion, защита экрана и встроенное голосовое управление не действуют во вкладке браузера. Данные аккаунта не копируются. Используйте тот же браузер по умолчанию, чтобы сохранить вход.</string>
     <string name="browser_mode_no_provider">Нет совместимого браузера Custom Tabs. Выберите браузер с поддержкой Custom Tabs по умолчанию и повторите попытку.</string>
     <string name="browser_mode_restart">Выбран встроенный режим. Откройте Character Companion заново.</string>
+    <string name="shell_saved">Избранное</string>
+    <string name="shell_voice">Голос</string>
+    <string name="shell_more">Ещё</string>
+    <string name="shell_refresh_cache">Обновить и очистить кэш</string>
+    <string name="shell_copy_link">Копировать ссылку</string>
+    <string name="shell_enable_shield">Включить защиту</string>
+    <string name="shell_disable_shield">Выключить защиту</string>
+    <string name="shell_no_page">Сначала откройте Character.AI во встроенном браузере.</string>
+    <string name="shell_session_info">Как работает вход через браузер</string>
+    <string name="browser_mode_summary">Продолжите общение в существующей сессии браузера. Встроенный движок использует отдельную авторизацию.</string>
+    <string name="voice_finish">Завершить диктовку</string>
 </resources>

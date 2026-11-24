@@ -1,3 +1,5 @@
+**0.35.0-rc1 (source):** compact chat-first Android shell, shared icon navigation, grouped settings, streamlined browser-session screen, finish/cancel dictation and safer bookmark handling. [Design and QA notes](docs/ANDROID_COMPACT_UI_0.35.md). Build/device QA pending.
+
 **0.34.0-rc1 (source):** New browser-session mode for Google/Apple sign-in in both Android flavors. Sign in and chat in the same browser-owned Custom Tab; closing it returns to a native Continue session screen. This does not transfer cookies into embedded GeckoView/WebView or enable native filtering inside the tab. Android build and device QA pending. [Details](docs/ANDROID_BROWSER_SESSION_MODE.md).
 
 **Build #7 partial success (2026-11-24):** [Verified WebView debug APK ZIP](https://github.com/ProhorovIlja/Character-Companion/actions/runs/45362926427/artifacts/14905217495) is available until 2026-12-01. GeckoView 159 requires compileSdk 37.2; the repair selects it for Gecko and retains 37.0 for WebView. New manual build required for Gecko; device QA pending. [Build report](docs/BUILD_FIX_RUN7_GECKO_SDK37_2.md).

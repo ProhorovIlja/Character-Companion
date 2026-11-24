@@ -57,9 +57,10 @@ class GeckoActivity : Activity() {
     private lateinit var root: LinearLayout
     private lateinit var locationLabel: TextView
     private lateinit var backButton: Button
-    private lateinit var forwardButton: Button
     private lateinit var privacyButton: Button
+    private lateinit var chromeHeader: LinearLayout
     private lateinit var actionsRow: LinearLayout
+    private var keyboardVisible = false
     private val recoveryBudget = RendererRecoveryBudget(2, 120_000L)
     private var needsRecovery = false
     private var recoveryDialog: AlertDialog? = null
@@ -80,9 +81,9 @@ class GeckoActivity : Activity() {
     private var downloadPickerOpen = false
     private var genericPromptDialog: AlertDialog? = null
     private var backCallback: OnBackInvokedCallback? = null
-    private val fg = Color.rgb(235, 225, 211)
-    private val accent = Color.rgb(201, 169, 113)
-    private val bg = Color.rgb(17, 18, 25)
+    private val fg = Color.rgb(228, 231, 240)
+    private val accent = Color.rgb(168, 184, 255)
+    private val bg = Color.rgb(17, 19, 25)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -101,64 +102,65 @@ class GeckoActivity : Activity() {
                 if (Build.VERSION.SDK_INT >= 30) {
                     val bars = insets.getInsets(WindowInsets.Type.systemBars())
                     view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+                    keyboardVisible = insets.isVisible(WindowInsets.Type.ime())
+                    updateCompactChrome()
                 }
                 insets
             }
         }
         setContentView(root)
         root.requestApplyInsets()
-        val top = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        locationLabel = TextView(this).apply {
-            text = getString(R.string.gecko_preview_title)
-            setTextColor(accent)
-            textSize = 15f
-            maxLines = 2
-            setPadding(dp(14), dp(10), dp(6), dp(8))
+        chromeHeader = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(Color.rgb(25, 28, 37))
+            setPadding(0, 0, dp(8), 0)
         }
-        top.addView(locationLabel, LinearLayout.LayoutParams(0, dp(54), 1f))
-        top.addView(button("🎙") {
-            startActivity(Intent(this, VoiceDraftActivity::class.java))
-        }.apply { contentDescription = getString(R.string.voice_title) },
-            LinearLayout.LayoutParams(dp(48), dp(54)))
-        top.addView(button("☆") { saveCurrentBookmark() }.apply {
-            contentDescription = getString(R.string.bookmark_add)
-        }, LinearLayout.LayoutParams(dp(48), dp(54)))
-        top.addView(button("☰") { showBookmarks() }.apply {
-            contentDescription = getString(R.string.bookmarks)
-        }, LinearLayout.LayoutParams(dp(48), dp(54)))
-        top.addView(button("⚙") { showGeckoSettings() }.apply {
-            contentDescription = getString(R.string.settings)
-        }, LinearLayout.LayoutParams(dp(48), dp(54)))
-        root.addView(top)
-        val bottom = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        backButton = button(getString(R.string.back)) { navigateBack() }
-        forwardButton = button(getString(R.string.forward)) { if (canGoForward) session.goForward() }
-        bottom.addView(backButton, LinearLayout.LayoutParams(0, dp(48), 1f))
-        bottom.addView(forwardButton, LinearLayout.LayoutParams(0, dp(48), 1f))
-        bottom.addView(button(getString(R.string.reload)) { session.reload() }, LinearLayout.LayoutParams(0, dp(48), 1f))
-        bottom.addView(button(getString(R.string.home)) { session.loadUri(HOME) }, LinearLayout.LayoutParams(0, dp(48), 1f))
-        root.addView(bottom)
-        actionsRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        val actions = actionsRow
+        backButton = Button(this).apply {
+            contentDescription = getString(R.string.back)
+            setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_shell_back, 0, 0, 0)
+            setPadding(dp(13), 0, 0, 0)
+            setBackgroundResource(android.R.drawable.list_selector_background)
+            setOnClickListener { navigateBack() }
+        }
+        chromeHeader.addView(backButton, LinearLayout.LayoutParams(dp(48), dp(52)))
+        locationLabel = TextView(this).apply {
+            text = "Character.AI"
+            setTextColor(fg); textSize = 15f
+            isSingleLine = true; ellipsize = android.text.TextUtils.TruncateAt.END
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(4), 0, dp(8), 0)
+        }
+        chromeHeader.addView(locationLabel, LinearLayout.LayoutParams(0, dp(52), 1f))
         privacyButton = button(getString(R.string.filter)) {
             settings.blocking = !settings.blocking
             refreshTrackingProtection()
+        }.apply {
+            setBackgroundResource(android.R.drawable.list_selector_background)
+            setPadding(dp(4), 0, dp(4), 0)
         }
-        privacyButton.setOnLongClickListener {
-            toggleLoginProtection()
-            true
-        }
-        actions.addView(privacyButton, LinearLayout.LayoutParams(0, dp(48), 1f))
-        actions.addView(button(getString(R.string.share)) { shareSafeUrl() }, LinearLayout.LayoutParams(0, dp(48), 1f))
-        actions.addView(button(getString(R.string.gecko_media)) { configureMedia() }, LinearLayout.LayoutParams(0, dp(48), 1f))
-        actions.addView(button(getString(R.string.open_browser)) {
-            confirmBrowser(activeUrl)
-        }, LinearLayout.LayoutParams(0, dp(48), 1f))
-        root.addView(actions)
-        updateCompactChrome()
+        privacyButton.setOnLongClickListener { toggleLoginProtection(); true }
+        chromeHeader.addView(privacyButton, LinearLayout.LayoutParams(dp(80), dp(48)))
+        root.addView(chromeHeader)
         surface = GeckoView(this)
         root.addView(surface, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        actionsRow = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(Color.rgb(25, 28, 37))
+        }
+        actionsRow.addView(navAction(R.string.home, R.drawable.ic_shell_home) {
+            if (sessionReady()) session.loadUri(HOME)
+        }, LinearLayout.LayoutParams(0, dp(56), 1f))
+        actionsRow.addView(navAction(R.string.shell_saved, R.drawable.ic_shell_saved) { showBookmarks() },
+            LinearLayout.LayoutParams(0, dp(56), 1f))
+        actionsRow.addView(navAction(R.string.shell_voice, R.drawable.ic_shell_mic) {
+            startActivity(Intent(this, VoiceDraftActivity::class.java))
+        }, LinearLayout.LayoutParams(0, dp(56), 1f))
+        val more = navAction(R.string.shell_more, R.drawable.ic_shell_more) {}
+        more.setOnClickListener { showPageMenu(more) }
+        actionsRow.addView(more, LinearLayout.LayoutParams(0, dp(56), 1f))
+        root.addView(actionsRow)
+        updateCompactChrome()
         updatePrivacy()
         updateNavigation()
         try {
@@ -202,6 +204,36 @@ class GeckoActivity : Activity() {
         setTextColor(fg)
         setBackgroundResource(R.drawable.settings_action)
         setOnClickListener { action() }
+    }
+
+    private fun sessionReady(): Boolean = ::session.isInitialized && session.isOpen && !needsRecovery
+
+    private fun navAction(label: Int, icon: Int, run: () -> Unit): TextView = TextView(this).apply {
+        setText(label); textSize = 11f; setTextColor(fg); gravity = Gravity.CENTER
+        setPadding(dp(4), dp(7), dp(4), dp(6))
+        setCompoundDrawablesWithIntrinsicBounds(0, icon, 0, 0)
+        compoundDrawablePadding = dp(3)
+        setBackgroundResource(android.R.drawable.list_selector_background)
+        isFocusable = true; contentDescription = getString(label)
+        setOnClickListener { run() }
+    }
+
+    private fun showPageMenu(anchor: View) {
+        val ready = sessionReady()
+        ShellMenu.show(this, anchor, listOf(
+            ShellMenu.Action(R.string.settings) { showGeckoSettings() },
+            ShellMenu.Action(R.string.forward, ready && canGoForward) { session.goForward() },
+            ShellMenu.Action(R.string.reload, ready) { session.reload() },
+            ShellMenu.Action(R.string.bookmark_add, ready) { saveCurrentBookmark() },
+            ShellMenu.Action(R.string.share, ready) { shareSafeUrl() },
+            ShellMenu.Action(if (settings.blocking) R.string.shell_disable_shield else R.string.shell_enable_shield) {
+                settings.blocking = !settings.blocking; refreshTrackingProtection()
+            },
+            ShellMenu.Action(R.string.login_compatibility_button, ready) { toggleLoginProtection() },
+            ShellMenu.Action(R.string.gecko_media) { configureMedia() },
+            ShellMenu.Action(R.string.browser_mode_sign_in) { confirmBrowserSessionMode() },
+            ShellMenu.Action(R.string.open_browser, ready) { confirmBrowser(activeUrl) }
+        ))
     }
 
     /** Gecko bookmark editor never accesses page DOM, cookies or chat text. */
@@ -301,50 +333,65 @@ class GeckoActivity : Activity() {
 
     /** Only options actually supported by Gecko are shown; WebView-only settings are omitted. */
     private fun showGeckoSettings() {
-        val options = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(12), dp(8), dp(12), dp(8))
-        }
-        options.addView(button(getString(R.string.browser_mode_sign_in)) {
-            confirmBrowserSessionMode()
-        })
-        options.addView(settingCheckbox(R.string.toggle_filter, settings.blocking) {
-            settings.blocking = it
-            if (::session.isInitialized && session.isOpen)
-                session.settings.setUseTrackingProtection(it && !loginProtection.bypass)
-            updatePrivacy()
-        })
-        options.addView(button(getString(R.string.login_compatibility_button)) {
-            toggleLoginProtection()
-        })
-        options.addView(TextView(this).apply {
-            text = getString(R.string.login_compatibility_info)
-            setTextColor(fg)
-            setPadding(dp(8), dp(6), dp(8), dp(10))
-        })
-        options.addView(settingCheckbox(R.string.toggle_media, settings.mediaAllowed) {
-            settings.mediaAllowed = it
-            if (!it) revokeMediaPermissions()
-        })
-        options.addView(settingCheckbox(R.string.toggle_protect_screen, settings.protectScreen) {
-            settings.protectScreen = it
-            if (it) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-            else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        })
-        options.addView(settingCheckbox(R.string.toggle_resume, settings.resumePage) {
-            settings.resumePage = it
-            if (!it) settings.lastVisited = ""
-            else UrlPolicy.sanitizeBookmark(activeUrl)?.let { safe -> settings.lastVisited = safe }
-        })
-        options.addView(settingCheckbox(R.string.toggle_compact, settings.compactChrome) {
-            settings.compactChrome = it
-            updateCompactChrome()
-        })
-        val scroll = ScrollView(this).apply { addView(options) }
-        AlertDialog.Builder(this).setTitle(R.string.settings).setView(scroll)
-            .setNeutralButton(R.string.gecko_legacy) { _, _ ->
+        val categories = intArrayOf(R.string.section_browser_session, R.string.section_privacy, R.string.section_appearance)
+        AlertDialog.Builder(this).setTitle(R.string.settings)
+            .setItems(categories.map { getString(it) }.toTypedArray()) { _, selected ->
+                showGeckoSettingsSection(categories[selected])
+            }.setNeutralButton(R.string.gecko_legacy) { _, _ ->
                 startActivity(Intent(this, MainActivity::class.java))
             }.setPositiveButton(R.string.close, null).show()
+    }
+
+    private fun showGeckoSettingsSection(section: Int) {
+        val options = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(8), dp(16), dp(16))
+        }
+        if (section == R.string.section_browser_session) {
+            options.addView(button(getString(R.string.browser_mode_sign_in)) {
+                confirmBrowserSessionMode()
+            })
+        }
+        if (section == R.string.section_privacy) {
+            options.addView(settingCheckbox(R.string.toggle_filter, settings.blocking) {
+                settings.blocking = it
+                if (::session.isInitialized && session.isOpen)
+                    session.settings.setUseTrackingProtection(it && !loginProtection.bypass)
+                updatePrivacy()
+            })
+            options.addView(button(getString(R.string.login_compatibility_button)) {
+                toggleLoginProtection()
+            })
+            options.addView(TextView(this).apply {
+                text = getString(R.string.login_compatibility_info)
+                setTextColor(fg)
+                setPadding(dp(8), dp(6), dp(8), dp(10))
+            })
+            options.addView(settingCheckbox(R.string.toggle_media, settings.mediaAllowed) {
+                settings.mediaAllowed = it
+                if (!it) revokeMediaPermissions()
+            })
+            options.addView(settingCheckbox(R.string.toggle_protect_screen, settings.protectScreen) {
+                settings.protectScreen = it
+                if (it) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            })
+        }
+        if (section == R.string.section_appearance) {
+            options.addView(settingCheckbox(R.string.toggle_resume, settings.resumePage) {
+                settings.resumePage = it
+                if (!it) settings.lastVisited = ""
+                else UrlPolicy.sanitizeBookmark(activeUrl)?.let { safe -> settings.lastVisited = safe }
+            })
+            options.addView(settingCheckbox(R.string.toggle_compact, settings.compactChrome) {
+                settings.compactChrome = it
+                updateCompactChrome()
+            })
+        }
+        val scroll = ScrollView(this).apply { addView(options) }
+        AlertDialog.Builder(this).setTitle(section).setView(scroll)
+            .setNeutralButton(R.string.settings) { _, _ -> showGeckoSettings() }
+            .setPositiveButton(R.string.close, null).show()
     }
 
     private fun revokeMediaPermissions() {
@@ -357,8 +404,10 @@ class GeckoActivity : Activity() {
     }
 
     private fun updateCompactChrome() {
+        if (::chromeHeader.isInitialized)
+            chromeHeader.visibility = if (settings.compactChrome) View.GONE else View.VISIBLE
         if (::actionsRow.isInitialized)
-            actionsRow.visibility = if (settings.compactChrome) View.GONE else View.VISIBLE
+            actionsRow.visibility = if (keyboardVisible) View.GONE else View.VISIBLE
     }
 
     /** User-initiated recovery, never a timer or background monitor. Form contents may be lost. */
@@ -727,8 +776,7 @@ class GeckoActivity : Activity() {
             // Only store public content paths, never credentials, tokens or fragments.
             UrlPolicy.sanitizeBookmark(url)?.let { if (settings.resumePage) settings.lastVisited = it }
             val safe = UrlPolicy.safeShareUrl(url)
-            locationLabel.text = safe?.let { "Character.AI · " + it.substringAfter("character.ai/").take(48) }
-                ?: getString(R.string.gecko_preview_title)
+            locationLabel.text = if (safe != null) "Character.AI" else getString(R.string.gecko_preview_title)
         }
 
         override fun onCanGoBack(session: GeckoSession, value: Boolean) {
@@ -835,10 +883,8 @@ class GeckoActivity : Activity() {
 
     private fun updateNavigation() {
         if (!::backButton.isInitialized) return
-        backButton.isEnabled = canGoBack
-        forwardButton.isEnabled = canGoForward
+        backButton.isEnabled = true
         backButton.alpha = if (canGoBack) 1f else 0.4f
-        forwardButton.alpha = if (canGoForward) 1f else 0.4f
     }
 
     private fun refreshTrackingProtection() {
@@ -867,14 +913,14 @@ class GeckoActivity : Activity() {
 
     private fun updatePrivacy() {
         if (::privacyButton.isInitialized)
-            privacyButton.text = getString(R.string.filter) + when {
-                !settings.blocking -> " ×"
-                loginProtection.bypass -> " ◇"
-                else -> " ✓"
+            privacyButton.text = when {
+                !settings.blocking -> getString(R.string.shield_off)
+                loginProtection.bypass -> getString(R.string.shield_login)
+                else -> getString(R.string.shield_on)
             }
         if (::privacyButton.isInitialized) privacyButton.contentDescription =
             if (settings.blocking && loginProtection.bypass) getString(R.string.login_compatibility_on)
-            else getString(R.string.filter)
+            else getString(if (settings.blocking) R.string.shield_enabled else R.string.shield_disabled)
     }
 
     private fun configureMedia() {
