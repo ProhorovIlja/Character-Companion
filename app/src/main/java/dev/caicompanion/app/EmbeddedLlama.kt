@@ -20,6 +20,11 @@ class EmbeddedLlama private constructor() : Closeable {
             if (cancelled() || Thread.currentThread().isInterrupted) throw IOException("Model load cancelled")
             admit(model)
             if (cancelled() || Thread.currentThread().isInterrupted) throw IOException("Model load cancelled")
+            return openVerified(model, cancelled)
+        }
+        /** Internal callers must fully verify the private GGUF before invoking. */
+        internal fun openVerified(model: NativeModelLibrary.Model, cancelled: () -> Boolean): EmbeddedLlama {
+            if (cancelled() || Thread.currentThread().isInterrupted) throw IOException("Model load cancelled")
             System.loadLibrary("mandy_llama")
             val engine = EmbeddedLlama()
             engine.handle = engine.nativeLoad(model.path.toAbsolutePath().toString().toByteArray(Charsets.UTF_8))

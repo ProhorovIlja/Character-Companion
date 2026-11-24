@@ -48,6 +48,7 @@ class MandyWorkspaceActivity : Activity() {
     private var editor: EditText? = null
     private var busy = false
     private val stopped = AtomicBoolean(false)
+    private val resident = ResidentModel()
     private lateinit var cancelGeneration: Button
     private val dictation = NativeDictation()
     private var speechToken: UUID? = null
@@ -231,7 +232,10 @@ class MandyWorkspaceActivity : Activity() {
         panel.addView(button("AI models") { if (editor != null && editor?.text?.toString() != current?.draft?.draft) {
                 status.text = "Save the current draft before opening models."
             } else startActivity(android.content.Intent(this, MandyModelActivity::class.java)) })
-        if (BuildConfig.MANDY_EMBEDDED_PREVIEW) panel.addView(button("Performance · " + performancePreset().label) { choosePerformancePreset() })
+        if (BuildConfig.MANDY_EMBEDDED_PREVIEW) {
+            panel.addView(button("Performance · " + performancePreset().label) { choosePerformancePreset() })
+            panel.addView(button("Release loaded model") { saveAnd { resident.close() } })
+        }
         panel.addView(button("Create character") { editProfile(null) })
         if (s.profiles.isNotEmpty()) panel.addView(button("Characters & conversations") { choose(s) })
         val ticket = s.ticket ?: return
@@ -285,7 +289,7 @@ class MandyWorkspaceActivity : Activity() {
         }.setNegativeButton(android.R.string.cancel, null).show()
     }
     private fun generate(ticket: NativeChatWorkspace.Ticket, draft: String, sha: String, retry: Boolean, mode: String, preset: InferencePreset) {
-        if (busy || !alive() || !BuildConfig.MANDY_EMBEDDED_PREVIEW || current?.ticket != ticket) return
+        if (!resumed || busy || !alive() || !BuildConfig.MANDY_EMBEDDED_PREVIEW || current?.ticket != ticket) return
         busy = true
         stopped.set(false)
         val states = mutableMapOf<View, Boolean>()
@@ -304,7 +308,7 @@ class MandyWorkspaceActivity : Activity() {
                 saved = true
                 if (!retry) workspace.prepare(ticket, mode)
                 AndroidConversationStore(applicationContext, account).use { history ->
-                    EmbeddedChatTurn.sendWithMemory(workspace, ticket, library, history, modelLibrary(), sha, memory, stopped::get, admit = { admitModel(it, preset.contextTokens) }, preset = preset) { origin, part ->
+                    EmbeddedChatTurn.sendWithMemory(workspace, ticket, library, history, modelLibrary(), sha, memory, stopped::get, admit = { admitModel(it, preset.contextTokens) }, preset = preset, resident = resident) { origin, part ->
                         text.append(part)
                         val now = System.nanoTime()
                         if (now - lastUpdate >= 100_000_000L) {
@@ -474,6 +478,9 @@ class MandyWorkspaceActivity : Activity() {
 
     override fun onPause() {
         resumed = false
+        stopped.set(true)
+        // Serialize lifecycle cleanup after any in-flight explicit inference; never load here.
+        disk.execute { resident.close() }
         cancelSpeech("Dictation cancelled · draft preserved")
         super.onPause()
     }
@@ -509,7 +516,7 @@ class MandyWorkspaceActivity : Activity() {
         }.setNegativeButton(android.R.string.cancel, null).show()
     }
     private fun assessDialogue(ticket: NativeChatWorkspace.Ticket, sha: String, forMemory: Boolean) {
-        if (busy || !alive() || !BuildConfig.MANDY_EMBEDDED_PREVIEW || current?.ticket != ticket) return
+        if (!resumed || busy || !alive() || !BuildConfig.MANDY_EMBEDDED_PREVIEW || current?.ticket != ticket) return
         busy = true
         stopped.set(false)
         val states = mutableMapOf<View, Boolean>()
@@ -524,7 +531,7 @@ class MandyWorkspaceActivity : Activity() {
                 AndroidConversationStore(applicationContext, account).use { history ->
                     val state = memory.get(ticket.key.character)
                     val generate: (List<NativeConversation.Message>, () -> Boolean) -> String = { messages, stop ->
-                        EmbeddedLlama.open(modelLibrary(), sha, stop, admit = { admitModel(it, preset.contextTokens) }).use { engine ->
+                        resident.useModel(modelLibrary(), sha, stop, { admitModel(it, preset.contextTokens) }) { engine ->
                             engine.generate(messages, contextTokens = preset.contextTokens, outputTokens = minOf(384, preset.outputTokens),
                                 cancelled = stop, threads = preset.threads, onText = {})
                         }
