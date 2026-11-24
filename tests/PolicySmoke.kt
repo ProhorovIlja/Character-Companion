@@ -142,6 +142,7 @@ fun main() {
     verifyLorebook()
     verifyLorebookEditor()
     verifyLorebookDraft()
+    verifyPngLorebook()
     // ASCII fast path must preserve label boundaries and allowlist precedence.
     for (bad in listOf("a..b", "-a.b", "a-.b", "a.b-", "a.b..", "a_b.example",
         "a\u0000.b", "a".repeat(64) + ".b", "a。b", "a\u200B.b")) {

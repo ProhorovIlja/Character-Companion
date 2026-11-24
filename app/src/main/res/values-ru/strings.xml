@@ -302,7 +302,7 @@
     <string name="shell_theme_amoled">AMOLED чёрное</string>
     <string name="shell_theme_restart">Применить оформление и открыть экран заново? Несохранённый текст может быть потерян. Внешний вид веб-страниц не изменится.</string>
     <string name="lorebook_title">Импорт лорбуков</string>
-    <string name="lorebook_help">Подготовьте лорбук локально из структурированного TXT или JSON (до 2 млн символов). Экспортируйте файл или скопируйте текст, затем выберите Create → Lorebook → Import в Character.AI. Доступ, привязка и публикация зависят от аккаунта.</string>
+    <string name="lorebook_help">Подготовьте лорбук локально из структурированного TXT, JSON или метаданных PNG-карты персонажа (до 2 млн символов текста). Экспортируйте файл или скопируйте текст, затем выберите Create → Lorebook → Import в Character.AI. Доступ, привязка и публикация зависят от аккаунта.</string>
     <string name="lorebook_open">Открыть файл лорбука</string>
     <string name="lorebook_paste">Вставить текст или JSON</string>
     <string name="lorebook_empty">Лорбук не загружен.</string>

@@ -450,8 +450,10 @@ class LorebookActivity : Activity() {
             importWork {
                 val decoder = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
-                contentResolver.openInputStream(uri)?.let { input ->
-                    InputStreamReader(input, decoder).use { reader ->
+                contentResolver.openInputStream(uri)?.buffered()?.use { input ->
+                    if (PngLorebookCard.isPng(input)) {
+                        PngLorebookCard.extract(input) { closed.get() }
+                    } else InputStreamReader(input, decoder).use { reader ->
                         BoundedText.read(reader, LorebookPolicy.MAX_CHARS) { closed.get() }
                     }
                 }

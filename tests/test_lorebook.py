@@ -58,6 +58,17 @@ class LorebookTests(unittest.TestCase):
         self.assertNotIn('WorkManager', store)
         self.assertNotIn('http', store)
 
+    def test_png_card_metadata_import(self):
+        a = (JAVA/'LorebookActivity.kt').read_text()
+        parser = (JAVA/'PngLorebookCard.kt').read_text()
+        self.assertIn('PngLorebookCard.isPng(input)', a)
+        self.assertIn('PngLorebookCard.extract(input) { closed.get() }', a)
+        for token in ('MAX_PNG = 32L * 1024 * 1024', 'MAX_CHUNKS = 4096',
+                      'CRC32()', 'Base64.getDecoder()', 'CodingErrorAction.REPORT',
+                      'v3 ?: v2 ?: return null', 'stream.read() == -1'):
+            self.assertIn(token, parser)
+        self.assertNotIn('BitmapFactory', parser)
+
     def test_localization(self):
         def names(locale):
             root = ET.parse(ROOT/f'app/src/main/res/{locale}/strings.xml').getroot()

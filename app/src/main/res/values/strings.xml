@@ -302,7 +302,7 @@
     <string name="shell_theme_amoled">AMOLED black</string>
     <string name="shell_theme_restart">Apply appearance and reopen this screen? Unsaved page text may be lost. Web content keeps its own appearance.</string>
     <string name="lorebook_title">Lorebook import</string>
-    <string name="lorebook_help">Prepare a lorebook locally from structured TXT or JSON (up to 2 million characters). Export a file or copy text, then use Create → Lorebook → Import in Character.AI. Service access, linking and publishing depend on your account.</string>
+    <string name="lorebook_help">Prepare a lorebook locally from structured TXT, JSON or embedded PNG character-card metadata (up to 2 million text characters). Export a file or copy text, then use Create → Lorebook → Import in Character.AI. Service access, linking and publishing depend on your account.</string>
     <string name="lorebook_open">Open lorebook file</string>
     <string name="lorebook_paste">Paste lorebook text or JSON</string>
     <string name="lorebook_empty">No lorebook loaded.</string>
