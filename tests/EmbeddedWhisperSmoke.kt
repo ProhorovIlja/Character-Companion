@@ -39,6 +39,24 @@ fun main() {
         var calls = 0
         bad { run(cancelled = { ++calls >= 5 }) }
         verify(run() == "Hello 🌙")
+        bad { run(ShortArray(16000)) }
+        bad { run(ShortArray(16000) { 1234 }) }
+        val owner = Thread.currentThread()
+        var probes = 0
+        verify(run(cancelled = { check(Thread.currentThread() === owner); probes++; false }) == "Hello 🌙")
+        verify(probes >= 14)
+        // Force cancellation at every observed checkpoint, including inside the fixture's whisper_full.
+        val total = probes
+        for (at in 1..total) {
+            var tick = 0
+            bad { run(cancelled = { ++tick >= at }) }
+            verify(run() == "Hello 🌙")
+        }
+        var attempted = false
+        verify(run(cancelled = {
+            if (!attempted) { attempted = true; bad { run() } }
+            false
+        }) == "Hello 🌙")
         println("EmbeddedWhisper: $checks checks passed (native fixture only)")
     } finally { root.toFile().deleteRecursively() }
 }

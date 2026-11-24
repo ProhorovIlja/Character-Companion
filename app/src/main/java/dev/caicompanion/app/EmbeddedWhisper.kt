@@ -8,17 +8,38 @@ import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.security.MessageDigest
 
+/** Called only on the originating JVM thread by native cancellation checkpoints. */
+internal class WhisperCancellation(private val cancelled: () -> Boolean) {
+    fun isCancelled(): Boolean = cancelled() || Thread.currentThread().isInterrupted
+}
+
 /** Explicit one-shot offline ASR. Caller owns and clears PCM; no automatic model selection. */
 internal object EmbeddedWhisper {
     private const val MAX_MODEL = 2L * 1024 * 1024 * 1024
-    private external fun nativeTranscribeV1(path: ByteArray, pcm: ShortArray, russian: Boolean, threads: Int): ByteArray
+    private external fun nativeTranscribeV2(path: ByteArray, pcm: ShortArray, russian: Boolean, threads: Int, stop: WhisperCancellation): ByteArray
+    private var active = false
     @Synchronized fun transcribe(model: Path, sha: String, pcm: ShortArray, language: MandyLanguage,
                                 threads: Int = 4, cancelled: () -> Boolean = { false }): String {
+        check(!active) { "Reentrant transcription" }
+        active = true
+        try { return recognize(model, sha, pcm, language, threads, cancelled) }
+        finally { active = false }
+    }
+    private fun recognize(model: Path, sha: String, pcm: ShortArray, language: MandyLanguage,
+                          threads: Int, cancelled: () -> Boolean): String {
         require(sha.matches(Regex("[0-9a-f]{64}")) && threads in 1..8 && pcm.size in 1..2_880_000)
         fun checkActive() {
             if (cancelled() || Thread.currentThread().isInterrupted) throw IOException("Transcription cancelled")
         }
         checkActive()
+        // A constant waveform cannot contain changing speech. Do not guess an energy threshold.
+        val first = pcm[0]
+        var varied = false
+        for (i in pcm.indices) {
+            if ((i and 4095) == 0) checkActive()
+            if (pcm[i] != first) { varied = true; break }
+        }
+        require(varied) { "Recording contains no varying signal" }
         require(Files.isRegularFile(model, LinkOption.NOFOLLOW_LINKS)) { "Speech model unavailable" }
         val size = Files.size(model)
         require(size in 1..MAX_MODEL)
@@ -38,7 +59,7 @@ internal object EmbeddedWhisper {
         checkActive()
         System.loadLibrary("mandy_whisper")
         val path = model.toAbsolutePath().toString().toByteArray(Charsets.UTF_8)
-        val result = nativeTranscribeV1(path, pcm, language == MandyLanguage.RUSSIAN, threads)
+        val result = nativeTranscribeV2(path, pcm, language == MandyLanguage.RUSSIAN, threads, WhisperCancellation(cancelled))
         try {
             checkActive()
             require(result.size in 1..64000)

@@ -1,6 +1,8 @@
 #include <jni.h>
 #include "whisper.h"
 #include <algorithm>
+#include <atomic>
+#include <thread>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
@@ -16,13 +18,38 @@ void fail(JNIEnv * env) {
     jclass cls = env->FindClass("java/io/IOException");
     if (cls) { env->ThrowNew(cls, "Local speech recognition failed"); env->DeleteLocalRef(cls); }
 }
+// JNI local references and JNIEnv belong to the calling thread. Backend worker
+// callbacks may observe the latched stop but never call Java or attach threads.
+struct Stop {
+    JNIEnv * env;
+    jobject probe;
+    jmethodID method;
+    const std::thread::id owner = std::this_thread::get_id();
+    std::atomic<bool> stopped{false};
+    bool cancelled() noexcept {
+        if (stopped.load()) return true;
+        if (std::this_thread::get_id() != owner) return false;
+        const bool value = env->CallBooleanMethod(probe, method) != JNI_FALSE;
+        if (env->ExceptionCheck() || value) stopped.store(true);
+        return stopped.load();
+    }
+    static bool abort(void * data) { return static_cast<Stop *>(data)->cancelled(); }
+    static bool encoder(whisper_context *, whisper_state *, void * data) { return !abort(data); }
+};
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_dev_caicompanion_app_EmbeddedWhisper_nativeTranscribeV1(JNIEnv * env, jobject,
-    jbyteArray path, jshortArray pcm, jboolean russian, jint threads) {
+Java_dev_caicompanion_app_EmbeddedWhisper_nativeTranscribeV2(JNIEnv * env, jobject,
+    jbyteArray path, jshortArray pcm, jboolean russian, jint threads, jobject probe) {
     try {
-        require(path && pcm && threads >= 1 && threads <= 8);
+        require(path && pcm && probe && threads >= 1 && threads <= 8);
+        jclass cls = env->GetObjectClass(probe);
+        require(cls != nullptr);
+        jmethodID method = env->GetMethodID(cls, "isCancelled", "()Z");
+        env->DeleteLocalRef(cls);
+        require(method && !env->ExceptionCheck());
+        Stop stop{env, probe, method};
+        require(!stop.cancelled());
         const int length = env->GetArrayLength(path), count = env->GetArrayLength(pcm);
         require(length > 0 && length <= 16384 && count > 0 && count <= 2880000);
         std::string name(length, '\0');
@@ -33,10 +60,11 @@ Java_dev_caicompanion_app_EmbeddedWhisper_nativeTranscribeV1(JNIEnv * env, jobje
         config.use_gpu = false;
         std::unique_ptr<whisper_context, decltype(&whisper_free)> ctx(
             whisper_init_from_file_with_params(name.c_str(), config), whisper_free);
-        require(ctx && whisper_is_multilingual(ctx.get()));
+        require(ctx && whisper_is_multilingual(ctx.get()) && !stop.cancelled());
         std::vector<float> audio(count);
         jshort chunk[4096];
         for (int offset = 0; offset < count;) {
+            require(!stop.cancelled());
             const int n = std::min(4096, count - offset);
             env->GetShortArrayRegion(pcm, offset, n, chunk);
             require(!env->ExceptionCheck());
@@ -51,11 +79,18 @@ Java_dev_caicompanion_app_EmbeddedWhisper_nativeTranscribeV1(JNIEnv * env, jobje
         params.no_context = true;
         params.no_timestamps = true;
         params.print_special = params.print_progress = params.print_realtime = params.print_timestamps = false;
+        params.encoder_begin_callback = Stop::encoder;
+        params.encoder_begin_callback_user_data = &stop;
+        params.abort_callback = Stop::abort;
+        params.abort_callback_user_data = &stop;
+        require(!stop.cancelled());
         require(whisper_full(ctx.get(), params, audio.data(), count) == 0);
+        require(!stop.cancelled());
         const int segments = whisper_full_n_segments(ctx.get());
         require(segments > 0 && segments <= 4096);
         std::string result;
         for (int i = 0; i < segments; ++i) {
+            require(!stop.cancelled());
             const char * text = whisper_full_get_segment_text(ctx.get(), i);
             require(text != nullptr);
             size_t n = 0;

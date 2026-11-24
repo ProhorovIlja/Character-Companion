@@ -4,3 +4,5 @@
 # Native method names and JNI callback signatures must survive R8.
 -keep class dev.caicompanion.app.EmbeddedLlama { *; }
 -keep class dev.caicompanion.app.EmbeddedTextSink { *; }
+-keep class dev.caicompanion.app.EmbeddedWhisper { *; }
+-keep class dev.caicompanion.app.WhisperCancellation { *; }

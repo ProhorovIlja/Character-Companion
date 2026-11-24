@@ -2,11 +2,13 @@
 // TEST DOUBLE ONLY. Never use as an actual recognition backend.
 #include <cassert>
 #include <string>
+#include <thread>
 enum ggml_log_level { GGML_LOG_LEVEL_NONE };
 enum whisper_sampling_strategy { WHISPER_SAMPLING_GREEDY };
 struct whisper_context { std::string language; int mode = 0; };
+struct whisper_state {};
 struct whisper_context_params { bool use_gpu = true; };
-struct whisper_full_params { int n_threads; const char * language; bool translate, detect_language, no_context, no_timestamps, print_special, print_progress, print_realtime, print_timestamps; };
+struct whisper_full_params { int n_threads; const char * language; bool translate, detect_language, no_context, no_timestamps, print_special, print_progress, print_realtime, print_timestamps; bool (*encoder_begin_callback)(whisper_context *, whisper_state *, void *); void * encoder_begin_callback_user_data; bool (*abort_callback)(void *); void * abort_callback_user_data; };
 inline int live = 0;
 inline void whisper_log_set(void (*)(ggml_log_level, const char *, void *), void *) {}
 inline whisper_context_params whisper_context_default_params() { return {}; }
@@ -22,6 +24,12 @@ inline whisper_full_params whisper_full_default_params(whisper_sampling_strategy
 inline int whisper_full(whisper_context * c, whisper_full_params p, const float * audio, int count) {
     assert(p.n_threads >= 1 && p.n_threads <= 8 && !p.translate && !p.detect_language && p.no_context && p.no_timestamps);
     assert(!p.print_special && !p.print_progress && !p.print_realtime && !p.print_timestamps);
+    assert(p.encoder_begin_callback && p.abort_callback);
+    // A foreign backend worker must never invoke JNI using the owner's JNIEnv.
+    std::thread worker([&] { assert(!p.abort_callback(p.abort_callback_user_data)); });
+    worker.join();
+    if (!p.encoder_begin_callback(c, nullptr, p.encoder_begin_callback_user_data)) return -1;
+    if (p.abort_callback(p.abort_callback_user_data)) return -1;
     c->language = p.language;
     assert(c->language == "en" || c->language == "ru");
     if (count == 1) { c->mode = 1; return -1; }

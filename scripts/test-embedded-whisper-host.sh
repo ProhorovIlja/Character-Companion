@@ -7,7 +7,7 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 java_home="$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")"
 src=app/src/main/java/dev/caicompanion/app
-clang++ -std=c++17 -shared -fPIC -Wall -Wextra -Werror \
+clang++ -std=c++17 -shared -fPIC -Wall -Wextra -Werror -pthread \
   -Itests/fixtures/jni_whisper -I"$java_home/include" -I"$java_home/include/linux" \
   app/src/main/cpp/whisper/mandy_whisper.cpp -o "$tmp/libmandy_whisper.so"
 kotlinc "$src/EmbeddedWhisper.kt" "$src/MandyLanguage.kt" "$src/NativeConversation.kt" \
