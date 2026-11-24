@@ -105,6 +105,7 @@ class MainActivity : Activity() {
     private val deferredWebReload = DeferredWebReload()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        ShellAppearance.apply(this)
         super.onCreate(savedInstanceState)
         // The native workspace starts without initializing the Chromium WebView provider.
         store = SettingsStore(this)
@@ -845,7 +846,7 @@ class MainActivity : Activity() {
         val fields = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(8), dp(20), dp(4))
-            setBackgroundColor(Color.rgb(21, 22, 30))
+            setBackgroundColor(ShellAppearance.color(this@MainActivity, R.attr.shellPanel))
         }
         val titleInput = EditText(this).apply {
             hint = getString(R.string.hub_bookmark_name_hint)
@@ -888,7 +889,7 @@ class MainActivity : Activity() {
         voiceHandoff.invalidate()
         if (destroyed || nativeHub != null) return
         val panel = ScrollView(this).apply {
-            setBackgroundColor(Color.rgb(17, 18, 25))
+            setBackgroundColor(ShellAppearance.color(this@MainActivity, R.attr.shellBackground))
             isFillViewport = true
         }
         val layout = settingsColumn()
@@ -1176,7 +1177,7 @@ class MainActivity : Activity() {
     }
 
     private fun showSettingsSection(section: Int) {
-        val scroll = ScrollView(this).apply { setBackgroundColor(Color.rgb(25, 28, 37)) }
+        val scroll = ScrollView(this).apply { setBackgroundColor(ShellAppearance.color(this@MainActivity, R.attr.shellPanel)) }
         val layout = settingsColumn()
         scroll.addView(layout)
         if (section == R.string.section_profiles) {
@@ -1227,6 +1228,7 @@ class MainActivity : Activity() {
             addButton(layout, getString(R.string.privacy_stats)) { showPrivacyStats() }
         }
         if (section == R.string.section_appearance) {
+            addButton(layout, getString(R.string.shell_theme_title)) { ShellAppearance.choose(this) }
             addToggle(layout, getString(R.string.toggle_compact), getString(R.string.toggle_compact_desc), store.compactChrome) {
                 store.compactChrome = it; applySettings(reload = false)
             }
@@ -1283,7 +1285,7 @@ class MainActivity : Activity() {
     private fun settingsColumn(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(20), dp(18), dp(20), dp(22))
-        setBackgroundColor(Color.rgb(25,28,37))
+        setBackgroundColor(ShellAppearance.color(this@MainActivity, R.attr.shellPanel))
     }
     private fun sectionLabel(text: String): TextView = TextView(this).apply {
         this.text = text; setTextColor(ACCENT); textSize = 12f

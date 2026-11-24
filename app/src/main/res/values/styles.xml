@@ -8,6 +8,22 @@
         <item name="android:navigationBarColor">#14161D</item>
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:windowBackground">#111319</item>
+        <item name="shellBackground">#111319</item>
+        <item name="shellChrome">#191C25</item>
+        <item name="shellPanel">#191C25</item>
+        <item name="shellAction">#222631</item>
+        <item name="shellOutline">#343B4D</item>
+    </style>
+    <style name="AppTheme.Amoled" parent="AppTheme">
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:colorBackground">#000000</item>
+        <item name="shellBackground">#000000</item>
+        <item name="shellChrome">#000000</item>
+        <item name="shellPanel">#0D0D0D</item>
+        <item name="shellAction">#141414</item>
+        <item name="shellOutline">#383838</item>
     </style>
     <style name="NavButton">
         <item name="android:layout_width">48dp</item>

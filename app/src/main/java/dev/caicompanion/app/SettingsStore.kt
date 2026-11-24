@@ -72,6 +72,9 @@ class SettingsStore(context: Context) {
     var compactChrome: Boolean
         get() = prefs.getBoolean("compact_chrome", false)
         set(v) = prefs.edit().putBoolean("compact_chrome", v).apply()
+    var amoledShell: Boolean
+        get() = prefs.getBoolean("amoled_shell", false)
+        set(v) = prefs.edit().putBoolean("amoled_shell", v).apply()
     var darkCanvas: Boolean
         get() = prefs.getBoolean("dark_canvas", true)
         set(v) = prefs.edit().putBoolean("dark_canvas", v).apply()
@@ -175,6 +178,7 @@ class SettingsStore(context: Context) {
         put("resumePage", resumePage)
         put("compactChrome", compactChrome)
         put("darkCanvas", darkCanvas)
+        put("amoledShell", amoledShell)
         put("textZoom", textZoom)
         put("customRules", customRules)
         put("excludeRules", excludeRules)
@@ -220,6 +224,7 @@ class SettingsStore(context: Context) {
             .putBoolean("resume_page", parsed.optBoolean("resumePage", false))
             .putBoolean("compact_chrome", parsed.optBoolean("compactChrome", false))
             .putBoolean("dark_canvas", parsed.optBoolean("darkCanvas", true))
+            .putBoolean("amoled_shell", parsed.optBoolean("amoledShell", false))
             .putInt("text_zoom", parsed.optInt("textZoom", 100).coerceIn(75, 175))
             .putString("custom_rules", parsed.optString("customRules").take(12_000))
             .putString("exclude_rules", parsed.optString("excludeRules").take(12_000))

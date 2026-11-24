@@ -85,6 +85,7 @@ class VoiceDraftActivity : Activity() {
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        ShellAppearance.apply(this)
         super.onCreate(savedInstanceState)
         val initialDraft = VoiceComposerPolicy.validDraft(intent?.getStringExtra(EXTRA_DRAFT))
         allowInsert = intent?.getBooleanExtra(EXTRA_INSERT, false) == true
@@ -104,7 +105,7 @@ class VoiceDraftActivity : Activity() {
         }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(17, 19, 25))
+            setBackgroundColor(ShellAppearance.color(this@VoiceDraftActivity, R.attr.shellBackground))
             setPadding(dp(14), dp(10), dp(14), dp(10))
             setOnApplyWindowInsetsListener { view, insets ->
                 if (Build.VERSION.SDK_INT >= 30) {

@@ -46,3 +46,6 @@ All three session modes now use one user-triggered SAF JSON backup/restore contr
 
 ### Favorites and library retention
 Both embedded libraries now provide a favorites-only filter compatible with search and all sort modes. Renaming or saving an existing canonical URL preserves its position. At capacity, new saves evict the oldest unpinned entry only; when all 100 entries are pinned the save is refused with an explicit message. The shared settings store applies this policy under its existing lock. Reference patterns: https://docs.weblibre.eu/weblibre/bookmarks.html and https://plateaukao.github.io/einkbro/ . No third-party code, dependencies or background tasks added.
+
+### AMOLED native shell (2026-11-24)
+Optional shared AMOLED palette with true black root/chrome, near-black panels and high-contrast action outlines. Applied before Activity creation in both embedded engines, browser shell and voice editor. Dark remains default; settings export/import preserves the option; explicit confirmation before recreation. This is native-shell styling only, not a CSS injection or forced website darkening; no measured battery savings claimed. References: https://developer.android.com/develop/ui/views/theming/darktheme and https://github.com/sk2andy/candy-browser , https://github.com/vm2st/VBrowser . Android compilation and visual QA required.

@@ -50,9 +50,10 @@ class BrowserSessionActivity : Activity() {
     private lateinit var store: SettingsStore
     private var destination = BrowserSessionPolicy.HOME
     private val fg = Color.rgb(228, 231, 240)
-    private val bg = Color.rgb(17, 19, 25)
+    private val bg get() = ShellAppearance.color(this, R.attr.shellBackground)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        ShellAppearance.apply(this)
         super.onCreate(savedInstanceState)
         store = SettingsStore(this)
         if (store.protectScreen) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
@@ -88,6 +89,7 @@ class BrowserSessionActivity : Activity() {
         column.addView(action(R.string.browser_mode_embedded) { returnToEmbedded() })
         column.addView(action(R.string.release_center) { ReleaseCenter.show(this) })
         column.addView(action(R.string.section_data) { settingsBackup.show() })
+        column.addView(action(R.string.shell_theme_title) { ShellAppearance.choose(this) })
         column.addView(action(R.string.device_compat_title) { DeviceRuntimeProbe.show(this, "browser") })
         column.addView(action(R.string.browser_mode_change_provider) {
             android.app.AlertDialog.Builder(this).setMessage(R.string.browser_mode_change_warning)

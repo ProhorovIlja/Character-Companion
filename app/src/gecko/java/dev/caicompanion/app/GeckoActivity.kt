@@ -87,9 +87,10 @@ class GeckoActivity : Activity() {
     private val fg = Color.rgb(228, 231, 240)
     private val accent = Color.rgb(168, 184, 255)
     private val settingsBackup = SettingsBackup(this)
-    private val bg = Color.rgb(17, 19, 25)
+    private val bg get() = ShellAppearance.color(this, R.attr.shellBackground)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        ShellAppearance.apply(this)
         super.onCreate(savedInstanceState)
         settings = SettingsStore(this)
         if (settings.browserSessionPreferred) {
@@ -120,7 +121,7 @@ class GeckoActivity : Activity() {
         root.requestApplyInsets()
         chromeHeader = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(Color.rgb(25, 28, 37))
+            setBackgroundColor(ShellAppearance.color(this@GeckoActivity, R.attr.shellPanel))
             setPadding(0, 0, dp(8), 0)
         }
         backButton = Button(this).apply {
@@ -154,7 +155,7 @@ class GeckoActivity : Activity() {
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         actionsRow = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(Color.rgb(25, 28, 37))
+            setBackgroundColor(ShellAppearance.color(this@GeckoActivity, R.attr.shellPanel))
         }
         actionsRow.addView(navAction(R.string.home, R.drawable.ic_shell_home) {
             if (sessionReady()) session.loadUri(HOME)
@@ -475,6 +476,10 @@ class GeckoActivity : Activity() {
             })
         }
         if (section == R.string.section_appearance) {
+            options.addView(Button(this).apply {
+                setText(R.string.shell_theme_title)
+                setOnClickListener { ShellAppearance.choose(this@GeckoActivity) }
+            })
             options.addView(settingCheckbox(R.string.toggle_resume, settings.resumePage) {
                 settings.resumePage = it
                 if (!it) settings.lastVisited = ""

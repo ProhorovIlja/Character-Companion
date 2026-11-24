@@ -297,4 +297,8 @@
     <string name="library_favorites_only">Только избранное</string>
     <string name="library_favorites_empty">Нет подходящих избранных.</string>
     <string name="library_full_pinned">Все 100 закладок закреплены. Открепите или удалите одну, чтобы добавить новую.</string>
+    <string name="shell_theme_title">Оформление приложения</string>
+    <string name="shell_theme_dark">Тёмное</string>
+    <string name="shell_theme_amoled">AMOLED чёрное</string>
+    <string name="shell_theme_restart">Применить оформление и открыть экран заново? Несохранённый текст может быть потерян. Внешний вид веб-страниц не изменится.</string>
 </resources>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <attr name="shellBackground" format="color" />
+    <attr name="shellChrome" format="color" />
+    <attr name="shellPanel" format="color" />
+    <attr name="shellAction" format="color" />
+    <attr name="shellOutline" format="color" />
+</resources>

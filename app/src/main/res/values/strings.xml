@@ -297,4 +297,8 @@
     <string name="library_favorites_only">Favorites only</string>
     <string name="library_favorites_empty">No matching favorites.</string>
     <string name="library_full_pinned">All 100 library entries are pinned. Unpin or delete one before adding another.</string>
+    <string name="shell_theme_title">App appearance</string>
+    <string name="shell_theme_dark">Dark</string>
+    <string name="shell_theme_amoled">AMOLED black</string>
+    <string name="shell_theme_restart">Apply appearance and reopen this screen? Unsaved page text may be lost. Web content keeps its own appearance.</string>
 </resources>
