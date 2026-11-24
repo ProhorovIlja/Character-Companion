@@ -16,14 +16,22 @@ class DebugApkVerificationTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         (self.root / 'scripts').mkdir()
-        shutil.copyfile(ROOT / 'scripts/verify-debug-apk.sh', self.root / 'scripts/verify-debug-apk.sh')
+        for name in ('verify-debug-apk.sh', 'check_apk_native.py', 'check_apk_renderer.py'):
+            shutil.copyfile(ROOT / 'scripts' / name, self.root / 'scripts' / name)
         (self.root / 'app').mkdir()
         shutil.copyfile(ROOT / 'app/build.gradle.kts', self.root / 'app/build.gradle.kts')
         self.sdk = self.root / 'sdk'
         self.tools = self.sdk / 'build-tools/36.0.0'
         self.tools.mkdir(parents=True)
         self.tool('apksigner', "printf '%s\\n' 'Signer #1 certificate DN: CN=Android Debug, O=Android, C=US'")
-        self.tool('aapt', '''printf "%s\\n" "package: name='dev.caicompanion.app' versionCode='38' versionName='0.38.0-rc1'"''')
+        self.tool('aapt', '''if [ "$2" = xmltree ]; then
+    case "$3" in */gecko/*) flavor=gecko;; *) flavor=legacy;; esac
+    printf '%s\n' '  E: manifest (line=2)' '    E: application (line=5)' '      E: meta-data (line=10)' '        A: android:name(0x01010003)="dev.caicompanion.app.RENDERER"'
+    printf '        A: android:value(0x01010024)="%s"\n' "$flavor"
+else
+    printf "%s\n" "package: name='dev.caicompanion.app' versionCode='38' versionName='0.38.0-rc1'"
+fi''')
+        self.tool('zipalign', 'exit 0')
         self.env = dict(os.environ, ANDROID_HOME=str(self.sdk))
 
     def tool(self, name, source):
@@ -54,6 +62,10 @@ class DebugApkVerificationTests(unittest.TestCase):
             result = self.verify(flavor)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(p.read_bytes(), self.output(flavor).read_bytes())
+            report = (self.root / f'dist/native-audit-{flavor}.txt').read_text()
+            self.assertIn('ZIP_ALIGNMENT_16K=PASSED', report)
+            self.assertIn('DEVICE_16K_RUNTIME=NOT_TESTED', report)
+            self.assertIn('ELF_CHECK_EXIT=NONZERO' if flavor == 'gecko' else 'ELF_CHECK_EXIT=0', report)
 
     def test_wrong_cert_rejected_and_stale_output_removed(self):
         self.fixture('legacy')
@@ -75,6 +87,16 @@ class DebugApkVerificationTests(unittest.TestCase):
         self.tool('aapt', '''printf "%s\\n" "package: name='dev.caicompanion.app' versionCode='32' versionName='0.32.0-rc1'"''')
         self.assertNotEqual(self.verify('legacy').returncode, 0)
         self.assertFalse(self.output('legacy').exists())
+
+    def test_wrong_renderer_manifest_rejected(self):
+        self.fixture('gecko')
+        self.tool('aapt', '''if [ "$2" = xmltree ]; then
+    printf '%s\n' '  E: manifest (line=2)' '    E: application (line=5)' '      E: meta-data (line=10)' '        A: android:name(0x01010003)="dev.caicompanion.app.RENDERER"' '        A: android:value(0x01010024)="legacy"'
+else
+    printf "%s\n" "package: name='dev.caicompanion.app' versionCode='38' versionName='0.38.0-rc1'"
+fi''')
+        self.assertNotEqual(self.verify('gecko').returncode, 0)
+        self.assertFalse(self.output('gecko').exists())
 
     def test_missing_dex_or_arm64_library_rejected(self):
         self.fixture('legacy', dex=False)

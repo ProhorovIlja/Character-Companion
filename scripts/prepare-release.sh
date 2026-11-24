@@ -58,6 +58,12 @@ BADGING="$($AAPT dump badging "$APK" 2>&1)" || {
 if ! grep -Eq "^package: name='$PKG' versionCode='$VERSION_CODE' versionName='$VERSION'" <<< "$BADGING"; then
   echo 'Package ID/version mismatch. Refusing to label APK as this version.' >&2; exit 2
 fi
+if grep -Fxq 'application-debuggable' <<< "$BADGING"; then
+  echo 'Release APK is debuggable. Refusing to package.' >&2; exit 2
+fi
+if ! "$AAPT" dump xmltree "$APK" AndroidManifest.xml | python3 scripts/check_apk_renderer.py "$FLAVOR"; then
+  echo 'Renderer manifest identity does not match release flavor.' >&2; exit 2
+fi
 if ! command -v unzip >/dev/null || ! unzip -tq "$APK" >/dev/null; then
   echo 'APK ZIP integrity check failed.' >&2; exit 2
 fi
@@ -86,6 +92,7 @@ commit=$(git rev-parse HEAD)
 package_id=$PKG
 apk_signature=verified_by_apksigner
 manifest=verified_by_aapt
+renderer_manifest=verified_by_aapt_xmltree
 native_elf_audit=passed_or_no_native_libraries
 zip_alignment_16k=verified_by_zipalign
 qa=provided_manual_device_signoff

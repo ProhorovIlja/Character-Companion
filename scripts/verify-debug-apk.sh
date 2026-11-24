@@ -25,6 +25,7 @@ code="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*([0-9]+).*/\
 test -n "$version"
 test -n "$code"
 grep -Fq "package: name='dev.caicompanion.app' versionCode='$code' versionName='$version'" <<< "$badging"
+"$tools/aapt" dump xmltree "$apk" AndroidManifest.xml | python3 scripts/check_apk_renderer.py "$flavor"
 if [[ "$flavor" == gecko ]]; then
   grep -Eq '^lib/arm64-v8a/[^/]+[.]so$' <<< "$entries"
 fi
