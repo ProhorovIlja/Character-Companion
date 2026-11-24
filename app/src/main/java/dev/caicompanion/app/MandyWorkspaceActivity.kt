@@ -111,13 +111,64 @@ class MandyWorkspaceActivity : Activity() {
     private fun alive() = !isFinishing && !isDestroyed
     private fun appearancePrefs() = getSharedPreferences("mandy_appearance_v1", MODE_PRIVATE)
     private fun amoled() = appearancePrefs().getBoolean("amoled", true)
+    private data class ColorRole(val key: String, val title: String, val attr: Int)
+    private val colorRoles = listOf(
+        ColorRole("canvas", "Chat background", R.attr.shellBackground),
+        ColorRole("composer", "Composer surface", R.attr.shellPanel),
+        ColorRole("bubble", "Your message bubble", R.attr.shellAction),
+        ColorRole("text", "Message text", R.attr.shellText),
+        ColorRole("muted", "Secondary text", R.attr.shellMuted),
+        ColorRole("accent", "Send button", R.attr.shellAccent),
+        ColorRole("outline", "Composer border", R.attr.shellOutline),
+        ColorRole("icons", "Action icons", R.attr.shellChrome)
+    )
+    private var customColors: Map<String, Int> = emptyMap()
+    private fun contrast(a: Int, b: Int) = androidx.core.graphics.ColorUtils.calculateContrast(a, b)
+    private fun paletteError(p: Map<String, Int>): String? {
+        if (colorRoles.any { it.key !in p }) return "All color roles are required."
+        val surfaces = listOf("canvas", "composer", "bubble")
+        for (surface in surfaces) {
+            if (contrast(p.getValue("text"), p.getValue(surface)) < 4.5)
+                return "Message text needs 4.5:1 contrast against " + surface + "."
+        }
+        for (surface in listOf("canvas", "composer")) {
+            if (contrast(p.getValue("muted"), p.getValue(surface)) < 4.5)
+                return "Secondary text needs 4.5:1 contrast against " + surface + "."
+            if (contrast(p.getValue("icons"), p.getValue(surface)) < 3.0)
+                return "Action icons need 3:1 contrast against " + surface + "."
+        }
+        if (contrast(p.getValue("accent"), p.getValue("composer")) < 3.0)
+            return "Send button needs 3:1 contrast against composer."
+        return null
+    }
+    private fun savedPalette(): Map<String, Int> {
+        val prefs = appearancePrefs()
+        val p = colorRoles.mapNotNull { role ->
+            val value = prefs.getString("color_" + role.key, null)
+            if (value != null && value.matches(Regex("#[0-9a-fA-F]{6}")))
+                role.key to android.graphics.Color.parseColor(value) else null
+        }.toMap()
+        return if (paletteError(p) == null) p else emptyMap()
+    }
+    private fun chatColor(attr: Int): Int {
+        if (attr == R.attr.shellOnAccent && customColors.isNotEmpty()) {
+            val accent = customColors.getValue("accent")
+            return if (contrast(android.graphics.Color.BLACK, accent) >= contrast(android.graphics.Color.WHITE, accent))
+                android.graphics.Color.BLACK else android.graphics.Color.WHITE
+        }
+        val role = colorRoles.firstOrNull { it.attr == attr }
+        return role?.let { customColors[it.key] } ?: ShellAppearance.color(this, attr)
+    }
+    private fun iconColor() = customColors["icons"] ?: ShellAppearance.color(this, R.attr.shellText)
+    private fun colorHex(color: Int) = String.format(java.util.Locale.ROOT, "#%06X", color and 0xffffff)
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(if (amoled()) R.style.AppTheme_MandyAmoled else R.style.AppTheme_MandyGraphite)
         super.onCreate(savedInstanceState)
+        if (appearancePrefs().getBoolean("custom", false)) customColors = savedPalette()
         if (SettingsStore(this).protectScreen) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(ShellAppearance.color(this@MandyWorkspaceActivity, R.attr.shellBackground))
+            setBackgroundColor(chatColor(R.attr.shellBackground))
         }
         ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
@@ -125,7 +176,7 @@ class MandyWorkspaceActivity : Activity() {
             view.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, ime.bottom))
             insets
         }
-        status = label("Opening local workspace…", 12f).apply {
+        status = chatLabel("Opening local workspace…", 12f).apply {
             maxLines = 2
             ellipsize = android.text.TextUtils.TruncateAt.END
             setOnClickListener { AlertDialog.Builder(this@MandyWorkspaceActivity).setTitle("Workspace status").setMessage(text).setPositiveButton("Close", null).show() }
@@ -226,6 +277,7 @@ class MandyWorkspaceActivity : Activity() {
         setPadding(dp(8), dp(8), dp(8), dp(8))
         isSaveEnabled = false
     }
+    private fun chatLabel(value: String, size: Float = 16f) = label(value, size).apply { setTextColor(chatColor(R.attr.shellText)) }
     private fun input(hintText: String, limit: Int, value: String = "", single: Boolean = false) = EditText(this).apply {
         hint = hintText; setSingleLine(single); setText(value)
         filters = arrayOf(InputFilter.LengthFilter(limit))
@@ -293,11 +345,11 @@ class MandyWorkspaceActivity : Activity() {
     private fun chatAction(kind: String, description: String, available: Boolean = true, action: () -> Unit) =
         ImageButton(this).apply {
             val primary = kind == "send" || kind == "retry"
-            val color = ShellAppearance.color(this@MandyWorkspaceActivity, if (primary && available) R.attr.shellOnAccent else R.attr.shellText)
+            val color = if (primary && available) chatColor(R.attr.shellOnAccent) else iconColor()
             val mask = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(android.graphics.Color.WHITE) }
             val fill = if (primary && available) GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(ShellAppearance.color(this@MandyWorkspaceActivity, R.attr.shellAccent))
+                setColor(chatColor(R.attr.shellAccent))
             } else null
             background = RippleDrawable(ColorStateList.valueOf((color and 0x00ffffff) or 0x22000000), fill, mask)
             setImageDrawable(ChatGlyph(kind, color))
@@ -320,9 +372,9 @@ class MandyWorkspaceActivity : Activity() {
         }
     }
     private fun roundedSurface(fill: Int, radius: Int, outlined: Boolean = false) = GradientDrawable().apply {
-        setColor(ShellAppearance.color(this@MandyWorkspaceActivity, fill))
+        setColor(chatColor(fill))
         cornerRadius = dp(radius).toFloat()
-        if (outlined) setStroke(dp(1), ShellAppearance.color(this@MandyWorkspaceActivity, R.attr.shellOutline))
+        if (outlined) setStroke(dp(1), chatColor(R.attr.shellOutline))
     }
     // One composer action region; no extra recording or generation toolbar below the chat.
     private fun composerMode(recording: Boolean = false, generating: Boolean = false) {
@@ -345,38 +397,38 @@ class MandyWorkspaceActivity : Activity() {
             if (s.profiles.isEmpty()) editProfile(null) else choose(s)
         }
         header.addView(libraryButton)
-        header.addView(label(profile?.name ?: "No character", 18f).apply {
+        header.addView(chatLabel(profile?.name ?: "No character", 18f).apply {
             maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
         }, LinearLayout.LayoutParams(0, -2, 1f))
         // Visible capability placeholders, never request permission or simulate a call.
         header.addView(chatAction("call", "Voice call not available in this build", false) {})
         header.addView(chatAction("settings", "Settings") { showWorkspaceSettings(s) })
         panel.addView(header)
-        if (chat != null) panel.addView(label(chat.title, 14f))
+        if (chat != null) panel.addView(chatLabel(chat.title, 14f))
         historyScroll = ScrollView(this).apply { isFillViewport = true }
         messages = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         historyScroll.addView(messages)
         panel.addView(historyScroll, LinearLayout.LayoutParams(-1, 0, 1f))
         if (ticket == null || profile == null) {
-            messages.addView(label("Create or select a character to begin."))
+            messages.addView(chatLabel("Create or select a character to begin."))
             messages.addView(button("Create character") { editProfile(null) })
             return
         }
         if (s.rows.isNotEmpty()) messages.addView(button("Earlier messages") { browseHistory(s, profile.name) })
-        if (s.rows.isEmpty()) messages.addView(label("No messages yet."))
+        if (s.rows.isEmpty()) messages.addView(chatLabel("No messages yet."))
         else s.rows.forEach {
             val author = if (it.role == "user") "You" else profile.name
             val row = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(8), dp(8), dp(8), dp(12)) }
             if (it.role == "user") row.background = roundedSurface(R.attr.shellAction, 20)
-            row.addView(label(author, 13f).apply { setPadding(0, 0, 0, dp(4)); typeface = android.graphics.Typeface.DEFAULT_BOLD })
-            row.addView(label(it.text).apply { setPadding(0, 0, 0, 0); setTextIsSelectable(true); setLineSpacing(dp(3).toFloat(), 1f) })
+            row.addView(chatLabel(author, 13f).apply { setPadding(0, 0, 0, dp(4)); typeface = android.graphics.Typeface.DEFAULT_BOLD })
+            row.addView(chatLabel(it.text).apply { setPadding(0, 0, 0, 0); setTextIsSelectable(true); setLineSpacing(dp(3).toFloat(), 1f) })
             messages.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
                 if (it.role == "user") marginStart = dp(36) else marginEnd = dp(24)
                 topMargin = dp(4); bottomMargin = dp(4)
             })
         }
         if (s.draft.pending != null) {
-            messages.addView(label("Pending message • " + s.draft.pending.text))
+            messages.addView(chatLabel("Pending message • " + s.draft.pending.text))
             messages.addView(button("Discard pending retry") {
                 AlertDialog.Builder(this).setMessage("Discard retry state? Already committed messages remain in history.")
                     .setNegativeButton(android.R.string.cancel, null)
@@ -392,8 +444,8 @@ class MandyWorkspaceActivity : Activity() {
             minLines = 1; maxLines = 4
             background = null
             setPadding(dp(8), dp(8), dp(8), dp(8))
-            setTextColor(ShellAppearance.color(this@MandyWorkspaceActivity, R.attr.shellText))
-            setHintTextColor(ShellAppearance.color(this@MandyWorkspaceActivity, R.attr.shellMuted))
+            setTextColor(chatColor(R.attr.shellText))
+            setHintTextColor(chatColor(R.attr.shellMuted))
         }
         editor = field
         composer.addView(field)
@@ -419,32 +471,74 @@ class MandyWorkspaceActivity : Activity() {
         composerMode()
         panel.addView(composer)
         if (!BuildConfig.MANDY_EMBEDDED_PREVIEW || s.models.isEmpty())
-            panel.addView(label("Local model required for Send", 12f))
+            panel.addView(chatLabel("Local model required for Send", 12f))
         // Scroll only when displaying a fresh snapshot, not on every token.
         val scroll = historyScroll
         scroll.post { if (alive() && historyScroll === scroll) scroll.scrollTo(0, (messages.height - scroll.height).coerceAtLeast(0)) }
     }
 
-    private fun chooseAppearance() {
-        val old = amoled()
-        AlertDialog.Builder(this).setTitle("Appearance")
-            .setSingleChoiceItems(arrayOf("Graphite dark", "Material AMOLED"), if (old) 1 else 0) { dialog, index ->
-                dialog.dismiss()
-                val selected = index == 1
-                if (selected != old && !busy && alive()) {
-                    val ticket = current?.ticket
-                    val draft = editor?.text?.toString()
-                    // Explicit theme change saves the draft first. Never recreate after a failed save.
-                    work(afterSuccess = { if (alive()) recreate() }) {
-                        if (ticket != null && draft != null) workspace.edit(ticket, draft)
-                        check(appearancePrefs().edit().putBoolean("amoled", selected).commit())
-                    }
+    private fun applyAppearance(custom: Map<String, Int>? = null, black: Boolean = amoled()) {
+        if (busy || !alive()) return
+        val ticket = current?.ticket
+        val draft = editor?.text?.toString()
+        work(afterSuccess = { if (alive()) recreate() }) {
+            if (ticket != null && draft != null) workspace.edit(ticket, draft)
+            val edit = appearancePrefs().edit().putBoolean("amoled", black).putBoolean("custom", custom != null)
+            custom?.forEach { (key, color) -> edit.putString("color_" + key, colorHex(color)) }
+            check(edit.commit())
+        }
+    }
+    private fun editPalette() {
+        val saved = savedPalette()
+        val fields = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(8), dp(16), dp(8)) }
+        val editors = colorRoles.associateWith { role ->
+            val base = if (role.key == "icons") iconColor() else chatColor(role.attr)
+            val field = input(role.title, 7, colorHex(saved[role.key] ?: base), single = true)
+            fields.addView(label(role.title, 14f))
+            fields.addView(field)
+            field
+        }
+        val warning = label("Use #RRGGBB. Text and action contrast is checked before applying.", 13f)
+        fields.addView(warning)
+        val dialog = AlertDialog.Builder(this).setTitle("Custom colors")
+            .setView(ScrollView(this).apply { addView(fields) })
+            .setNegativeButton("Cancel", null).setNeutralButton("Reset fields", null)
+            .setPositiveButton("Apply", null).create()
+        dialog.show()
+        dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+            editors.forEach { (role, field) ->
+                val base = ShellAppearance.color(this, if (role.key == "icons") R.attr.shellText else role.attr)
+                field.setText(colorHex(base))
+            }
+            warning.text = "Preset colors restored to fields. Apply to save."
+        }
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val p = mutableMapOf<String, Int>()
+            for ((role, field) in editors) {
+                val value = field.text.toString().trim()
+                if (!value.matches(Regex("#[0-9a-fA-F]{6}"))) {
+                    field.error = "Enter #RRGGBB"; return@setOnClickListener
                 }
+                p[role.key] = android.graphics.Color.parseColor(value)
+            }
+            val error = paletteError(p)
+            if (error != null) { warning.text = error; return@setOnClickListener }
+            dialog.dismiss()
+            applyAppearance(p.toMap())
+        }
+    }
+    private fun chooseAppearance() {
+        val active = if (customColors.isNotEmpty()) 2 else if (amoled()) 1 else 0
+        AlertDialog.Builder(this).setTitle("Appearance")
+            .setSingleChoiceItems(arrayOf("Graphite dark", "Material AMOLED", "Custom colors"), active) { dialog, index ->
+                dialog.dismiss()
+                if (index == 2) editPalette()
+                else if (index != active) applyAppearance(black = index == 1)
             }.setNegativeButton(android.R.string.cancel, null).show()
     }
     private fun showWorkspaceSettings(s: Snapshot) {
         val options = mutableListOf<Pair<String, () -> Unit>>()
-        options += ("Appearance · " + if (amoled()) "Material AMOLED" else "Graphite dark") to { chooseAppearance() }
+        options += ("Appearance · " + if (customColors.isNotEmpty()) "Custom" else if (amoled()) "Material AMOLED" else "Graphite dark") to { chooseAppearance() }
         options += "AI models" to {
             if (editor != null && editor?.text?.toString() != current?.draft?.draft)
                 status.text = "Save the current draft before opening models."
@@ -567,7 +661,7 @@ class MandyWorkspaceActivity : Activity() {
         stopped.set(false)
         val states = mutableMapOf<View, Boolean>()
         suspendInputs(panel, states)
-        val preview = label("Verifying and loading model…")
+        val preview = chatLabel("Verifying and loading model…")
         messages.addView(preview)
         val previewScroll = historyScroll
         previewScroll.post { if (alive() && historyScroll === previewScroll && busy) previewScroll.scrollTo(0, (messages.height - previewScroll.height).coerceAtLeast(0)) }
