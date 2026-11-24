@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Read-only ELF64 PT_LOAD audit for Character Companion APKs."""
 import argparse
+import stat
 import struct
 import zipfile
 
 PAGE = 16384
 MACHINES = {'arm64-v8a': 183, 'x86_64': 62}
+MAX_ADDRESS = 1 << 64
 
 
 def check_elf(stream, size, machine):
@@ -20,6 +22,7 @@ def check_elf(stream, size, machine):
         return 'invalid ELF type, machine or program header table'
     stream.seek(phoff)
     loads = 0
+    file_backed = 0
     for _ in range(count):
         row = stream.read(56)
         if len(row) != 56:
@@ -28,11 +31,15 @@ def check_elf(stream, size, machine):
         if kind != 1:
             continue
         loads += 1
-        if filesz > memsz or offset + filesz > size:
+        if filesz > memsz or offset + filesz > size or address + memsz > MAX_ADDRESS:
             return 'invalid PT_LOAD bounds'
         if align < PAGE or align & (align - 1) or offset % align != address % align:
             return 'PT_LOAD is not 16 KiB compatible'
-    return None if loads else 'no PT_LOAD segments'
+        if filesz:
+            file_backed += 1
+    if not loads:
+        return 'no PT_LOAD segments'
+    return None if file_backed else 'no file-backed PT_LOAD segments'
 
 
 def audit(path, flavor):
@@ -55,6 +62,9 @@ def audit(path, flavor):
             count += 1
             if flavor == 'gecko' and parts[1] != 'arm64-v8a':
                 errors.append('unexpected Gecko ABI: ' + repr(name))
+                continue
+            if entry.create_system == 3 and stat.S_ISLNK(entry.external_attr >> 16):
+                errors.append('native library is a symbolic link: ' + repr(name))
                 continue
             with archive.open(entry) as stream:
                 issue = check_elf(stream, entry.file_size, MACHINES[parts[1]])

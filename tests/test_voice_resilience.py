@@ -36,7 +36,9 @@ class VoiceResilience(unittest.TestCase):
             self.assertIn(f'if (BrowserSessionActivity.enter(this, {link} ?: HOME, openNow = {link} != null)) return',source)
         self.assertIn('R.string.browser_mode_open_failed',BROWSER)
         self.assertIn('R.string.browser_mode_switch_failed',BROWSER)
-        self.assertIn('store.browserSessionPreferred = true',BROWSER.split('private fun returnToEmbedded()',1)[1])
+        exit_mode = BROWSER.split('private fun returnToEmbedded()',1)[1]
+        self.assertIn('val previousPreference = store.browserSessionPreferred', exit_mode)
+        self.assertIn('store.browserSessionPreferred = previousPreference', exit_mode)
         self.assertIn('onRetainNonConfigurationInstance(): Any = BrowserSessionPolicy.safeTabUrl(destination)',BROWSER)
         self.assertIn('if (!openTab()) store.browserSessionProvider = previous',BROWSER)
         self.assertIn('permissionPending || draft == null',VOICE)

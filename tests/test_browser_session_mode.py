@@ -36,7 +36,8 @@ class BrowserSessionModeTests(unittest.TestCase):
         external = MAIN.split('private fun openExternal(url: String)', 1)[1].split('\n    }', 1)[0]
         self.assertIn('Uri.parse(target)', external)
         self.assertNotIn('Uri.parse(url)', external)
-        self.assertIn('else destination)', MODE)
+        self.assertIn('BrowserSessionPolicy.resolveLaunch(restoring = !allowOpen,', MODE)
+        self.assertIn('destination = launch.destination', MODE)
         self.assertIn('action(R.string.browser_mode_home)', MODE)
 
     def test_no_loop_or_automatic_success_claim(self):

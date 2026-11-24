@@ -1,4 +1,5 @@
 import io
+import stat
 import struct
 import tempfile
 import unittest
@@ -56,6 +57,27 @@ class NativeAudit(unittest.TestCase):
                 archive.writestr('lib/x86_64/libtest.so', elf(machine=62))
             self.assertTrue(audit.audit(path, 'gecko')[1])
             self.assertEqual(audit.audit(path, 'legacy'), (1, []))
+
+    def test_virtual_address_overflow(self):
+        address = (1 << 64) - 16384
+        self.assertIsNone(self.verify(elf(address=address, memsz=16384)))
+        self.assertEqual(self.verify(elf(address=address, memsz=16385)), 'invalid PT_LOAD bounds')
+
+    def test_empty_or_bss_only_load(self):
+        for memsz in (0, 16384):
+            self.assertEqual(self.verify(elf(filesz=0, memsz=memsz)), 'no file-backed PT_LOAD segments')
+
+    def test_native_symlink_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'test.apk'
+            entry = zipfile.ZipInfo('lib/arm64-v8a/libtest.so')
+            entry.create_system = 3
+            entry.external_attr = (stat.S_IFLNK | 0o777) << 16
+            with zipfile.ZipFile(path, 'w') as archive:
+                archive.writestr(entry, elf())
+            count, errors = audit.audit(path, 'gecko')
+            self.assertEqual(count, 1)
+            self.assertIn('symbolic link', errors[0])
 
 
 if __name__ == '__main__':
