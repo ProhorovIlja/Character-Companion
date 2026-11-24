@@ -8,12 +8,15 @@ namespace Mandy.NativePreview;
 internal sealed class Workspace : IDisposable
 {
     internal sealed record Profile(int Version, string Account, string Device, string Character, string Chat, string Name, string Identity);
-    internal Profile Character { get; }
+    internal Profile Character { get; private set; }
+    private readonly List<Profile> profiles;
+    private readonly string catalogPath;
+    internal IReadOnlyList<Profile> Profiles => profiles.AsReadOnly();
     internal string Database { get; }
     private readonly FileStream lease;
-    private Workspace(Profile profile, string database, FileStream lease)
+    private Workspace(Profile profile, string database, FileStream lease, string catalogPath, List<Profile> profiles)
     {
-        Character = profile; Database = database; this.lease = lease;
+        Character = profile; Database = database; this.lease = lease; this.catalogPath = catalogPath; this.profiles = profiles;
     }
     private static void Validate(Profile p)
     {
@@ -32,11 +35,12 @@ internal sealed class Workspace : IDisposable
         string meta = Path.Combine(root, "workspace.json");
         string db = Path.Combine(root, "history.db");
         string lockPath = Path.Combine(root, "workspace.lock");
+        string catalog = Path.Combine(root, "characters.json");
         if (create && Directory.EnumerateFileSystemEntries(root).Any())
             throw new IOException("Creation requires an empty folder.");
         if (!create && (!File.Exists(meta) || !File.Exists(db)))
             throw new IOException("Incomplete workspace; existing files have not been reset.");
-        foreach (var path in new[] { meta, db, lockPath, db + "-wal", db + "-shm" })
+        foreach (var path in new[] { meta, db, lockPath, db + "-wal", db + "-shm", catalog })
             if (File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
                 throw new IOException("Linked workspace files are not supported.");
         var lease = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
@@ -67,9 +71,59 @@ internal sealed class Workspace : IDisposable
                 Validate(p);
                 using var store = new LocalHistory(db, p.Account);
             }
-            return new Workspace(p, db, lease);
+            var profiles = new List<Profile> { p };
+            if (File.Exists(catalog))
+            {
+                using var stream = new FileStream(catalog, FileMode.Open, FileAccess.Read, FileShare.Read);
+                if (stream.Length is < 1 or > 4_194_304) throw new InvalidDataException("Invalid character catalog size.");
+                var additional = JsonSerializer.Deserialize<List<Profile>>(stream) ?? throw new InvalidDataException("Invalid catalog.");
+                if (additional.Count > 63) throw new InvalidDataException("Too many characters.");
+                foreach (var entry in additional)
+                {
+                    if (entry == null) throw new InvalidDataException("Invalid character.");
+                    Validate(entry);
+                    if (entry.Account != p.Account || entry.Device != p.Device ||
+                        profiles.Any(x => x.Character == entry.Character || x.Chat == entry.Chat))
+                        throw new InvalidDataException("Character catalog scope conflict.");
+                    profiles.Add(entry);
+                }
+            }
+            return new Workspace(p, db, lease, catalog, profiles);
         }
         catch { lease.Dispose(); throw; }
+    }
+    // Preserve original workspace.json and all existing event IDs. Additional profiles are
+    // stored separately; this preview keeps one conversation per character.
+    internal Profile AddCharacter(string name, string identity)
+    {
+        if (profiles.Count >= 64) throw new InvalidOperationException("Character limit reached.");
+        var p = new Profile(1, Character.Account, Character.Device, Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(), name, identity);
+        Validate(p);
+        var next = profiles.Skip(1).Append(p).ToArray();
+        byte[] data = JsonSerializer.SerializeToUtf8Bytes(next);
+        if (data.Length > 4_194_304) throw new InvalidDataException("Character catalog exceeds limit.");
+        string temp = catalogPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            using (var file = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            { file.Write(data); file.Flush(flushToDisk: true); }
+            if (File.Exists(catalogPath))
+            {
+                if ((File.GetAttributes(catalogPath) & FileAttributes.ReparsePoint) != 0)
+                    throw new IOException("Linked catalog not supported.");
+                File.Replace(temp, catalogPath, null);
+            }
+            else File.Move(temp, catalogPath);
+            profiles.Add(p);
+            return p;
+        }
+        finally { if (File.Exists(temp)) File.Delete(temp); }
+    }
+    internal void SelectCharacter(string id)
+    {
+        LocalHistory.Id(id);
+        Character = profiles.Single(p => p.Character == id);
     }
     internal List<LocalHistory.Event> Recent() => Page(null);
 
