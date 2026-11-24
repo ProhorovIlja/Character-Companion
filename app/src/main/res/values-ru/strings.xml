@@ -286,4 +286,5 @@
     <string name="library_pin">Закрепить сверху</string>
     <string name="library_unpin">Открепить</string>
     <string name="library_pinned_title">★ %1$s</string>
+    <string name="voice_live_preview">Распознавание: %1$s</string>
 </resources>

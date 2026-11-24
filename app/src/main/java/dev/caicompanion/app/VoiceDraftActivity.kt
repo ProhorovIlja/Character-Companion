@@ -60,6 +60,7 @@ class VoiceDraftActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var listenButton: Button
     private lateinit var languageSpinner: Spinner
+    private lateinit var speechPreview: TextView
     private var recognizer: SpeechRecognizer? = null
     private var supportProbe: SpeechRecognizer? = null
     private var listening = false
@@ -129,8 +130,11 @@ class VoiceDraftActivity : Activity() {
             setTextColor(Color.rgb(171, 178, 195))
         })
         languageSpinner = Spinner(this)
-        val languageNames = listOf(getString(R.string.voice_lang_device),
-            getString(R.string.voice_lang_ru), getString(R.string.voice_lang_en))
+        val displayLocale = resources.configuration.locales[0]
+        val languageNames = VoiceRecognitionOptions.languages.map { tag ->
+            if (tag == null) getString(R.string.voice_lang_device)
+            else java.util.Locale.forLanguageTag(tag).getDisplayName(displayLocale)
+        }
         val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, languageNames)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         languageSpinner.adapter = adapter
@@ -167,7 +171,7 @@ class VoiceDraftActivity : Activity() {
             editor.setSelection(restored.first, restored.last)
             pendingSaveText = retained.pendingSave
             lastSpeechEdit = retained.speechUndo?.takeIf { it.available(editor.text.toString()) }
-            languageSpinner.setSelection(VoiceDraftPolicy.languageIndex(retained.languageIndex))
+            languageSpinner.setSelection(VoiceRecognitionOptions.index(retained.languageIndex))
         }
         // A fixed minimum editor viewport permits natural outer scrolling even under
         // a small/landscape window. The editor itself scrolls for longer transcripts.
@@ -179,6 +183,24 @@ class VoiceDraftActivity : Activity() {
         }
         status.setText(R.string.voice_idle)
         root.addView(status)
+        speechPreview = TextView(this).apply {
+            visibility = View.GONE
+            isSaveEnabled = false
+            isSaveFromParentEnabled = false
+            importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+            setTextColor(Color.rgb(171, 178, 195))
+            textSize = 14f
+        }
+        root.addView(speechPreview)
+        languageSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (supportProbe != null) {
+                    cancelSupportProbe()
+                    status.setText(R.string.voice_idle)
+                }
+            }
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
+        }
         undoSpeechButton = Button(this).apply {
             setText(R.string.voice_undo_speech)
             isAllCaps = false
@@ -287,14 +309,10 @@ class VoiceDraftActivity : Activity() {
 
     private fun requestIntent() = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-        putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-        putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+        putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+        putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-        val language = when (languageSpinner.selectedItemPosition) {
-            1 -> "ru-RU"
-            2 -> "en-US"
-            else -> null
-        }
+        val language = VoiceRecognitionOptions.language(languageSpinner.selectedItemPosition)
         if (language != null) putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
     }
 
@@ -420,15 +438,22 @@ class VoiceDraftActivity : Activity() {
                 }
                 override fun onResults(results: Bundle?) {
                     if (!recognitionGuard.finish(sessionToken)) return
-                    val candidate = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        ?.firstOrNull()
+                    val candidate = VoiceRecognitionOptions.candidate(
+                        results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION))
                     finishListening()
                     acceptRecognition(candidate)
                 }
-                override fun onPartialResults(partialResults: Bundle?) {}
+                override fun onPartialResults(partialResults: Bundle?) {
+                    if (!active() || !resumed) return
+                    val preview = VoiceRecognitionOptions.preview(
+                        partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION))
+                    speechPreview.text = preview?.let { getString(R.string.voice_live_preview, it) }.orEmpty()
+                    speechPreview.visibility = if (preview == null) View.GONE else View.VISIBLE
+                }
                 override fun onEvent(eventType: Int, params: Bundle?) {}
             })
             listening = true
+            languageSpinner.isEnabled = false
             finishingRecognition = false
             cancelListenButton.visibility = View.VISIBLE
             listenButton.setText(R.string.voice_finish)
@@ -466,6 +491,11 @@ class VoiceDraftActivity : Activity() {
         recognitionGuard.cancel()
         listening = false
         finishingRecognition = false
+        if (::languageSpinner.isInitialized) languageSpinner.isEnabled = true
+        if (::speechPreview.isInitialized) {
+            speechPreview.text = ""
+            speechPreview.visibility = View.GONE
+        }
         if (::listenButton.isInitialized) {
             listenButton.isEnabled = true
             listenButton.setText(R.string.voice_start_local)
@@ -609,7 +639,7 @@ class VoiceDraftActivity : Activity() {
                 if (!systemRecognitionPending) return
                 systemRecognitionPending = false
                 if (resultCode == RESULT_OK) acceptRecognition(
-                    data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull())
+                    VoiceRecognitionOptions.candidate(data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)))
             }
             SAVE_TEXT_REQUEST -> {
                 val snapshot = pendingSaveText

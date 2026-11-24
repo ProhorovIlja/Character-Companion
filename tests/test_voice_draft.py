@@ -59,7 +59,7 @@ class VoiceDraft(unittest.TestCase):
 
     def test_language_choice_is_retained_only_in_memory(self):
         self.assertIn('val languageIndex: Int', ACTIVITY)
-        self.assertIn('languageSpinner.setSelection(VoiceDraftPolicy.languageIndex(retained.languageIndex))', ACTIVITY)
+        self.assertIn('languageSpinner.setSelection(VoiceRecognitionOptions.index(retained.languageIndex))', ACTIVITY)
         self.assertIn('RetainedDraft(editor.text.toString(), pendingSaveText, languageSpinner.selectedItemPosition,', ACTIVITY)
         self.assertNotIn('onSaveInstanceState', ACTIVITY)
         self.assertNotIn('SharedPreferences', ACTIVITY)
@@ -140,6 +140,16 @@ class VoiceDraft(unittest.TestCase):
         self.assertNotIn('triggerModelDownload(', probe)
         self.assertIn('cancelSupportProbe()', ACTIVITY.split('override fun onPause()', 1)[1])
         self.assertIn('Settings.ACTION_VOICE_INPUT_SETTINGS', ACTIVITY)
+
+    def test_partial_preview_never_mutates_draft(self):
+        block = ACTIVITY.split('override fun onPartialResults(partialResults: Bundle?)', 1)[1].split('override fun onEvent', 1)[0]
+        self.assertIn('!active() || !resumed', block)
+        self.assertIn('VoiceRecognitionOptions.preview', block)
+        self.assertNotIn('editor.', block)
+        self.assertNotIn('acceptRecognition(', block)
+        self.assertIn('speechPreview.text = ""', ACTIVITY)
+        self.assertIn('languageSpinner.isEnabled = false', ACTIVITY)
+        self.assertIn('VoiceRecognitionOptions.candidate', ACTIVITY)
 
     def test_locales_expose_same_strings(self):
         en = ET.parse(ROOT/'app/src/main/res/values/strings.xml').getroot()

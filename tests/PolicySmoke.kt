@@ -143,6 +143,7 @@ fun main() {
     verifyUpdateIntegrity()
     verifyLoginCompatibility()
     verifyVoiceDraft()
+    verifyVoiceRecognitionOptions()
     // A pending SAF operation may finish only for its original HTTPS page.
     check(GeckoTransferOriginPolicy.isSamePage("https://character.ai/chat/abc", "https://character.ai/chat/abc"))
     check(!GeckoTransferOriginPolicy.isSamePage("https://character.ai/chat/abc", "https://character.ai/chat/xyz"))
