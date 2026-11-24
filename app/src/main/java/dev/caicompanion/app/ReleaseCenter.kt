@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 object ReleaseCenter {
     private const val RELEASES = "https://github.com/ProhorovIlja/Character-Companion/releases"
     private const val LATEST = "https://api.github.com/repos/ProhorovIlja/Character-Companion/releases/latest"
-    private val safeTag = Regex("^[A-Za-z0-9._-]{1,80}$")
+
 
     fun show(activity: Activity) {
         if (activity.isFinishing || activity.isDestroyed) return
@@ -67,8 +67,26 @@ object ReleaseCenter {
                             if (body != null && !cancelled.get()) {
                                 val json = JSONObject(body)
                                 if (!json.optBoolean("draft", true) && !json.optBoolean("prerelease", true)) {
-                                    tag = json.optString("tag_name").takeIf(safeTag::matches)
-                                    if (tag != null) result = R.string.release_found
+                                    val remote = json.optString("tag_name")
+                                    val entries = json.optJSONArray("assets")
+                                    val assets = if (entries != null && entries.length() <= 100) {
+                                        (0 until entries.length()).mapNotNull { i ->
+                                            val item = entries.optJSONObject(i) ?: return@mapNotNull null
+                                            ReleasePolicy.Asset(item.optString("name"),
+                                                item.optString("browser_download_url"),
+                                                item.optLong("size", -1), item.optString("digest"),
+                                                item.optString("state"))
+                                        }
+                                    } else emptyList()
+                                    tag = remote.takeIf { ReleasePolicy.version(it) != null }
+                                    result = when (ReleasePolicy.status(BuildConfig.VERSION_NAME,
+                                        remote, BuildConfig.FLAVOR, assets)) {
+                                        ReleasePolicy.Status.CURRENT -> R.string.release_current_match
+                                        ReleasePolicy.Status.OLDER -> R.string.release_older
+                                        ReleasePolicy.Status.NEWER_NO_APK -> R.string.release_no_compatible
+                                        ReleasePolicy.Status.NEWER -> R.string.release_update_candidate
+                                        ReleasePolicy.Status.UNKNOWN -> R.string.release_unavailable
+                                    }
                                 }
                             }
                         }
@@ -84,7 +102,8 @@ object ReleaseCenter {
                     return@runOnUiThread
                 dialog.dismiss()
                 AlertDialog.Builder(activity).setTitle(R.string.release_center)
-                    .setMessage(if (result == R.string.release_found)
+                    .setMessage(if (result in setOf(R.string.release_current_match, R.string.release_older,
+                        R.string.release_no_compatible, R.string.release_update_candidate))
                         activity.getString(result, tag.orEmpty()) else activity.getString(result))
                     .setPositiveButton(R.string.release_open) { _, _ -> open(activity) }
                     .setNegativeButton(R.string.close, null).show()

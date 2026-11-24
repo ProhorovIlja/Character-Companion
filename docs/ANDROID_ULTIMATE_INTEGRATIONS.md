@@ -19,3 +19,6 @@ Manual release center currently checks exact GitHub releases/latest endpoint onc
 - Prioritize actual APK build and device verification before calling features complete.
 
 No Windows change, no automation/scheduled checks, no third-party binary imported.
+
+### Release metadata validation
+The update center now compares numeric version names (including installed RC builds) and checks the stable release asset filename, renderer, exact official download URL, upload state, bounded size and published SHA-256 digest format. A matching asset is a candidate only, not a verified APK. A future installer must inspect APK versionCode, application ID, signer and actual downloaded digest. No downloads or unattended checks are triggered by this revision.

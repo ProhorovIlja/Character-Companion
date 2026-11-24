@@ -267,4 +267,8 @@
     <string name="release_found">Published stable release: %1$s. Compare with the installed version and review release notes before installing.</string>
     <string name="release_unavailable">Could not verify release metadata. Try again manually.</string>
     <string name="release_browser_error">Could not open the official release page.</string>
+    <string name="release_current_match">Installed version matches stable release %1$s.</string>
+    <string name="release_older">Published stable release %1$s is older than this installation. Do not downgrade.</string>
+    <string name="release_no_compatible">Newer stable release %1$s exists, but no matching APK with valid asset metadata was found.</string>
+    <string name="release_update_candidate">Newer stable release %1$s has a matching APK with published SHA-256 metadata. Review release notes; the APK itself and its signer have not been verified.</string>
 </resources>
