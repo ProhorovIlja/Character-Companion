@@ -179,6 +179,7 @@ class MandyWorkspaceActivity : Activity() {
         panel.addView(button("Memory & relationship") { editMemory(profile, s.memory) })
         if (BuildConfig.MANDY_EMBEDDED_PREVIEW && s.models.isNotEmpty() && s.rows.lastOrNull()?.role == "character" && s.draft.pending == null) {
             panel.addView(button("Review relationship from dialogue…") { chooseAssessmentModel(s) })
+            if (s.memory.memories.size < 32) panel.addView(button("Review memory from dialogue…") { chooseAssessmentModel(s, forMemory = true) })
         }
         panel.addView(button("New conversation") { createChat(profile) })
         if (s.rows.isEmpty()) panel.addView(label("No messages yet."))
@@ -283,18 +284,20 @@ class MandyWorkspaceActivity : Activity() {
             saveAnd { workspace.select(NativeChatWorkspace.Key(p.id, c.id)) }
         }.setNegativeButton(android.R.string.cancel, null).show()
     }
-    private fun chooseAssessmentModel(s: Snapshot) {
+    private data class DialogueReview(val details: String, val apply: (AndroidConversationStore) -> Unit)
+
+    private fun chooseAssessmentModel(s: Snapshot, forMemory: Boolean = false) {
         val ticket = s.ticket ?: return
         val labels = s.models.map { it.sha256 + "\nBytes: " + it.bytes }.toTypedArray()
         AlertDialog.Builder(this).setTitle("Select a trusted local assessment model").setItems(labels) { _, index ->
             val sha = s.models[index].sha256
-            AlertDialog.Builder(this).setTitle("Review fictional relationship")
-                .setMessage("Analyze the latest completed dialogue locally. No relationship changes without your approval. Only continue if you trust the model publisher. Experimental inference may fail.")
+            AlertDialog.Builder(this).setTitle(if (forMemory) "Review memory" else "Review fictional relationship")
+                .setMessage("Analyze the latest completed dialogue locally. Nothing is changed without your approval. Only continue if you trust the model publisher. Experimental inference may fail.")
                 .setNegativeButton(android.R.string.cancel, null)
-                .setPositiveButton("Assess") { _, _ -> assessRelationship(ticket, sha) }.show()
+                .setPositiveButton("Assess") { _, _ -> assessDialogue(ticket, sha, forMemory) }.show()
         }.setNegativeButton(android.R.string.cancel, null).show()
     }
-    private fun assessRelationship(ticket: NativeChatWorkspace.Ticket, sha: String) {
+    private fun assessDialogue(ticket: NativeChatWorkspace.Ticket, sha: String, forMemory: Boolean) {
         if (busy || !alive() || !BuildConfig.MANDY_EMBEDDED_PREVIEW || current?.ticket != ticket) return
         busy = true
         stopped.set(false)
@@ -307,9 +310,30 @@ class MandyWorkspaceActivity : Activity() {
             val result = runCatching {
                 require(workspace.visible(ticket))
                 AndroidConversationStore(applicationContext, account).use { history ->
-                    RelationshipAssessment.propose(history, ticket.key, memory.get(ticket.key.character), stopped::get) { messages, stop ->
+                    val state = memory.get(ticket.key.character)
+                    val generate: (List<NativeConversation.Message>, () -> Boolean) -> String = { messages, stop ->
                         EmbeddedLlama.open(modelLibrary(), sha, stop).use { engine ->
                             engine.generate(messages, outputTokens = 384, cancelled = stop, onText = {})
+                        }
+                    }
+                    if (forMemory) {
+                        MemoryAssessment.propose(history, ticket.key, state, stopped::get, generate)?.let { proposal ->
+                            val details = "Proposed memory:\n" + proposal.note +
+                                "\n\nOriginal user dialogue:\n" + proposal.evidence.user.text +
+                                "\n\nCharacter reply:\n" + proposal.evidence.reply.text
+                            DialogueReview(details) { store ->
+                                MemoryAssessment.apply(store, memory, ticket.key, proposal, approved = true)
+                            }
+                        }
+                    } else {
+                        RelationshipAssessment.propose(history, ticket.key, state, stopped::get, generate)?.let { proposal ->
+                            val details = "Proposed stage: " + proposal.stage.name.lowercase(java.util.Locale.ROOT).replace('_', ' ') +
+                                "\n\nProposed note:\n" + proposal.note +
+                                "\n\nEvidence — user:\n" + proposal.evidence.user.text +
+                                "\n\nEvidence — character:\n" + proposal.evidence.reply.text
+                            DialogueReview(details) { store ->
+                                RelationshipAssessment.apply(store, memory, ticket.key, proposal, approved = true)
+                            }
                         }
                     }
                 }
@@ -324,25 +348,21 @@ class MandyWorkspaceActivity : Activity() {
                     return@runOnUiThread
                 }
                 result.onSuccess { proposal ->
-                    if (proposal == null) status.text = "No supported change proposed"
+                    if (proposal == null) status.text = "No new change proposed"
                     else {
                         status.text = "Review proposed change"
-                        val details = "Proposed stage: " + proposal.stage.name.lowercase(java.util.Locale.ROOT).replace('_', ' ') +
-                            "\n\nProposed note:\n" + proposal.note +
-                            "\n\nEvidence — user:\n" + proposal.evidence.user.text +
-                            "\n\nEvidence — character:\n" + proposal.evidence.reply.text
-                        AlertDialog.Builder(this).setTitle("Relationship proposal").setMessage(details)
+                        AlertDialog.Builder(this).setTitle(if (forMemory) "Memory proposal" else "Relationship proposal").setMessage(proposal.details)
                             .setNegativeButton("Reject", null)
                             .setPositiveButton("Approve") { _, _ ->
                                 saveAnd {
                                     require(workspace.visible(ticket))
                                     AndroidConversationStore(applicationContext, account).use { history ->
-                                        RelationshipAssessment.apply(history, memory, ticket.key, proposal, approved = true)
+                                        proposal.apply(history)
                                     }
                                 }
                             }.show()
                     }
-                }.onFailure { status.text = "Assessment unavailable • relationship unchanged" }
+                }.onFailure { status.text = "Assessment unavailable • memory and relationship unchanged" }
             }
         }
     }

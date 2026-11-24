@@ -34,3 +34,8 @@ kotlinc "$src/NativeConversation.kt" "$src/NativeCharacterMemory.kt" tests/Nativ
 kotlinc "$src/NativeConversation.kt" "$src/NativeCharacterMemory.kt" "$src/NativeChatWorkspace.kt" \
   "$src/RelationshipAssessment.kt" tests/RelationshipAssessmentSmoke.kt -include-runtime -d "$tmp/assessment.jar"
 "$java_home/bin/java" -jar "$tmp/assessment.jar"
+
+# Extractive memory assessment regression (no real model).
+kotlinc "$src/NativeConversation.kt" "$src/NativeCharacterMemory.kt" "$src/NativeChatWorkspace.kt" \
+  "$src/RelationshipAssessment.kt" "$src/MemoryAssessment.kt" tests/MemoryAssessmentSmoke.kt -include-runtime -d "$tmp/memory-assessment.jar"
+"$java_home/bin/java" -jar "$tmp/memory-assessment.jar"
