@@ -96,6 +96,8 @@ class MainActivity : Activity() {
     private var fullscreenView: View? = null
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
     private var destroyed = false
+    private var rendererNeedsNavigation = false
+    private var rendererDisposed = false
     private var keyboardVisible = false
     private var activityResumed = false
     private var nativeHub: View? = null
@@ -270,7 +272,7 @@ class MainActivity : Activity() {
                 return filterResponse(request.url.toString())
             }
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
-                if (destroyed || !::webView.isInitialized || view !== webView) return
+                if (destroyed || rendererNeedsNavigation || !::webView.isInitialized || view !== webView) return
                 voiceHandoff.invalidate()
                 observeLoginPage(url)
                 // WebRTC grants are scoped to the page that requested them, not its successor.
@@ -316,9 +318,10 @@ class MainActivity : Activity() {
                     UrlPolicy.isInternal(view?.url)) showError(getString(R.string.error_tls))
             }
             override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                // Ignore stale termination callbacks from a previously discarded view.
+                if (destroyed || rendererDisposed || !::webView.isInitialized || view !== webView) return true
                 voiceHandoff.invalidate()
-                // Old WebView is unusable. Replace it; don't crash the whole application.
-                if (destroyed) return true
+                rendererNeedsNavigation = true
                 loginProtection.reset()
                 filter.loginBypass = false
                 denyPendingMedia()
@@ -327,18 +330,37 @@ class MainActivity : Activity() {
                 chooser = null
                 val index = container.indexOfChild(view)
                 container.removeView(view)
-                view.destroy()
-                webView = WebView(this@MainActivity)
-                container.addView(webView, index.coerceAtLeast(0), FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-                configureWebView(webView)
-                syncRendererLifecycle()
-                if (rendererRecovery.allowAutomaticRestart(SystemClock.elapsedRealtime())) {
-                    showToast(getString(R.string.browser_restarted))
-                    if (nativeHub == null) webView.loadUrl(NativeWorkspaceNavigation.safeDestination(lastUrl))
-                } else {
-                    // A healthy WebView is installed, but must not auto-load in a crash loop.
-                    showError(getString(R.string.renderer_crash_loop))
+                rendererDisposed = true
+                runCatching { view.destroy() }
+                var replacement: WebView? = null
+                try {
+                    val next = WebView(this@MainActivity)
+                    replacement = next
+                    configureWebView(next)
+                    container.addView(next, index.coerceIn(0, container.childCount), FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+                    webView = next
+                    rendererDisposed = false
+                    syncRendererLifecycle()
+                    if (!RendererRecoveryBudget.canRestoreAutomatically(detail.didCrash(), activityResumed, nativeHub != null)) {
+                        showError(getString(R.string.renderer_recovery_required))
+                    } else if (rendererRecovery.allowAutomaticRestart(SystemClock.elapsedRealtime())) {
+                        rendererNeedsNavigation = false
+                        deferredWebReload.consumedByNavigation()
+                        showToast(getString(R.string.browser_restarted))
+                        webView.loadUrl(NativeWorkspaceNavigation.safeDestination(lastUrl))
+                    } else {
+                        showError(getString(R.string.renderer_crash_loop))
+                    }
+                } catch (_: RuntimeException) {
+                    // Never leave a destroyed WebView available to the UI after allocation failure.
+                    rendererDisposed = true
+                    destroyed = true
+                    replacement?.let {
+                        runCatching { (it.parent as? ViewGroup)?.removeView(it); it.destroy() }
+                    }
+                    showToast(getString(R.string.error_loading))
+                    finish()
                 }
                 return true
             }
@@ -583,7 +605,7 @@ class MainActivity : Activity() {
     }
 
     private fun showPageMenu(anchor: View) {
-        val ready = ::webView.isInitialized && !destroyed
+        val ready = ::webView.isInitialized && !destroyed && !rendererNeedsNavigation
         ShellMenu.show(this, anchor, listOf(
             ShellMenu.Action(R.string.settings) { showSettings() },
             ShellMenu.Action(R.string.release_center) { ReleaseCenter.show(this) },
@@ -786,7 +808,7 @@ class MainActivity : Activity() {
 
     /** A settings toggle in the offline workspace must never silently fetch a webpage. */
     private fun flushDeferredWebReload() {
-        if (!::webView.isInitialized || destroyed) return
+        if (!::webView.isInitialized || destroyed || rendererNeedsNavigation) return
         if (!deferredWebReload.consumeIfVisible(activityResumed, nativeHub != null)) return
         if (NativeWorkspaceNavigation.needsInitialLoad(webView.url)) {
             webView.loadUrl(NativeWorkspaceNavigation.safeDestination(lastUrl))
@@ -973,6 +995,7 @@ class MainActivity : Activity() {
             closeNativeHub(loadIfBlank = false)
             return
         }
+        rendererNeedsNavigation = false
         closeNativeHub(loadIfBlank = false)
         webView.loadUrl(safeUrl)
     }
@@ -989,7 +1012,7 @@ class MainActivity : Activity() {
         if (!destroyed && loadIfBlank && !::webView.isInitialized && !ensureWebView()) return
         if (!destroyed && ::webView.isInitialized) {
             // Closing the native launch screen must never reveal an uninitialized blank WebView.
-            if (loadIfBlank && NativeWorkspaceNavigation.needsInitialLoad(webView.url)) {
+            if (loadIfBlank && !rendererNeedsNavigation && NativeWorkspaceNavigation.needsInitialLoad(webView.url)) {
                 deferredWebReload.consumedByNavigation()
                 webView.loadUrl(NativeWorkspaceNavigation.safeDestination(lastUrl))
             }
@@ -1446,7 +1469,7 @@ class MainActivity : Activity() {
         super.onPause()
         syncRendererLifecycle()
         // CookieManager access itself may start WebView: keep cold native startup cold.
-        if (::webView.isInitialized) CookieManager.getInstance().flush()
+        if (::webView.isInitialized && !rendererDisposed) CookieManager.getInstance().flush()
     }
     override fun onResume() {
         super.onResume()
@@ -1491,9 +1514,10 @@ class MainActivity : Activity() {
         closeNativeHub()
         denyPendingMedia()
         chooser?.onReceiveValue(null); chooser = null
-        if (::webView.isInitialized) {
+        if (::webView.isInitialized && !rendererDisposed) {
             container.removeView(webView)
             webView.destroy()
+            rendererDisposed = true
         }
         super.onDestroy()
     }

@@ -490,6 +490,11 @@ class GeckoActivity : Activity() {
             actionsRow.visibility = if (keyboardVisible) View.GONE else View.VISIBLE
     }
 
+    private fun onRendererExit(failed: GeckoSession) {
+        if (!::session.isInitialized || failed !== session || needsRecovery || isFinishing || isDestroyed) return
+        geckoExited()
+    }
+
     /** User-initiated recovery, never a timer or background monitor. Form contents may be lost. */
     private fun geckoExited() {
         voiceHandoff.invalidate()
@@ -705,8 +710,8 @@ class GeckoActivity : Activity() {
     }
 
     private val contentDelegate = object : GeckoSession.ContentDelegate {
-        override fun onCrash(session: GeckoSession) { geckoExited() }
-        override fun onKill(session: GeckoSession) { geckoExited() }
+        override fun onCrash(session: GeckoSession) { onRendererExit(session) }
+        override fun onKill(session: GeckoSession) { onRendererExit(session) }
         override fun onExternalResponse(session: GeckoSession, response: WebResponse) {
             val stream = response.body
             if (stream == null || !started || pendingDownload != null ||

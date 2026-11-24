@@ -287,4 +287,5 @@
     <string name="library_unpin">Unpin</string>
     <string name="library_pinned_title">★ %1$s</string>
     <string name="voice_live_preview">Listening: %1$s</string>
+    <string name="renderer_recovery_required">The browser renderer stopped. Tap Retry to reopen the page or use your external browser.</string>
 </resources>

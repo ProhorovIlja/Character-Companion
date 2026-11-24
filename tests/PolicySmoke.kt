@@ -139,6 +139,9 @@ fun verifyLoginCompatibility() {
 }
 
 fun main() {
+    for (crash in listOf(false, true)) for (visible in listOf(false, true)) for (hub in listOf(false, true)) {
+        check(RendererRecoveryBudget.canRestoreAutomatically(crash, visible, hub) == (!crash && visible && !hub))
+    }
     verifyDeviceRuntimeCapabilities()
     verifyReleasePolicy()
     verifyUpdateIntegrity()

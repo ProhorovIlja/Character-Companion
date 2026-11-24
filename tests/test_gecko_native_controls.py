@@ -45,6 +45,7 @@ class GeckoNativeControlsTests(unittest.TestCase):
     def test_manual_crash_recovery_has_bounded_user_action(self):
         self.assertIn('override fun onCrash(session: GeckoSession)', ACTIVITY)
         self.assertIn('override fun onKill(session: GeckoSession)', ACTIVITY)
+        self.assertIn('failed !== session || needsRecovery || isFinishing || isDestroyed', ACTIVITY)
         self.assertIn('private fun showRecoveryPrompt()', ACTIVITY)
         self.assertIn('private fun recoverGecko()', ACTIVITY)
         self.assertIn('RendererRecoveryBudget(2, 120_000L)', ACTIVITY)

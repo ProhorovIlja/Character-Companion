@@ -12,6 +12,13 @@ class RendererRecoveryBudget(
         require(windowMillis > 0)
     }
 
+    companion object {
+        /** A real crash can repeat on the same page; hidden views must not load implicitly. */
+        fun canRestoreAutomatically(didCrash: Boolean, activityResumed: Boolean,
+                                    workspaceVisible: Boolean): Boolean =
+            !didCrash && activityResumed && !workspaceVisible
+    }
+
     private val restarts = ArrayDeque<Long>()
 
     private fun prune(elapsedRealtime: Long) {
