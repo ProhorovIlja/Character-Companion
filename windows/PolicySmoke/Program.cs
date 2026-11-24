@@ -90,6 +90,26 @@ Check(Resample(Samples(7_000, 7_000, 7_000), 44_100, 1)
     .All(x => x == 7_000), "44.1k mono constant level");
 Check(Resample(Samples(short.MinValue, short.MaxValue), 48_000, 1)
     .Length == 1, "clipped values produce one sample");
+// Exercise the direct-copy path across chunk boundaries and partial reads.
+var pcmBytes = new byte[32770];
+new Random(4816).NextBytes(pcmBytes);
+using (var input = new MemoryStream(pcmBytes))
+using (var output = new MemoryStream())
+{
+    long count = Pcm16Resampler.Convert(input, output, 16000, 1, pcmBytes.Length - 2);
+    Check(count == 16384 && input.Position == pcmBytes.Length - 2 &&
+          output.ToArray().SequenceEqual(pcmBytes.Take(pcmBytes.Length - 2)), "16k bounded exact copy");
+}
+using (var input = new MemoryStream(new byte[2]))
+using (var output = new MemoryStream())
+{
+    try
+    {
+        Pcm16Resampler.Convert(input, output, 16000, 1, 4);
+        Check(false, "16k truncated input rejected");
+    }
+    catch (EndOfStreamException) { Check(true, "16k truncated input rejected"); }
+}
 Console.WriteLine("PASS PCM16 capture-rate normalization cases (no hardware).");
 
 // These rejects must happen before starting any executable or reading a model.

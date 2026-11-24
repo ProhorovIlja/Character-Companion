@@ -21,6 +21,27 @@ public static class Pcm16Resampler
             inputBytes > 180L * inputRate * blockAlign)
             throw new ArgumentOutOfRangeException(nameof(inputBytes), "Audio duration/format is invalid.");
 
+        // Already-normalized mono PCM needs no arithmetic or per-sample I/O.
+        // ReadExactly rejects truncation, and never reads beyond the stated length.
+        if (inputRate == OutputSampleRate && channels == 1)
+        {
+            var buffer = new byte[16 * 1024];
+            try
+            {
+                long remaining = inputBytes;
+                while (remaining > 0)
+                {
+                    int count = (int)Math.Min(remaining, buffer.Length);
+                    input.ReadExactly(buffer, 0, count);
+                    output.Write(buffer, 0, count);
+                    remaining -= count;
+                }
+                output.Flush();
+                return inputBytes / sizeof(short);
+            }
+            finally { Array.Clear(buffer); }
+        }
+
         using var reader = new BinaryReader(input, Encoding.UTF8, leaveOpen: true);
         using var writer = new BinaryWriter(output, Encoding.UTF8, leaveOpen: true);
         long accumulated = 0;

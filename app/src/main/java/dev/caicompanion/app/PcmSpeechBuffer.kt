@@ -21,6 +21,12 @@ internal class PcmSpeechBuffer(val inputRate: Int, maxSeconds: Int = 180) : Clos
     fun append(input: ShortArray, count: Int = input.size) {
         check(!closed)
         require(count in 0..input.size && count <= remainingFrames)
+        if (inputRate == RATE) {
+            ensureCapacity(size + count)
+            input.copyInto(samples, size, 0, count)
+            size += count; frames += count; target += count.toLong()
+            return
+        }
         for (i in 0 until count) {
             var current = frames.toLong() * RATE
             val end = current + RATE
@@ -35,13 +41,16 @@ internal class PcmSpeechBuffer(val inputRate: Int, maxSeconds: Int = 180) : Clos
             frames++
         }
     }
+    private fun ensureCapacity(required: Int) {
+        require(required in 0..maxSamples)
+        if (required <= samples.size) return
+        val old = samples
+        samples = old.copyOf(minOf(maxSamples, maxOf(required, old.size * 2)))
+        old.fill(0)
+    }
     private fun flush() {
         check(weight > 0 && size < maxSamples)
-        if (size == samples.size) {
-            val old = samples
-            samples = old.copyOf(minOf(maxSamples, old.size * 2))
-            old.fill(0)
-        }
+        ensureCapacity(size + 1)
         val magnitude = (kotlin.math.abs(sum) + weight / 2) / weight
         samples[size++] = (if (sum < 0) -magnitude else magnitude).toShort()
         target++; sum = 0; weight = 0
