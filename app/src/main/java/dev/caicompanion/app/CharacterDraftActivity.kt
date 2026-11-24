@@ -24,19 +24,22 @@ import java.util.concurrent.atomic.AtomicBoolean
 /** Private creator preparation. No web injection, account access or automatic publishing. */
 class CharacterDraftActivity : Activity() {
     private var draft = CharacterDraftPolicy.Draft()
+    private var savedId: String? = null
+    private var savedDraft: CharacterDraftPolicy.Draft? = null
     private var picking = false
     private var busy = false
     private val closed = AtomicBoolean(false)
     private lateinit var status: TextView
     private lateinit var summary: TextView
     private val fieldButtons = mutableMapOf<CharacterDraftPolicy.Field, Button>()
-    private data class Retained(val draft: CharacterDraftPolicy.Draft, val picking: Boolean)
+    private data class Retained(val draft: CharacterDraftPolicy.Draft, val picking: Boolean,
+                                val savedId: String?, val savedDraft: CharacterDraftPolicy.Draft?)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ShellAppearance.apply(this)
         super.onCreate(savedInstanceState)
         if (SettingsStore(this).protectScreen) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        (lastNonConfigurationInstance as? Retained)?.let { draft = it.draft; picking = it.picking }
+        (lastNonConfigurationInstance as? Retained)?.let { draft = it.draft; picking = it.picking; savedId = it.savedId; savedDraft = it.savedDraft }
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(12), dp(16), dp(12))
@@ -56,9 +59,12 @@ class CharacterDraftActivity : Activity() {
         }
         column.addView(TextView(this).apply { setText(R.string.character_draft_title); textSize = 23f })
         column.addView(TextView(this).apply { setText(R.string.character_draft_help) })
+        button(R.string.character_draft_library) { showLibrary() }
+        button(R.string.character_draft_save) { saveLocal(false) }
+        button(R.string.character_draft_save_copy) { saveLocal(true) }
         button(R.string.character_draft_import) { replace { openCard() } }
         button(R.string.character_draft_paste) { replace { pasteCard() } }
-        button(R.string.character_draft_new) { replace { draft = CharacterDraftPolicy.Draft(); refresh() } }
+        button(R.string.character_draft_new) { replace { draft = CharacterDraftPolicy.Draft(); savedId = null; savedDraft = null; refresh() } }
         summary = TextView(this)
         column.addView(summary)
         for (field in CharacterDraftPolicy.Field.entries) {
@@ -167,7 +173,7 @@ class CharacterDraftActivity : Activity() {
     }
 
     private fun replace(action: () -> Unit) {
-        if (draft == CharacterDraftPolicy.Draft()) action()
+        if (draft == (savedDraft ?: CharacterDraftPolicy.Draft())) action()
         else AlertDialog.Builder(this).setMessage(R.string.character_draft_replace)
             .setPositiveButton(R.string.confirm) { _, _ -> action() }
             .setNegativeButton(R.string.cancel, null).show()
@@ -205,6 +211,7 @@ class CharacterDraftActivity : Activity() {
                 if (closed.get() || isFinishing || isDestroyed) return@runOnUiThread
                 busy = false
                 if (result != null) draft = result
+                if (result != null) { savedId = null; savedDraft = null }
                 status.setText(if (result == null) R.string.character_draft_invalid else R.string.character_draft_loaded)
                 refresh()
             }
@@ -231,8 +238,78 @@ class CharacterDraftActivity : Activity() {
         }
     }
 
+    private fun <T> libraryWork(work: () -> T, done: (T) -> Unit) {
+        if (busy || picking || closed.get()) return
+        busy = true
+        refresh()
+        status.setText(R.string.lorebook_processing)
+        Thread({
+            val result = runCatching { work() }
+            runOnUiThread {
+                if (closed.get() || isFinishing || isDestroyed) return@runOnUiThread
+                busy = false
+                refresh()
+                result.fold(done, { status.setText(R.string.character_draft_library_failed) })
+            }
+        }, "manual-character-library").start()
+    }
+
+    private fun saveLocal(copy: Boolean) {
+        val snapshot = draft
+        val id = if (copy) null else savedId
+        val context = applicationContext
+        libraryWork({ CharacterDraftStore.save(context, id, snapshot) }) { stored ->
+            savedId = stored
+            savedDraft = snapshot
+            status.setText(R.string.character_draft_saved)
+            refresh()
+        }
+    }
+
+    private fun showLibrary() {
+        val context = applicationContext
+        libraryWork({ CharacterDraftStore.list(context) }) { items ->
+            if (items.isEmpty()) {
+                status.setText(R.string.character_draft_library_empty)
+                return@libraryWork
+            }
+            status.setText(R.string.character_draft_library)
+            val labels = items.map { item ->
+                val header = item.header
+                if (header == null) getString(R.string.character_draft_library_damaged, item.id.take(8))
+                else getString(R.string.character_draft_library_row,
+                    header.name.ifBlank { getString(R.string.character_draft_untitled) }, item.id.take(8))
+            }
+            AlertDialog.Builder(this).setTitle(R.string.character_draft_library)
+                .setItems(labels.toTypedArray()) { _, index ->
+                    val item = items[index]
+                    AlertDialog.Builder(this).setTitle(labels[index])
+                        .setItems(arrayOf(getString(R.string.character_draft_library_load),
+                            getString(R.string.character_draft_library_delete))) { _, action ->
+                            if (action == 0) replace {
+                                libraryWork({ CharacterDraftStore.load(context, item.id) }) { loaded ->
+                                    draft = loaded
+                                    savedId = item.id
+                                    savedDraft = loaded
+                                    status.setText(R.string.character_draft_loaded)
+                                    refresh()
+                                }
+                            } else AlertDialog.Builder(this).setMessage(R.string.character_draft_library_delete_confirm)
+                                .setNegativeButton(R.string.cancel, null)
+                                .setPositiveButton(R.string.confirm) { _, _ ->
+                                    libraryWork({ CharacterDraftStore.delete(context, item.id) }) {
+                                        if (savedId == item.id) { savedId = null; savedDraft = null }
+                                        status.setText(R.string.character_draft_library_deleted)
+                                        refresh()
+                                    }
+                                }.show()
+                        }.setNegativeButton(R.string.cancel, null).show()
+                }.setNegativeButton(R.string.close, null).show()
+        }
+    }
+
     private fun confirmClose() {
-        if (draft == CharacterDraftPolicy.Draft() && !busy && !picking) finish()
+        if (draft == (savedDraft ?: CharacterDraftPolicy.Draft()) && !busy && !picking) finish()
         else AlertDialog.Builder(this).setMessage(R.string.character_draft_close)
             .setPositiveButton(R.string.confirm) { _, _ -> finish() }
             .setNegativeButton(R.string.cancel, null).show()
@@ -240,6 +317,6 @@ class CharacterDraftActivity : Activity() {
 
     @Deprecated("Legacy Android back navigation")
     override fun onBackPressed() { confirmClose() }
-    override fun onRetainNonConfigurationInstance(): Any = Retained(draft, picking)
+    override fun onRetainNonConfigurationInstance(): Any = Retained(draft, picking, savedId, savedDraft)
     override fun onDestroy() { closed.set(true); super.onDestroy() }
 }

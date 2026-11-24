@@ -31,6 +31,18 @@ class CharacterDraftTests(unittest.TestCase):
                       'CharacterDraftPolicy.fromCard'):
             self.assertIn(token, adapter)
 
+    def test_private_character_library(self):
+        activity = (JAVA/'CharacterDraftActivity.kt').read_text()
+        store = (JAVA/'CharacterDraftStore.kt').read_text()
+        codec = (JAVA/'CharacterDraftCodec.kt').read_text()
+        for token in ('CharacterDraftStore.save', 'CharacterDraftStore.load', 'CharacterDraftStore.delete',
+                      'savedDraft = null', 'manual-character-library'):
+            self.assertIn(token, activity)
+        for token in ('noBackupFilesDir', 'AtomicFile', 'MAX_DRAFTS', '@Synchronized', 'failWrite'):
+            self.assertIn(token, store)
+        for token in ('CodingErrorAction.REPORT', 'MAX_CHARS', 'read() == -1'):
+            self.assertIn(token, codec)
+
     def test_localization(self):
         def names(locale):
             root = ET.parse(ROOT/f'app/src/main/res/{locale}/strings.xml').getroot()

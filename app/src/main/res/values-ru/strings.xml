@@ -382,4 +382,17 @@
     <string name="character_draft_replace">Заменить текущий черновик в памяти? Сначала скопируйте важные поля.</string>
     <string name="character_draft_loaded">Карта загружена. Проверьте и отредактируйте поля перед копированием.</string>
     <string name="character_draft_close">Закрыть редактор? Локальный черновик персонажа не сохраняется на диск.</string>
+    <string name="character_draft_library">Сохранённые черновики персонажей</string>
+    <string name="character_draft_save">Сохранить локально</string>
+    <string name="character_draft_save_copy">Сохранить копию</string>
+    <string name="character_draft_saved">Черновик персонажа сохранён</string>
+    <string name="character_draft_library_failed">Не удалось открыть хранилище черновиков</string>
+    <string name="character_draft_library_empty">Нет сохранённых черновиков персонажей</string>
+    <string name="character_draft_library_damaged">Повреждённый черновик (%1$s)</string>
+    <string name="character_draft_library_row">%1$s (%2$s)</string>
+    <string name="character_draft_untitled">Персонаж без имени</string>
+    <string name="character_draft_library_load">Загрузить черновик</string>
+    <string name="character_draft_library_delete">Удалить сохранённый черновик</string>
+    <string name="character_draft_library_delete_confirm">Удалить сохранённый черновик? Открытый черновик останется в редакторе.</string>
+    <string name="character_draft_library_deleted">Сохранённый черновик удалён</string>
 </resources>

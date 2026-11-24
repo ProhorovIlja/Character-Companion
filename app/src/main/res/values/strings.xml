@@ -382,4 +382,17 @@
     <string name="character_draft_replace">Replace the current memory-only draft? Copy important fields first.</string>
     <string name="character_draft_loaded">Card loaded. Review and edit each field before copying.</string>
     <string name="character_draft_close">Close this editor? The local character draft is not saved to disk.</string>
+    <string name="character_draft_library">Saved character drafts</string>
+    <string name="character_draft_save">Save locally</string>
+    <string name="character_draft_save_copy">Save a copy</string>
+    <string name="character_draft_saved">Character draft saved</string>
+    <string name="character_draft_library_failed">Could not access character drafts</string>
+    <string name="character_draft_library_empty">No saved character drafts</string>
+    <string name="character_draft_library_damaged">Unreadable draft (%1$s)</string>
+    <string name="character_draft_library_row">%1$s (%2$s)</string>
+    <string name="character_draft_untitled">Untitled character</string>
+    <string name="character_draft_library_load">Load draft</string>
+    <string name="character_draft_library_delete">Delete saved draft</string>
+    <string name="character_draft_library_delete_confirm">Delete this saved draft? Any open draft remains in the editor.</string>
+    <string name="character_draft_library_deleted">Saved draft deleted</string>
 </resources>

@@ -33,5 +33,16 @@ fun verifyCharacterDraft() {
         check(P.needsReview(field, "x".repeat(field.targetMax + 1)))
     }
     check(draft.greeting == card.greeting)
-    println("CharacterDraftPolicy: 33 checks passed")
+    val original = draft.copy(tagline = "Ночь 🌙", definition = "line\n{{char}}\u0000", alternatives = listOf("Привет", ""))
+    val bytes = java.io.ByteArrayOutputStream().also { dev.caicompanion.app.CharacterDraftCodec.write(original, it) }.toByteArray()
+    val codec = dev.caicompanion.app.CharacterDraftCodec
+    check(codec.read(bytes.inputStream()) == original)
+    check(codec.header(bytes.inputStream()).name == original.name)
+    check(runCatching { codec.read(bytes.copyOf(bytes.size - 1).inputStream()) }.isFailure)
+    check(runCatching { codec.read((bytes + byteArrayOf(0)).inputStream()) }.isFailure)
+    check(runCatching { codec.read(bytes.clone().apply { this[0] = 0 }.inputStream()) }.isFailure)
+    check(runCatching { codec.read(bytes.clone().apply { this[7] = 2 }.inputStream()) }.isFailure)
+    check(runCatching { codec.write(original.copy(name = "x".repeat(513)), java.io.ByteArrayOutputStream()) }.isFailure)
+    check(runCatching { codec.write(original.copy(name = "\uD800"), java.io.ByteArrayOutputStream()) }.isFailure)
+    println("CharacterDraftPolicy/Codec: 41 checks passed")
 }
