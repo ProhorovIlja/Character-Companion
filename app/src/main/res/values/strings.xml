@@ -450,4 +450,8 @@
     <string name="memory_bank_recall_help">Enter names, places or a topic. Exact word matching within the selected profile only.</string>
     <string name="memory_bank_no_match">No matches or invalid query</string>
     <string name="memory_bank_recall_count">Included: %1$d. Over budget: %2$d. Review context before copying.</string>
+    <string name="shell_menu_creator">Character editors</string>
+    <string name="shell_menu_page">Page actions</string>
+    <string name="shell_menu_privacy">Privacy and sign-in</string>
+    <string name="shell_menu_support">Maintenance and help</string>
 </resources>

@@ -628,27 +628,27 @@ class MainActivity : Activity() {
                 }
             },
             ShellMenu.Action(R.string.settings) { showSettings() },
-            ShellMenu.Action(R.string.release_center) { ReleaseCenter.show(this) },
-            ShellMenu.Action(R.string.free_experience_title) { FreeExperienceHelp.show(this) },
-            ShellMenu.Action(R.string.lorebook_title) { startActivity(Intent(this, LorebookActivity::class.java)) },
-            ShellMenu.Action(R.string.character_draft_title) { startActivity(Intent(this, CharacterDraftActivity::class.java)) },
+            ShellMenu.Action(R.string.release_center, section = ShellMenu.Section.SUPPORT) { ReleaseCenter.show(this) },
+            ShellMenu.Action(R.string.free_experience_title, section = ShellMenu.Section.SUPPORT) { FreeExperienceHelp.show(this) },
+            ShellMenu.Action(R.string.lorebook_title, section = ShellMenu.Section.CREATOR) { startActivity(Intent(this, LorebookActivity::class.java)) },
+            ShellMenu.Action(R.string.character_draft_title, section = ShellMenu.Section.CREATOR) { startActivity(Intent(this, CharacterDraftActivity::class.java)) },
             ShellMenu.Action(R.string.roleplay_title) { RoleplayToolkitUi.show(this) },
-            ShellMenu.Action(R.string.engine_use_gecko, BuildConfig.FLAVOR == "gecko") { returnToGecko() },
+            ShellMenu.Action(R.string.engine_use_gecko, BuildConfig.FLAVOR == "gecko", section = ShellMenu.Section.SUPPORT) { returnToGecko() },
             ShellMenu.Action(R.string.forward, ready && webView.canGoForward()) { webView.goForward() },
-            ShellMenu.Action(R.string.shell_refresh_cache, ready) {
+            ShellMenu.Action(R.string.shell_refresh_cache, ready, section = ShellMenu.Section.PAGE) {
                 webView.clearCache(true); webView.reload(); showToast(getString(R.string.cache_refreshed))
             },
-            ShellMenu.Action(R.string.share, ready) { sharePage() },
-            ShellMenu.Action(R.string.shell_copy_link, ready) { copyPageLink() },
-            ShellMenu.Action(if (store.blocking) R.string.shell_disable_shield else R.string.shell_enable_shield) {
+            ShellMenu.Action(R.string.share, ready, section = ShellMenu.Section.PAGE) { sharePage() },
+            ShellMenu.Action(R.string.shell_copy_link, ready, section = ShellMenu.Section.PAGE) { copyPageLink() },
+            ShellMenu.Action(if (store.blocking) R.string.shell_disable_shield else R.string.shell_enable_shield, section = ShellMenu.Section.PRIVACY) {
                 store.blocking = !store.blocking; applySettings(reload = true)
             },
-            ShellMenu.Action(R.string.login_compatibility_button) { toggleLoginProtection() },
-            ShellMenu.Action(R.string.filter_edit) { showFilterRules() },
-            ShellMenu.Action(R.string.diagnostics) { showDiagnostics() },
-            ShellMenu.Action(R.string.browser_mode_sign_in) { confirmBrowserSessionMode() },
-            ShellMenu.Action(R.string.open_browser, ready) { openBrowserTab(BrowserSessionPolicy.safeTabUrl(webView.url)) },
-            ShellMenu.Action(R.string.hub_open) { showNativeHub() }
+            ShellMenu.Action(R.string.login_compatibility_button, section = ShellMenu.Section.PRIVACY) { toggleLoginProtection() },
+            ShellMenu.Action(R.string.filter_edit, section = ShellMenu.Section.PRIVACY) { showFilterRules() },
+            ShellMenu.Action(R.string.diagnostics, section = ShellMenu.Section.SUPPORT) { showDiagnostics() },
+            ShellMenu.Action(R.string.browser_mode_sign_in, section = ShellMenu.Section.PRIVACY) { confirmBrowserSessionMode() },
+            ShellMenu.Action(R.string.open_browser, ready, section = ShellMenu.Section.PAGE) { openBrowserTab(BrowserSessionPolicy.safeTabUrl(webView.url)) },
+            ShellMenu.Action(R.string.hub_open, section = ShellMenu.Section.PAGE) { showNativeHub() }
         ))
     }
 

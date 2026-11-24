@@ -242,24 +242,24 @@ class GeckoActivity : Activity() {
                 }
             },
             ShellMenu.Action(R.string.settings) { showGeckoSettings() },
-            ShellMenu.Action(R.string.release_center) { ReleaseCenter.show(this) },
-            ShellMenu.Action(R.string.free_experience_title) { FreeExperienceHelp.show(this) },
-            ShellMenu.Action(R.string.lorebook_title) { startActivity(Intent(this, LorebookActivity::class.java)) },
-            ShellMenu.Action(R.string.character_draft_title) { startActivity(Intent(this, CharacterDraftActivity::class.java)) },
+            ShellMenu.Action(R.string.release_center, section = ShellMenu.Section.SUPPORT) { ReleaseCenter.show(this) },
+            ShellMenu.Action(R.string.free_experience_title, section = ShellMenu.Section.SUPPORT) { FreeExperienceHelp.show(this) },
+            ShellMenu.Action(R.string.lorebook_title, section = ShellMenu.Section.CREATOR) { startActivity(Intent(this, LorebookActivity::class.java)) },
+            ShellMenu.Action(R.string.character_draft_title, section = ShellMenu.Section.CREATOR) { startActivity(Intent(this, CharacterDraftActivity::class.java)) },
             ShellMenu.Action(R.string.roleplay_title) { RoleplayToolkitUi.show(this) },
-            ShellMenu.Action(R.string.section_data) { settingsBackup.show() },
-            ShellMenu.Action(R.string.gecko_legacy) { confirmWebViewSwitch() },
-            ShellMenu.Action(R.string.device_compat_title) { DeviceRuntimeProbe.show(this, "gecko") },
-            ShellMenu.Action(R.string.forward, ready && canGoForward) { session.goForward() },
-            ShellMenu.Action(R.string.bookmark_add, ready) { saveCurrentBookmark() },
-            ShellMenu.Action(R.string.share, ready) { shareSafeUrl() },
-            ShellMenu.Action(if (settings.blocking) R.string.shell_disable_shield else R.string.shell_enable_shield) {
+            ShellMenu.Action(R.string.section_data, section = ShellMenu.Section.SUPPORT) { settingsBackup.show() },
+            ShellMenu.Action(R.string.gecko_legacy, section = ShellMenu.Section.SUPPORT) { confirmWebViewSwitch() },
+            ShellMenu.Action(R.string.device_compat_title, section = ShellMenu.Section.SUPPORT) { DeviceRuntimeProbe.show(this, "gecko") },
+            ShellMenu.Action(R.string.forward, ready && canGoForward, section = ShellMenu.Section.PAGE) { session.goForward() },
+            ShellMenu.Action(R.string.bookmark_add, ready, section = ShellMenu.Section.PAGE) { saveCurrentBookmark() },
+            ShellMenu.Action(R.string.share, ready, section = ShellMenu.Section.PAGE) { shareSafeUrl() },
+            ShellMenu.Action(if (settings.blocking) R.string.shell_disable_shield else R.string.shell_enable_shield, section = ShellMenu.Section.PRIVACY) {
                 settings.blocking = !settings.blocking; refreshTrackingProtection()
             },
-            ShellMenu.Action(R.string.login_compatibility_button, ready) { toggleLoginProtection() },
-            ShellMenu.Action(R.string.gecko_media) { configureMedia() },
-            ShellMenu.Action(R.string.browser_mode_sign_in) { confirmBrowserSessionMode() },
-            ShellMenu.Action(R.string.open_browser, ready) { confirmBrowser(activeUrl) }
+            ShellMenu.Action(R.string.login_compatibility_button, ready, section = ShellMenu.Section.PRIVACY) { toggleLoginProtection() },
+            ShellMenu.Action(R.string.gecko_media, section = ShellMenu.Section.PRIVACY) { configureMedia() },
+            ShellMenu.Action(R.string.browser_mode_sign_in, section = ShellMenu.Section.PRIVACY) { confirmBrowserSessionMode() },
+            ShellMenu.Action(R.string.open_browser, ready, section = ShellMenu.Section.PAGE) { confirmBrowser(activeUrl) }
         ))
     }
 

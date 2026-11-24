@@ -450,4 +450,8 @@
     <string name="memory_bank_recall_help">Введите имена, места или тему. Поиск только в выбранном профиле, по совпадению слов.</string>
     <string name="memory_bank_no_match">Нет совпадений или запрос некорректен</string>
     <string name="memory_bank_recall_count">Включено: %1$d. Не поместилось: %2$d. Проверьте контекст перед копированием.</string>
+    <string name="shell_menu_creator">Редакторы персонажей</string>
+    <string name="shell_menu_page">Действия со страницей</string>
+    <string name="shell_menu_privacy">Приватность и вход</string>
+    <string name="shell_menu_support">Обслуживание и помощь</string>
 </resources>
