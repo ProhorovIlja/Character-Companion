@@ -57,6 +57,23 @@ class MandyWorkspaceActivity : Activity() {
     private lateinit var stopSpeech: Button
     private lateinit var sendSpeech: Button
     private var resumed = false
+    /** Sample system memory only during explicitly requested local inference. */
+    private fun admitModel(model: NativeModelLibrary.Model) {
+        val manager = applicationContext.getSystemService(android.app.ActivityManager::class.java)
+            ?: throw ModelAdmission.Denied(ModelAdmission.Decision(ModelAdmission.Reason.INVALID_METRICS, 0, 0))
+        val info = android.app.ActivityManager.MemoryInfo()
+        manager.getMemoryInfo(info)
+        ModelAdmission.requireAllowed(model.bytes, ModelAdmission.Memory(info.availMem, info.totalMem, info.threshold, info.lowMemory))
+    }
+    private fun admissionMessage(error: ModelAdmission.Denied): String {
+        val decision = error.decision
+        return when (decision.reason) {
+            ModelAdmission.Reason.INVALID_METRICS -> "System memory information unavailable"
+            ModelAdmission.Reason.LOW_MEMORY -> "Android reports low memory. Close other apps or select a smaller model."
+            else -> "Conservative memory check refused model. Available " + decision.available / ModelAdmission.MIB +
+                " MiB; estimated minimum " + decision.required / ModelAdmission.MIB + " MiB."
+        }
+    }
     private fun modelLibrary() = NativeModelLibrary(applicationContext.noBackupFilesDir.toPath().resolve("mandy-models-v1"))
     private fun dp(n: Int) = (n * resources.displayMetrics.density + .5f).toInt()
     private fun alive() = !isFinishing && !isDestroyed
@@ -271,7 +288,7 @@ class MandyWorkspaceActivity : Activity() {
                 saved = true
                 if (!retry) workspace.prepare(ticket, mode)
                 AndroidConversationStore(applicationContext, account).use { history ->
-                    EmbeddedChatTurn.sendWithMemory(workspace, ticket, library, history, modelLibrary(), sha, memory, stopped::get) { origin, part ->
+                    EmbeddedChatTurn.sendWithMemory(workspace, ticket, library, history, modelLibrary(), sha, memory, stopped::get, admit = ::admitModel) { origin, part ->
                         text.append(part)
                         val now = System.nanoTime()
                         if (now - lastUpdate >= 100_000_000L) {
@@ -300,6 +317,7 @@ class MandyWorkspaceActivity : Activity() {
                     saved && refreshed == null -> "Reload workspace before continuing. Saved data was not reset."
                     result.isSuccess -> "Reply saved"
                     stopped.get() -> "Stopped • check saved draft or pending message"
+                    result.exceptionOrNull() is ModelAdmission.Denied -> admissionMessage(result.exceptionOrNull() as ModelAdmission.Denied) + " • pending message retained"
                     else -> "Generation failed • check saved draft or retry state"
                 }
             }
@@ -489,7 +507,7 @@ class MandyWorkspaceActivity : Activity() {
                 AndroidConversationStore(applicationContext, account).use { history ->
                     val state = memory.get(ticket.key.character)
                     val generate: (List<NativeConversation.Message>, () -> Boolean) -> String = { messages, stop ->
-                        EmbeddedLlama.open(modelLibrary(), sha, stop).use { engine ->
+                        EmbeddedLlama.open(modelLibrary(), sha, stop, admit = ::admitModel).use { engine ->
                             engine.generate(messages, outputTokens = 384, cancelled = stop, onText = {})
                         }
                     }
@@ -539,7 +557,7 @@ class MandyWorkspaceActivity : Activity() {
                                 }
                             }.show()
                     }
-                }.onFailure { status.text = "Assessment unavailable • memory and relationship unchanged" }
+                }.onFailure { error -> status.text = if (error is ModelAdmission.Denied) admissionMessage(error) else "Assessment unavailable • memory and relationship unchanged" }
             }
         }
     }

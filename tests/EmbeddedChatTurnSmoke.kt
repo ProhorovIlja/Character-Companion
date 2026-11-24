@@ -63,7 +63,15 @@ fun main() {
         val third = w.prepare(bt)
         verify(runCatching { send(bt, "0".repeat(64)) }.isFailure)
         verify(w.state(bt.key).pending == third && h.find(NativeConversation.replyId(third.id)) == null)
-        verify(EmbeddedChatTurn.sendWithMemory(w, bt, chars, h, models, m.sha256, memory, onText = { _, _ -> }).character == b.id)
+        var admitted = 0
+        val denied = runCatching { EmbeddedChatTurn.sendWithMemory(w, bt, chars, h, models, m.sha256, memory,
+            admit = { model -> check(model == m); admitted++; throw ModelAdmission.Denied(ModelAdmission.Decision(ModelAdmission.Reason.LOW_MEMORY, 0, 0)) },
+            onText = { _, _ -> error("No output on refusal") }) }.exceptionOrNull()
+        verify(denied is ModelAdmission.Denied && admitted == 1)
+        verify(w.state(bt.key).pending == third && h.find(third.id) != null && h.find(NativeConversation.replyId(third.id)) == null)
+        verify(EmbeddedChatTurn.sendWithMemory(w, bt, chars, h, models, m.sha256, memory,
+            admit = { model -> check(model == m); admitted++ }, onText = { _, _ -> }).character == b.id)
+        verify(admitted == 2)
         verify(h.recent(a.id, t.key.chat, 20).size == 4 && h.recent(b.id, bt.key.chat, 20).size == 2)
         w.edit(bt, "normal")
         val fourth = w.prepare(bt)
@@ -71,7 +79,8 @@ fun main() {
         val u = h.appendUser(fourth.id, device, b.id, bt.key.chat, "text", fourth.text)
         h.commitReply(u, NativeConversation.replyId(fourth.id), "Saved reply")
         Files.delete(m.path)
-        verify(send(bt).text == "Saved reply")
+        verify(EmbeddedChatTurn.sendWithMemory(w, bt, chars, h, models, m.sha256, memory,
+            admit = { error("Completed retry needs no model") }, onText = { _, _ -> }).text == "Saved reply")
         verify(w.state(bt.key).pending == null)
         println("EmbeddedChatTurn: $count checks passed (JNI test double)")
     } finally { root.toFile().deleteRecursively() }

@@ -14,8 +14,11 @@ class EmbeddedLlama private constructor() : Closeable {
 
     companion object {
         /** Caller explicitly trusts this model; hash validation is not proof of publisher identity. */
-        fun open(library: NativeModelLibrary, sha: String, cancelled: () -> Boolean = { false }): EmbeddedLlama {
+        fun open(library: NativeModelLibrary, sha: String, cancelled: () -> Boolean = { false },
+                 admit: (NativeModelLibrary.Model) -> Unit = {}): EmbeddedLlama {
             val model = library.verify(sha, cancelled)
+            if (cancelled() || Thread.currentThread().isInterrupted) throw IOException("Model load cancelled")
+            admit(model)
             if (cancelled() || Thread.currentThread().isInterrupted) throw IOException("Model load cancelled")
             System.loadLibrary("mandy_llama")
             val engine = EmbeddedLlama()

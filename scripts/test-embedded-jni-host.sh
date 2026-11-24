@@ -23,7 +23,7 @@ kotlinc "$src/EmbeddedLlama.kt" "$src/EmbeddedTextSink.kt" "$src/NativeModelLibr
 # Full durable turn integration, using the same isolated test-only native library.
 kotlinc "$src/EmbeddedLlama.kt" "$src/EmbeddedTextSink.kt" "$src/NativeModelLibrary.kt" \
   "$src/NativeConversation.kt" "$src/NativeCharacterLibrary.kt" "$src/NativeChatWorkspace.kt" \
-  "$src/NativeCharacterMemory.kt" "$src/EmbeddedChatTurn.kt" tests/EmbeddedChatTurnSmoke.kt -include-runtime -d "$tmp/turn.jar"
+  "$src/NativeCharacterMemory.kt" "$src/EmbeddedChatTurn.kt" "$src/ModelAdmission.kt" tests/EmbeddedChatTurnSmoke.kt -include-runtime -d "$tmp/turn.jar"
 "$java_home/bin/java" -Xcheck:jni -Djava.library.path="$tmp" -jar "$tmp/turn.jar"
 
 # Independent character memory regression.
@@ -43,3 +43,7 @@ kotlinc "$src/NativeConversation.kt" "$src/NativeCharacterMemory.kt" "$src/Nativ
 # Memory format compatibility and weighted retrieval.
 kotlinc "$src/NativeConversation.kt" "$src/NativeCharacterMemory.kt" tests/NativeMemoryScaleSmoke.kt -include-runtime -d "$tmp/memory-scale.jar"
 "$java_home/bin/java" -jar "$tmp/memory-scale.jar"
+
+# Conservative model admission policy.
+kotlinc "$src/ModelAdmission.kt" tests/ModelAdmissionSmoke.kt -include-runtime -d "$tmp/admission.jar"
+"$java_home/bin/java" -jar "$tmp/admission.jar"
