@@ -481,4 +481,6 @@
     <string name="module_center_knowledge">Память и знания</string>
     <string name="module_center_utilities">Инструменты и помощь</string>
     <string name="module_center_empty">Модули не найдены</string>
+    <string name="module_center_pinned">Закреплённые</string>
+    <string name="module_center_pin">Закрепить %1$s</string>
 </resources>

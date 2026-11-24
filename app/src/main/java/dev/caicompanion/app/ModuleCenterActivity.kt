@@ -10,6 +10,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -22,11 +23,14 @@ class ModuleCenterActivity : Activity() {
     private lateinit var results: LinearLayout
     private lateinit var search: EditText
     private var opening = false
+    private var pins: Set<CompanionModules.Module> = emptySet()
+    private val preferences by lazy { getSharedPreferences("module_center", MODE_PRIVATE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ShellAppearance.apply(this)
         super.onCreate(savedInstanceState)
         if (SettingsStore(this).protectScreen) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        pins = CompanionModules.decodePins(runCatching { preferences.getStringSet("pinned_ids", emptySet()).orEmpty() }.getOrDefault(emptySet()))
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(ShellAppearance.color(this@ModuleCenterActivity, R.attr.shellBackground))
@@ -107,6 +111,8 @@ class ModuleCenterActivity : Activity() {
         CompanionModules.Module.MEMORY_BACKUP -> R.string.memory_transfer_title
         CompanionModules.Module.DICE -> R.string.roleplay_dice
         CompanionModules.Module.FREE_HELP -> R.string.free_experience_title
+        CompanionModules.Module.VOICE -> R.string.voice_title
+        CompanionModules.Module.UPDATES -> R.string.release_center
     }
 
     private fun groupLabel(group: CompanionModules.Group): Int = when (group) {
@@ -116,47 +122,74 @@ class ModuleCenterActivity : Activity() {
     }
 
     private fun render(query: String) {
-        val modules = CompanionModules.matching(query) { getString(label(it)) }
+        val sections = CompanionModules.sections(query, pins) { getString(label(it)) }
         results.removeAllViews()
-        if (modules.isEmpty()) {
-            results.addView(TextView(this).apply { setText(R.string.module_center_empty) })
+        if (sections.pinned.isEmpty() && sections.groups.isEmpty()) {
+            results.addView(TextView(this).apply {
+                setText(R.string.module_center_empty)
+                setTextColor(ShellAppearance.color(this@ModuleCenterActivity, R.attr.shellMuted))
+            })
             return
         }
+        if (sections.pinned.isNotEmpty()) addPanel(R.string.module_center_pinned, sections.pinned)
         for (group in CompanionModules.Group.entries) {
-            val members = modules.filter { it.group == group }
-            if (members.isEmpty()) continue
-            val panel = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setBackgroundResource(R.drawable.panel_background)
-                setPaddingRelative(dp(12), dp(10), dp(12), dp(12))
+            val members = sections.groups[group].orEmpty()
+            if (members.isNotEmpty()) addPanel(groupLabel(group), members)
+        }
+    }
+
+    private fun addPanel(title: Int, members: List<CompanionModules.Module>) {
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundResource(R.drawable.panel_background)
+            setPaddingRelative(dp(12), dp(10), dp(12), dp(12))
+        }
+        panel.addView(TextView(this).apply {
+            setText(title)
+            textSize = 14f
+            setTextColor(ShellAppearance.color(this@ModuleCenterActivity, R.attr.shellAccent))
+            setPaddingRelative(dp(4), dp(4), dp(4), dp(8))
+            ViewCompat.setAccessibilityHeading(this, true)
+        })
+        for (module in members) {
+            val row = LinearLayout(this).apply {
+                gravity = android.view.Gravity.CENTER_VERTICAL
             }
-            panel.addView(TextView(this).apply {
-                setText(groupLabel(group))
-                textSize = 14f
-                setTextColor(ShellAppearance.color(this@ModuleCenterActivity, R.attr.shellAccent))
-                setPaddingRelative(dp(4), dp(4), dp(4), dp(8))
-                ViewCompat.setAccessibilityHeading(this, true)
-            })
-            for (module in members) {
-                panel.addView(Button(this).apply {
-                    setText(label(module))
-                    minHeight = dp(48)
-                    gravity = android.view.Gravity.CENTER_VERTICAL or android.view.Gravity.START
-                    isAllCaps = false
-                    setOnClickListener {
-                        if (!opening && !isFinishing && !isDestroyed) {
-                            opening = true
-                            try { RoleplayToolkitUi.open(this@ModuleCenterActivity, module) }
-                            finally { opening = false }
-                        }
+            row.addView(Button(this).apply {
+                setText(label(module))
+                minHeight = dp(48)
+                gravity = android.view.Gravity.CENTER_VERTICAL or android.view.Gravity.START
+                isAllCaps = false
+                setOnClickListener {
+                    if (!opening && !isFinishing && !isDestroyed && hasWindowFocus()) {
+                        opening = true
+                        try { RoleplayToolkitUi.open(this@ModuleCenterActivity, module) }
+                        catch (_: RuntimeException) {
+                            android.widget.Toast.makeText(this@ModuleCenterActivity, R.string.roleplay_failed,
+                                android.widget.Toast.LENGTH_SHORT).show()
+                        } finally { opening = false }
                     }
-                }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                    topMargin = dp(6)
-                })
-            }
-            results.addView(panel, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                bottomMargin = dp(12)
+                }
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            row.addView(CheckBox(this).apply {
+                minHeight = dp(48)
+                minWidth = dp(48)
+                isChecked = module in pins
+                contentDescription = getString(R.string.module_center_pin, getString(label(module)))
+                setOnCheckedChangeListener { _, checked ->
+                    if (checked != (module in pins) && !isFinishing && !isDestroyed) {
+                        pins = CompanionModules.toggle(pins, module)
+                        preferences.edit().putStringSet("pinned_ids", CompanionModules.encodePins(pins)).apply()
+                        render(search.text.toString())
+                    }
+                }
+            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            panel.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = dp(6)
             })
         }
+        results.addView(panel, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            bottomMargin = dp(12)
+        })
     }
 }

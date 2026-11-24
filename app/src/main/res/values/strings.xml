@@ -481,4 +481,6 @@
     <string name="module_center_knowledge">Memory and knowledge</string>
     <string name="module_center_utilities">Utilities and help</string>
     <string name="module_center_empty">No matching modules</string>
+    <string name="module_center_pinned">Pinned modules</string>
+    <string name="module_center_pin">Pin %1$s</string>
 </resources>

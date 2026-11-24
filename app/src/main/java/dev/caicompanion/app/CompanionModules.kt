@@ -11,7 +11,8 @@ object CompanionModules {
         SCENE(Group.CREATOR), PROMPT(Group.CREATOR),
         MEMORY_BANK(Group.KNOWLEDGE), CHAT_MEMORY(Group.KNOWLEDGE), CONTEXT(Group.KNOWLEDGE),
         WIKIPEDIA(Group.KNOWLEDGE), WEB_SEARCH(Group.KNOWLEDGE),
-        MEMORY_BACKUP(Group.UTILITIES), DICE(Group.UTILITIES), FREE_HELP(Group.UTILITIES)
+        MEMORY_BACKUP(Group.UTILITIES), DICE(Group.UTILITIES), FREE_HELP(Group.UTILITIES),
+        VOICE(Group.UTILITIES), UPDATES(Group.UTILITIES)
     }
 
     private fun fold(value: String): String =
@@ -24,5 +25,18 @@ object CompanionModules {
             val text = fold(module.name.replace('_', ' ') + " " + labels(module))
             terms.all { text.contains(it) }
         }
+    }
+    /** Ignore unknown/stale preference IDs; enum names, never ordinals, are stored. */
+    fun decodePins(ids: Set<String>): Set<Module> = Module.entries.filter { it.name in ids }.toSet()
+    fun encodePins(pins: Set<Module>): Set<String> = pins.map { it.name }.toSet()
+    fun toggle(pins: Set<Module>, module: Module): Set<Module> =
+        if (module in pins) pins - module else pins + module
+
+    data class Sections(val pinned: List<Module>, val groups: Map<Group, List<Module>>)
+    fun sections(query: String, pins: Set<Module>, labels: (Module) -> String): Sections {
+        val matches = matching(query, labels)
+        val pinned = matches.filter { it in pins }
+        val groups = matches.filterNot { it in pins }.groupBy { it.group }
+        return Sections(pinned, groups)
     }
 }

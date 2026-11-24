@@ -63,6 +63,8 @@ object RoleplayToolkitUi {
             CompanionModules.Module.MEMORY_BACKUP -> activity.startActivity(Intent(activity, MemoryBackupActivity::class.java))
             CompanionModules.Module.DICE -> dice(activity)
             CompanionModules.Module.FREE_HELP -> FreeExperienceHelp.show(activity)
+            CompanionModules.Module.VOICE -> activity.startActivity(VoiceDraftActivity.handoffIntent(activity, false))
+            CompanionModules.Module.UPDATES -> ReleaseCenter.show(activity)
         }
     }
 
