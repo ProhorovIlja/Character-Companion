@@ -331,6 +331,19 @@ fun main() {
     check(BoundedText.read(StringReader("test"), 4) == "test")
     check(BoundedText.read(StringReader("test"), 3) == null)
     check(BoundedText.read(StringReader(""), 4) == "")
+    check(BoundedText.read(StringReader("test"), Int.MAX_VALUE) == "test")
+    check(BoundedText.read(StringReader("test"), 4) { true } == null)
+    var cancelledReads = 0
+    val cancelledReader = object : java.io.Reader() {
+        override fun read(cbuf: CharArray, off: Int, len: Int): Int {
+            cancelledReads++
+            cbuf[off] = 'a'
+            return 1
+        }
+        override fun close() {}
+    }
+    check(BoundedText.read(cancelledReader, 100) { cancelledReads >= 2 } == null)
+    check(cancelledReads == 2)
     val strictEngine = FilterEngine(listOf("doubleclick.net"), listOf("sentry.io"))
     check(!strictEngine.shouldBlock("https://sentry.io/"))
     strictEngine.strict = true

@@ -45,6 +45,9 @@ object ReleaseCenter {
             .setNegativeButton(R.string.cancel, null).create()
         ForegroundUpdateUi.show(activity, dialog) { cancelled.set(true) }
         if (!dialog.isShowing) return
+        val startedAt = android.os.SystemClock.elapsedRealtime()
+        fun expired(): Boolean = cancelled.get() ||
+            android.os.SystemClock.elapsedRealtime() - startedAt >= 15_000L
         // One bounded request following a button press. No retries, periodic checks, or token storage.
         Thread {
             var connection: HttpsURLConnection? = null
@@ -52,7 +55,7 @@ object ReleaseCenter {
             var tag: String? = null
             var candidate: ReleasePolicy.Asset? = null
             try {
-                if (!cancelled.get()) {
+                if (!expired()) {
                     val request = URL(LATEST).openConnection() as HttpsURLConnection
                     connection = request
                     request.instanceFollowRedirects = false
@@ -61,12 +64,12 @@ object ReleaseCenter {
                     request.setRequestProperty("Accept", "application/vnd.github+json")
                     request.setRequestProperty("User-Agent", "CharacterCompanion-Android")
                     when (request.responseCode) {
-                        404 -> result = R.string.release_none
+                        404 -> if (!expired()) result = R.string.release_none
                         200 -> {
                             val body = request.inputStream.bufferedReader(Charsets.UTF_8).use {
-                                BoundedText.read(it, 256_000)
+                                BoundedText.read(it, 256_000, ::expired)
                             }
-                            if (body != null && !cancelled.get()) {
+                            if (body != null && !expired()) {
                                 val json = JSONObject(body)
                                 if (!json.optBoolean("draft", true) && !json.optBoolean("prerelease", true)) {
                                     val remote = json.optString("tag_name")
@@ -99,6 +102,11 @@ object ReleaseCenter {
                 result = R.string.release_unavailable
             } finally {
                 connection?.disconnect()
+            }
+            if (expired()) {
+                result = R.string.release_unavailable
+                candidate = null
+                tag = null
             }
             activity.runOnUiThread {
                 if (cancelled.get() || activity.isFinishing || activity.isDestroyed || !dialog.isShowing)
