@@ -12,7 +12,7 @@ class MemoryBankTests(unittest.TestCase):
         for token in ('noBackupFilesDir', 'AtomicFile', 'check(current == expected)', 'check(load(context) == entries)'):
             self.assertIn(token, store)
         for token in ('MemoryBank.forProfile(entries, profile)', 'MemoryBank.recall(entries, profile',
-                      'MemoryBankStore.put(activity, entries, entry)', 'previewContext(activity, packet)'):
+                      'MemoryBankStore.put(context, entries, entry)', 'previewContext(activity, packet)'):
             self.assertIn(token, ui)
         for token in ('WorkManager', 'evaluateJavascript', 'openConnection'):
             self.assertNotIn(token, store)

@@ -454,4 +454,6 @@
     <string name="shell_menu_page">Page actions</string>
     <string name="shell_menu_privacy">Privacy and sign-in</string>
     <string name="shell_menu_support">Maintenance and help</string>
+    <string name="editor_working">Processing…</string>
+    <string name="editor_character_count">%1$d / %2$d</string>
 </resources>

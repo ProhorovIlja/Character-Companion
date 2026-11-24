@@ -11,6 +11,8 @@ import android.net.Uri
 import android.os.Build
 import android.os.PersistableBundle
 import android.text.InputFilter
+import android.text.Editable
+import android.text.TextWatcher
 import android.text.InputType
 import android.view.View
 import android.view.WindowManager
@@ -63,16 +65,25 @@ object RoleplayToolkitUi {
     }
 
     private fun edit(activity: Activity, slot: RoleplayToolkit.Slot) {
-        val saved = runCatching { RoleplayToolkitStore.load(activity, slot) }.getOrElse {
+        val context = activity.applicationContext
+        ManualEditorWork.load(activity, { RoleplayToolkitStore.load(context, slot) }) { result ->
+            editLoaded(activity, slot, result)
+        }
+    }
+
+    private fun editLoaded(activity: Activity, slot: RoleplayToolkit.Slot, result: Result<String>) {
+        val saved = result.getOrElse {
             // Do not silently replace unreadable data.
             showPrivate(activity, AlertDialog.Builder(activity).setTitle(title(slot))
                 .setMessage(R.string.roleplay_damaged)
                 .setNegativeButton(R.string.cancel, null)
                 .setPositiveButton(R.string.roleplay_reset) { _, _ ->
                     if (active(activity)) {
-                        if (runCatching { RoleplayToolkitStore.clear(activity, slot) }.isSuccess)
-                            edit(activity, slot)
-                        else toast(activity, R.string.roleplay_failed)
+                        val context = activity.applicationContext
+                        ManualEditorWork.load(activity, { RoleplayToolkitStore.clear(context, slot) }) { cleared ->
+                            if (cleared.isSuccess) edit(activity, slot)
+                            else toast(activity, R.string.roleplay_failed)
+                        }
                     }
                 }.create())
             return
@@ -94,6 +105,7 @@ object RoleplayToolkitUi {
             setPadding(pad, pad, pad, 0)
             addView(TextView(activity).apply { setText(R.string.roleplay_privacy) })
             addView(editor)
+            addView(characterCounter(activity, editor, RoleplayToolkit.MAX_CHARS))
         }
         val dialog = AlertDialog.Builder(activity).setTitle(title(slot)).setView(body)
             .setNegativeButton(R.string.cancel, null)
@@ -108,10 +120,16 @@ object RoleplayToolkitUi {
             if (!active(activity)) return@setOnClickListener
             val text = editor.text.toString()
             if (!RoleplayToolkit.valid(text)) editor.error = activity.getString(R.string.roleplay_invalid)
-            else if (runCatching { RoleplayToolkitStore.save(activity, slot, text) }.isSuccess) {
-                toast(activity, R.string.roleplay_saved)
-                dialog.dismiss()
-            } else editor.error = activity.getString(R.string.roleplay_failed)
+            else {
+                val context = activity.applicationContext
+                ManualEditorWork.run(activity, dialog, listOf(editor),
+                    { RoleplayToolkitStore.save(context, slot, text) }) { saved ->
+                    if (saved.isSuccess) {
+                        toast(activity, R.string.roleplay_saved)
+                        dialog.dismiss()
+                    } else editor.error = activity.getString(R.string.roleplay_failed)
+                }
+            }
         }
     }
 
@@ -139,14 +157,11 @@ object RoleplayToolkitUi {
             }.setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.confirm) { _, _ ->
                 if (active(activity)) {
-                    val data = runCatching {
-                        slots.filterIndexed { index, _ -> selected[index] }
-                            .associateWith { RoleplayToolkitStore.load(activity, it) }
-                    }.getOrElse {
-                        toast(activity, R.string.roleplay_failed)
-                        return@setPositiveButton
+                    val chosen = slots.filterIndexed { index, _ -> selected[index] }
+                    val context = activity.applicationContext
+                    ManualEditorWork.load(activity, { chosen.associateWith { RoleplayToolkitStore.load(context, it) } }) { result ->
+                        result.fold({ research(activity, it) }, { toast(activity, R.string.roleplay_failed) })
                     }
-                    research(activity, data)
                 }
             }.create())
     }
@@ -163,11 +178,36 @@ object RoleplayToolkitUi {
             if (!singleLine) { minLines = 3; maxLines = 8 }
         }
 
+    private fun characterCounter(activity: Activity, editor: EditText, limit: Int): TextView =
+        TextView(activity).apply {
+            textSize = 12f
+            setTextColor(ShellAppearance.color(activity, R.attr.shellMuted))
+            gravity = android.view.Gravity.END
+            fun update(length: Int) { text = activity.getString(R.string.editor_character_count, length, limit) }
+            update(editor.length())
+            editor.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    update(s?.length ?: 0)
+                }
+                override fun afterTextChanged(s: Editable?) = Unit
+            })
+        }
+
+    private fun countedEditor(activity: Activity, editor: EditText, limit: Int): LinearLayout =
+        LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            val pad = (16 * resources.displayMetrics.density).toInt()
+            setPaddingRelative(pad, 0, pad, 0)
+            addView(editor)
+            addView(characterCounter(activity, editor, limit))
+        }
+
     private fun research(activity: Activity, slots: Map<RoleplayToolkit.Slot, String>) {
         val editor = privateEditor(activity, CharacterContext.MAX_PACKET)
         editor.setHint(R.string.roleplay_research_hint)
         val dialog = AlertDialog.Builder(activity).setTitle(R.string.roleplay_context)
-            .setMessage(R.string.roleplay_research_help).setView(editor)
+            .setMessage(R.string.roleplay_research_help).setView(countedEditor(activity, editor, CharacterContext.MAX_PACKET))
             .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.confirm, null).create()
         showPrivate(activity, dialog)
         if (!dialog.isShowing) return
@@ -186,7 +226,7 @@ object RoleplayToolkitUi {
         val editor = privateEditor(activity, CharacterContext.MAX_PACKET)
         editor.setText(packet)
         val dialog = AlertDialog.Builder(activity).setTitle(R.string.roleplay_context)
-            .setMessage(R.string.roleplay_context_review).setView(editor)
+            .setMessage(R.string.roleplay_context_review).setView(countedEditor(activity, editor, CharacterContext.MAX_PACKET))
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.character_draft_copy, null).create()
         showPrivate(activity, dialog)
@@ -229,10 +269,13 @@ object RoleplayToolkitUi {
     }
 
     private fun memoryBank(activity: Activity) {
-        val entries = runCatching { MemoryBankStore.load(activity) }.getOrElse {
-            toast(activity, R.string.roleplay_failed)
-            return
+        val context = activity.applicationContext
+        ManualEditorWork.load(activity, { MemoryBankStore.load(context) }) { result ->
+            result.fold({ memoryProfiles(activity, it) }, { toast(activity, R.string.roleplay_failed) })
         }
+    }
+
+    private fun memoryProfiles(activity: Activity, entries: List<MemoryBank.Entry>) {
         val profiles = MemoryBank.profiles(entries)
         val labels = profiles + activity.getString(R.string.memory_bank_new)
         showPrivate(activity, AlertDialog.Builder(activity).setTitle(R.string.memory_bank_title)
@@ -275,9 +318,13 @@ object RoleplayToolkitUi {
                                     2 -> showPrivate(activity, AlertDialog.Builder(activity).setMessage(R.string.memory_bank_delete)
                                         .setNegativeButton(R.string.cancel, null)
                                         .setPositiveButton(R.string.confirm) { _, _ ->
-                                            if (active(activity)) toast(activity,
-                                                if (runCatching { MemoryBankStore.remove(activity, entry) }.isSuccess)
-                                                    R.string.roleplay_saved else R.string.roleplay_failed)
+                                            if (active(activity)) {
+                                                val context = activity.applicationContext
+                                                ManualEditorWork.load(activity, { MemoryBankStore.remove(context, entry) }) { result ->
+                                                    toast(activity, if (result.isSuccess) R.string.roleplay_saved else R.string.roleplay_failed)
+                                                    if (result.isSuccess) memoryBank(activity)
+                                                }
+                                            }
                                         }.create())
                                 }
                             }.setNegativeButton(R.string.close, null).create())
@@ -298,7 +345,12 @@ object RoleplayToolkitUi {
         }
         val content = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            addView(title); addView(body)
+            val pad = (16 * resources.displayMetrics.density).toInt()
+            setPaddingRelative(pad, 0, pad, 0)
+            addView(title)
+            addView(characterCounter(activity, title, MemoryBank.MAX_TITLE))
+            addView(body)
+            addView(characterCounter(activity, body, MemoryBank.MAX_BODY))
         }
         val dialog = AlertDialog.Builder(activity).setTitle(profile)
             .setMessage(R.string.memory_bank_edit_help).setView(content)
@@ -311,9 +363,17 @@ object RoleplayToolkitUi {
             val next = MemoryBank.put(entries, entry)
             if (next == null || (existing == null && next.size <= entries.size)) {
                 body.error = activity.getString(R.string.memory_bank_invalid)
-            } else if (runCatching { MemoryBankStore.put(activity, entries, entry) }.isSuccess) {
-                toast(activity, R.string.roleplay_saved); dialog.dismiss()
-            } else body.error = activity.getString(R.string.roleplay_failed)
+            } else {
+                val context = activity.applicationContext
+                ManualEditorWork.run(activity, dialog, listOf(title, body),
+                    { MemoryBankStore.put(context, entries, entry) }) { result ->
+                    if (result.isSuccess) {
+                        toast(activity, R.string.roleplay_saved)
+                        dialog.dismiss()
+                        memoryBank(activity)
+                    } else body.error = activity.getString(R.string.roleplay_failed)
+                }
+            }
         }
     }
 
@@ -327,18 +387,22 @@ object RoleplayToolkitUi {
         if (!dialog.isShowing) return
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             if (!active(activity)) return@setOnClickListener
-            val result = MemoryBank.recall(entries, profile, input.text.toString())
-            if (result == null || result.entries.isEmpty()) input.error = activity.getString(R.string.memory_bank_no_match)
-            else {
-                val packet = CharacterContext.compose(mapOf(RoleplayToolkit.Slot.MEMORY to result.text))
-                if (packet == null) input.error = activity.getString(R.string.roleplay_context_invalid)
+            val query = input.text.toString()
+            ManualEditorWork.run(activity, dialog, listOf(input), { MemoryBank.recall(entries, profile, query) }) { response ->
+                val result = response.getOrNull()
+                if (response.isFailure) input.error = activity.getString(R.string.roleplay_failed)
+                else if (result == null || result.entries.isEmpty()) input.error = activity.getString(R.string.memory_bank_no_match)
                 else {
-                    dialog.dismiss()
-                    showPrivate(activity, AlertDialog.Builder(activity).setTitle(profile)
-                        .setMessage(activity.getString(R.string.memory_bank_recall_count, result.entries.size, result.omitted))
-                        .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.confirm) { _, _ ->
-                            if (active(activity)) previewContext(activity, packet)
-                        }.create())
+                    val packet = CharacterContext.compose(mapOf(RoleplayToolkit.Slot.MEMORY to result.text))
+                    if (packet == null) input.error = activity.getString(R.string.roleplay_context_invalid)
+                    else {
+                        dialog.dismiss()
+                        showPrivate(activity, AlertDialog.Builder(activity).setTitle(profile)
+                            .setMessage(activity.getString(R.string.memory_bank_recall_count, result.entries.size, result.omitted))
+                            .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.confirm) { _, _ ->
+                                if (active(activity)) previewContext(activity, packet)
+                            }.create())
+                    }
                 }
             }
         }

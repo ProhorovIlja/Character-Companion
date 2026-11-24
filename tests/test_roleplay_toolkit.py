@@ -17,7 +17,7 @@ class RoleplayToolkitTests(unittest.TestCase):
         for token in ('noBackupFilesDir', 'AtomicFile', 'finishWrite', 'failWrite', 'check(load(context, slot) == text)'):
             self.assertIn(token, store)
         for token in ('IME_FLAG_NO_PERSONALIZED_LEARNING', 'isSaveEnabled = false', 'EXTRA_IS_SENSITIVE',
-                      'RoleplayToolkitStore.save(activity, slot, text)', 'RoleplayToolkit.roll'):
+                      'RoleplayToolkitStore.save(context, slot, text)', 'RoleplayToolkit.roll'):
             self.assertIn(token, ui)
         for forbidden in ('evaluateJavascript', 'CookieManager', 'openConnection', 'WorkManager', 'postDelayed'):
             self.assertNotIn(forbidden, ui + store)

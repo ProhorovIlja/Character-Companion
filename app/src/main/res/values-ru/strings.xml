@@ -454,4 +454,6 @@
     <string name="shell_menu_page">Действия со страницей</string>
     <string name="shell_menu_privacy">Приватность и вход</string>
     <string name="shell_menu_support">Обслуживание и помощь</string>
+    <string name="editor_working">Обработка…</string>
+    <string name="editor_character_count">%1$d / %2$d</string>
 </resources>
