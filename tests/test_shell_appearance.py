@@ -16,13 +16,15 @@ class ShellAppearanceTest(unittest.TestCase):
         themes = ET.parse(RES/'values/styles.xml').getroot()
         attrs = ET.parse(RES/'values/attrs.xml').getroot()
         declared = {item.attrib['name'] for item in attrs}
-        for name in ('AppTheme', 'AppTheme.Amoled'):
-            theme = themes.find(f"style[@name='{name}']")
-            colors = {item.attrib['name']: item.text for item in theme}
-            self.assertTrue(declared <= colors.keys())
-            if name.endswith('Amoled'):
-                self.assertEqual(colors['shellBackground'], '#000000')
-                self.assertEqual(colors['shellChrome'], '#000000')
+        base = themes.find("style[@name='AppTheme']")
+        amoled = themes.find("style[@name='AppTheme.Amoled']")
+        self.assertEqual(amoled.get('parent'), 'AppTheme')
+        base_colors = {item.attrib['name']: item.text for item in base}
+        overrides = {item.attrib['name']: item.text for item in amoled}
+        self.assertTrue(declared <= base_colors.keys())
+        self.assertTrue(declared <= (base_colors | overrides).keys())
+        self.assertEqual(overrides['shellBackground'], '#000000')
+        self.assertEqual(overrides['shellChrome'], '#000000')
         self.assertIn('?attr/shellBackground', (RES/'layout/activity_main.xml').read_text())
         self.assertIn('?attr/shellAction', (RES/'drawable/settings_action.xml').read_text())
 
