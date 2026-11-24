@@ -130,6 +130,17 @@ class VoiceDraft(unittest.TestCase):
         self.assertIn('target.scheme != "content"', ACTIVITY)
         self.assertIn('VoiceDraftPolicy.validText(content)', ACTIVITY)
 
+    def test_manual_offline_support_query_is_not_recording_or_downloading(self):
+        probe = ACTIVITY.split('private fun checkOfflineModel()', 1)[1].split('private fun startOnDevice()', 1)[0]
+        self.assertIn('Build.VERSION.SDK_INT < 33', probe)
+        self.assertIn('checkRecognitionSupport(request, mainExecutor', probe)
+        self.assertIn('supportProbe !== probe || !resumed', probe)
+        self.assertIn('previous?.destroy()', probe)
+        self.assertNotIn('startListening(', probe)
+        self.assertNotIn('triggerModelDownload(', probe)
+        self.assertIn('cancelSupportProbe()', ACTIVITY.split('override fun onPause()', 1)[1])
+        self.assertIn('Settings.ACTION_VOICE_INPUT_SETTINGS', ACTIVITY)
+
     def test_locales_expose_same_strings(self):
         en = ET.parse(ROOT/'app/src/main/res/values/strings.xml').getroot()
         ru = ET.parse(ROOT/'app/src/main/res/values-ru/strings.xml').getroot()

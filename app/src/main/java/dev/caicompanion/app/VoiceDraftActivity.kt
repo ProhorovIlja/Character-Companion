@@ -15,6 +15,9 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PersistableBundle
 import android.speech.RecognitionListener
+import android.speech.RecognitionSupport
+import android.speech.RecognitionSupportCallback
+import android.provider.Settings
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.text.Editable
@@ -58,6 +61,7 @@ class VoiceDraftActivity : Activity() {
     private lateinit var listenButton: Button
     private lateinit var languageSpinner: Spinner
     private var recognizer: SpeechRecognizer? = null
+    private var supportProbe: SpeechRecognizer? = null
     private var listening = false
     private var finishingRecognition = false
     private var systemRecognitionPending = false
@@ -205,6 +209,11 @@ class VoiceDraftActivity : Activity() {
             setText(R.string.voice_system)
             setOnClickListener { confirmSystemRecognizer() }
         })
+        root.addView(Button(this).apply {
+            setText(R.string.voice_setup)
+            isAllCaps = false
+            setOnClickListener { showSpeechSetup() }
+        })
         val stackedActions = resources.configuration.screenWidthDp < 360 ||
             resources.configuration.fontScale >= 1.25f
         val actions = LinearLayout(this).apply {
@@ -289,8 +298,80 @@ class VoiceDraftActivity : Activity() {
         if (language != null) putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
     }
 
+    private fun showSpeechSetup() {
+        if (!draftActionReady() || !resumed) return
+        val options = arrayOf(getString(R.string.voice_check_model), getString(R.string.voice_android_settings))
+        AlertDialog.Builder(this).setTitle(R.string.voice_setup).setItems(options) { _, choice ->
+            when (choice) {
+                0 -> checkOfflineModel()
+                1 -> {
+                    cancelSupportProbe()
+                    try {
+                        startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
+                    } catch (_: RuntimeException) {
+                        try { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) }
+                        catch (_: RuntimeException) { status.setText(R.string.voice_setup_unavailable) }
+                    }
+                }
+            }
+        }.setNegativeButton(android.R.string.cancel, null).show()
+    }
+
+    /** Explicit foreground support query. No recording, model download or repeated polling. */
+    private fun checkOfflineModel() {
+        if (!resumed || !draftActionReady()) return
+        cancelSupportProbe()
+        if (Build.VERSION.SDK_INT < 33) {
+            status.setText(R.string.voice_check_unavailable)
+            return
+        }
+        if (!runCatching { SpeechRecognizer.isOnDeviceRecognitionAvailable(this) }.getOrDefault(false)) {
+            status.setText(R.string.voice_local_missing)
+            return
+        }
+        val request = requestIntent()
+        val language = request.getStringExtra(RecognizerIntent.EXTRA_LANGUAGE)
+            ?: java.util.Locale.getDefault().toLanguageTag()
+        request.putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
+        try {
+            val probe = SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
+            supportProbe = probe
+            status.setText(R.string.voice_check_running)
+            probe.checkRecognitionSupport(request, mainExecutor, object : RecognitionSupportCallback {
+                override fun onSupportResult(recognitionSupport: RecognitionSupport) {
+                    if (supportProbe !== probe || !resumed) return
+                    cancelSupportProbe()
+                    status.setText(when (VoiceDraftPolicy.modelStatus(language,
+                        recognitionSupport.installedOnDeviceLanguages,
+                        recognitionSupport.pendingOnDeviceLanguages,
+                        recognitionSupport.supportedOnDeviceLanguages)) {
+                        VoiceDraftPolicy.ModelStatus.INSTALLED -> R.string.voice_model_installed
+                        VoiceDraftPolicy.ModelStatus.PENDING -> R.string.voice_model_pending
+                        VoiceDraftPolicy.ModelStatus.AVAILABLE -> R.string.voice_model_available
+                        VoiceDraftPolicy.ModelStatus.NOT_REPORTED -> R.string.voice_check_unavailable
+                    })
+                }
+                override fun onError(error: Int) {
+                    if (supportProbe !== probe || !resumed) return
+                    cancelSupportProbe()
+                    status.setText(R.string.voice_check_unavailable)
+                }
+            })
+        } catch (_: RuntimeException) {
+            cancelSupportProbe()
+            status.setText(R.string.voice_check_unavailable)
+        }
+    }
+
+    private fun cancelSupportProbe() {
+        val previous = supportProbe
+        supportProbe = null
+        runCatching { previous?.destroy() }
+    }
+
     private fun startOnDevice() {
         if (listening || systemRecognitionPending || permissionPending || !resumed) return
+        cancelSupportProbe()
         if (Build.VERSION.SDK_INT < 31 || !runCatching {
                 SpeechRecognizer.isOnDeviceRecognitionAvailable(this)
             }.getOrDefault(false)) {
@@ -396,6 +477,7 @@ class VoiceDraftActivity : Activity() {
 
     private fun confirmSystemRecognizer() {
         if (listening || systemRecognitionPending || permissionPending || !resumed) return
+        cancelSupportProbe()
         AlertDialog.Builder(this)
             .setTitle(R.string.voice_system)
             .setMessage(R.string.voice_system_warning)
@@ -573,6 +655,7 @@ class VoiceDraftActivity : Activity() {
 
     override fun onPause() {
         resumed = false
+        cancelSupportProbe()
         // No listening while another Activity, the home screen or app switcher has focus.
         if (listening) stopListening()
         super.onPause()
@@ -585,6 +668,7 @@ class VoiceDraftActivity : Activity() {
             onBackInvokedDispatcher.unregisterOnBackInvokedCallback(it)
         }
         backCallback = null
+        cancelSupportProbe()
         finishListening()
         super.onDestroy()
     }

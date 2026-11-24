@@ -761,6 +761,10 @@ fun main() {
             check(changed.text.contains("вставка"))
         }
     }
+    check(VoiceDraftPolicy.modelStatus("ru-RU", listOf("ru"), emptyList(), emptyList()) == VoiceDraftPolicy.ModelStatus.INSTALLED)
+    check(VoiceDraftPolicy.modelStatus("en-US", listOf("en-GB"), listOf("en_US"), listOf("en")) == VoiceDraftPolicy.ModelStatus.PENDING)
+    check(VoiceDraftPolicy.modelStatus("ja-JP", emptyList(), emptyList(), listOf("JA-jp")) == VoiceDraftPolicy.ModelStatus.AVAILABLE)
+    check(VoiceDraftPolicy.modelStatus("ru-RU", listOf("en"), emptyList(), emptyList()) == VoiceDraftPolicy.ModelStatus.NOT_REPORTED)
     val speechEdit = VoiceDraftPolicy.insert("Hello world", "hunter", 6, 11)!!
     val undo = VoiceDraftPolicy.SpeechUndo("Hello world", speechEdit.text, 6, 11)
     check(undo.available("Hello hunter"))

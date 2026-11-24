@@ -248,4 +248,13 @@
     <string name="browser_mode_switch_failed">Could not open embedded mode. Your browser session is still available.</string>
     <string name="gecko_tracking_protection">Tracking protection (GeckoView)</string>
     <string name="gecko_tracking_explanation">Uses Gecko’s built-in tracker protection, not the WebView custom domain lists. System browser sessions use their own protection settings.</string>
+    <string name="voice_setup">Speech setup</string>
+    <string name="voice_check_model">Check offline language model</string>
+    <string name="voice_android_settings">Android voice input settings</string>
+    <string name="voice_setup_unavailable">Voice input settings are unavailable.</string>
+    <string name="voice_check_running">Checking selected language…</string>
+    <string name="voice_check_unavailable">The provider did not confirm offline support. Try dictation or configure a speech service in Android settings.</string>
+    <string name="voice_model_installed">The provider reports that the offline language model is installed.</string>
+    <string name="voice_model_pending">The provider reports a pending language model installation.</string>
+    <string name="voice_model_available">The provider supports this offline language, but its model is not installed. Use Android or provider settings.</string>
 </resources>

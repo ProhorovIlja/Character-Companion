@@ -4,6 +4,26 @@ package dev.caicompanion.app
 object VoiceDraftPolicy {
     const val MAX_CHARS = 16_000
 
+    enum class ModelStatus { INSTALLED, PENDING, AVAILABLE, NOT_REPORTED }
+
+    /** A provider report is advisory, not evidence that a microphone request will succeed.
+     * Accept an exact language tag or a provider's language-only tag, not another region.
+     */
+    fun modelStatus(language: String, installed: List<String>, pending: List<String>,
+                    supported: List<String>): ModelStatus {
+        val target = language.replace('_', '-').lowercase(java.util.Locale.ROOT)
+        fun matches(tags: List<String>): Boolean = target.isNotBlank() && tags.any {
+            val tag = it.replace('_', '-').lowercase(java.util.Locale.ROOT)
+            tag == target || tag == target.substringBefore('-')
+        }
+        return when {
+            matches(installed) -> ModelStatus.INSTALLED
+            matches(pending) -> ModelStatus.PENDING
+            matches(supported) -> ModelStatus.AVAILABLE
+            else -> ModelStatus.NOT_REPORTED
+        }
+    }
+
     data class Edit(val text: String, val caret: Int)
     data class SpeechUndo(val before: String, val after: String, val start: Int, val end: Int) {
         /** Never overwrite manual edits made after this recognition result. */

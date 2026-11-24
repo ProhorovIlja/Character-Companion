@@ -248,4 +248,13 @@
     <string name="browser_mode_switch_failed">Не удалось открыть встроенный режим. Сессия браузера по-прежнему доступна.</string>
     <string name="gecko_tracking_protection">Защита от трекеров (GeckoView)</string>
     <string name="gecko_tracking_explanation">Встроенная защита Gecko от трекеров, а не пользовательские списки доменов WebView. Системный браузер использует собственные настройки защиты.</string>
+    <string name="voice_setup">Настройка распознавания</string>
+    <string name="voice_check_model">Проверить автономную модель языка</string>
+    <string name="voice_android_settings">Настройки голосового ввода Android</string>
+    <string name="voice_setup_unavailable">Настройки голосового ввода недоступны.</string>
+    <string name="voice_check_running">Проверка выбранного языка…</string>
+    <string name="voice_check_unavailable">Служба не подтвердила автономное распознавание. Попробуйте диктовку или настройте службу в Android.</string>
+    <string name="voice_model_installed">Служба сообщает, что автономная модель языка установлена.</string>
+    <string name="voice_model_pending">Служба сообщает об ожидающей установке модели языка.</string>
+    <string name="voice_model_available">Служба поддерживает этот язык автономно, но модель не установлена. Откройте настройки Android или службы.</string>
 </resources>
