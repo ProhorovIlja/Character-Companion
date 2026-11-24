@@ -5,6 +5,8 @@ using System.Windows.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Input;
+using System.Windows.Automation;
 using Microsoft.Win32;
 using CharacterCompanion.Windows.Intelligence;
 
@@ -32,7 +34,9 @@ internal sealed class ChatWindow : Window
     private readonly PasswordBox key = new() { MaxLength = 128 };
     private readonly TextBox draft = new() { MaxLength = 16000, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 76, MaxHeight = 144, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
     private readonly ListBox history = new() { HorizontalContentAlignment = HorizontalAlignment.Stretch };
-    private readonly Expander configuration = new() { Header = "Workspace and local AI settings", IsExpanded = true };
+    private readonly Border configuration = new() { Visibility = Visibility.Visible };
+    private readonly TextBlock characterTitle = new() { Text = "No character selected", FontSize = 18, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+    private readonly Button settingsButton = new() { Content = "Settings" };
     private readonly TextBox liveReply = new() { IsReadOnly = true, TextWrapping = TextWrapping.Wrap, MaxHeight = 160, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Visibility = Visibility.Collapsed, IsUndoEnabled = false, Margin = new Thickness(0, 0, 0, 8) };
     private readonly TextBlock status = new() { Text = "Choose an empty folder to create a workspace, or open an existing one.", TextWrapping = TextWrapping.Wrap };
     private readonly Button choose = new() { Content = "Choose folder" };
@@ -54,11 +58,19 @@ internal sealed class ChatWindow : Window
         Background = new SolidColorBrush(Color.FromRgb(17, 19, 23));
         Foreground = Brushes.WhiteSmoke;
         var layout = new DockPanel { Margin = new Thickness(18), LastChildFill = true };
+        var header = new DockPanel { Margin = new Thickness(0,0,0,10), LastChildFill = true };
+        DockPanel.SetDock(header, Dock.Top);
+        layout.Children.Add(header);
+        var headerActions = Buttons(Unavailable("Call", "Live voice calls are not implemented in this preview."), settingsButton);
+        DockPanel.SetDock(headerActions, Dock.Right);
+        header.Children.Add(headerActions);
+        header.Children.Add(characterTitle);
         var settings = new StackPanel();
         DockPanel.SetDock(configuration, Dock.Top);
-        configuration.Content = settings;
+        configuration.Child = new ScrollViewer { Content = settings, MaxHeight = 320, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         layout.Children.Add(configuration);
-        settings.Children.Add(new TextBlock { Text = "Mandy AI", FontSize = 24, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0,0,0,10) });
+        settings.Children.Add(new TextBlock { Text = "Workspace and local AI settings", FontSize = 18, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0,0,0,10) });
+        settingsButton.Click += (_, _) => configuration.Visibility = configuration.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
         settings.Children.Add(Labeled("Local workspace", folder));
         settings.Children.Add(Buttons(choose, create, open));
         settings.Children.Add(Labeled("Character name (creation)", name));
@@ -66,12 +78,21 @@ internal sealed class ChatWindow : Window
         settings.Children.Add(Labeled("Trusted local server model alias", alias));
         settings.Children.Add(Labeled("Loopback port", port));
         settings.Children.Add(Labeled("Local server API key (not saved)", key));
+        settings.Children.Add(Buttons(refresh));
         var composer = new StackPanel { Margin = new Thickness(0,8,0,0) };
         DockPanel.SetDock(composer, Dock.Bottom);
         layout.Children.Add(composer);
         composer.Children.Add(liveReply);
         composer.Children.Add(draft);
-        composer.Children.Add(Buttons(send, stop, refresh));
+        var composerActions = new DockPanel { LastChildFill = false };
+        var primaryActions = Buttons(send, stop);
+        DockPanel.SetDock(primaryActions, Dock.Right);
+        composerActions.Children.Add(primaryActions);
+        var mediaActions = Buttons(Unavailable("Attach", "Multimodal attachments are not implemented in this preview."),
+            Unavailable("Dictate", "Native speech recognition is not connected to this workspace yet."));
+        DockPanel.SetDock(mediaActions, Dock.Left);
+        composerActions.Children.Add(mediaActions);
+        composer.Children.Add(composerActions);
         composer.Children.Add(status);
         history.Background = new SolidColorBrush(Color.FromRgb(29,32,38));
         history.Foreground = Brushes.WhiteSmoke;
@@ -89,6 +110,27 @@ internal sealed class ChatWindow : Window
         history.ItemTemplate = template;
         layout.Children.Add(history);
         Content = layout;
+        AutomationProperties.SetName(draft, "Message draft");
+        AutomationProperties.SetName(history, "Conversation history");
+        AutomationProperties.SetName(liveReply, "Incomplete streamed reply");
+        AutomationProperties.SetName(key, "Local server API key");
+        AutomationProperties.SetName(settingsButton, "Show or hide settings");
+        draft.PreviewKeyDown += async (_, e) =>
+        {
+            if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control && send.IsEnabled)
+            {
+                e.Handled = true;
+                await SendAsync();
+            }
+        };
+        PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Escape && stop.IsEnabled)
+            {
+                e.Handled = true;
+                stop.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            }
+        };
         choose.Click += (_, _) =>
         {
             var picker = new OpenFolderDialog { Title = "Choose local Mandy workspace folder" };
@@ -110,6 +152,15 @@ internal sealed class ChatWindow : Window
             workspace?.Dispose();
         };
         UpdateControls();
+    }
+
+    private static Button Unavailable(string label, string reason)
+    {
+        var button = new Button { Content = label, IsEnabled = false, ToolTip = reason };
+        ToolTipService.SetShowOnDisabled(button, true);
+        AutomationProperties.SetName(button, label);
+        AutomationProperties.SetHelpText(button, reason);
+        return button;
     }
 
     private static FrameworkElement Labeled(string label, Control field)
@@ -142,6 +193,8 @@ internal sealed class ChatWindow : Window
         send.Content = pending != null ? "Retry pending message" : "Send";
         refresh.IsEnabled = workspace != null && !busy;
         stop.IsEnabled = busy && operation != null && !operation.IsCancellationRequested;
+        stop.Visibility = busy && operation != null ? Visibility.Visible : Visibility.Collapsed;
+        send.Visibility = busy && operation != null ? Visibility.Collapsed : Visibility.Visible;
     }
     private void Finish()
     {
@@ -170,7 +223,8 @@ internal sealed class ChatWindow : Window
             workspace = await Task.Run(() => Workspace.Open(path, isNew, characterName, characterIdentity));
             name.Text = workspace.Character.Name; identity.Text = workspace.Character.Identity;
             ShowRows(await Task.Run(workspace.Recent));
-            configuration.IsExpanded = false;
+            configuration.Visibility = Visibility.Collapsed;
+            characterTitle.Text = workspace.Character.Name;
             status.Text = pending == null ? "Local workspace ready." : "A saved user message is awaiting a reply.";
         }
         catch (Exception)
@@ -204,6 +258,7 @@ internal sealed class ChatWindow : Window
         // Do not persist the server credential or print provider exception messages.
         var p = w.Character;
         var text = pending?.Text ?? draft.Text;
+        if (string.IsNullOrWhiteSpace(text)) { status.Text = "Enter a message."; return; }
         var request = new LocalChatTurn.Request(p.Account,p.Device,p.Character,p.Chat,
             pending?.Id ?? Guid.NewGuid().ToString(),text,p.Identity,pending?.Mode ?? "text");
         var turn = new LocalChatTurn(w.Database, client);
