@@ -483,4 +483,16 @@
     <string name="module_center_empty">No matching modules</string>
     <string name="module_center_pinned">Pinned modules</string>
     <string name="module_center_pin">Pin %1$s</string>
+    <string name="evolution_title">Character evolution</string>
+    <string name="evolution_identity">Core identity</string>
+    <string name="evolution_growth">Development and acquired experience</string>
+    <string name="evolution_relationship">Relationships</string>
+    <string name="evolution_interests">Interests and goals</string>
+    <string name="evolution_state">Current situation</string>
+    <string name="evolution_packet">Build evolution context</string>
+    <string name="evolution_review">Review conversation</string>
+    <string name="evolution_event">Record important event</string>
+    <string name="evolution_empty">Fill at least one field first</string>
+    <string name="evolution_edit_help">Save confirmed changes for this profile. Blank values are not saved; remove entries through Memory Bank. Fields occupy normal memory records.</string>
+    <string name="evolution_review_help">Paste a conversation excerpt. Companion prepares a review prompt to copy into an AI model of your choice. Review its suggestions and update the fields manually. Do not paste secrets.</string>
 </resources>

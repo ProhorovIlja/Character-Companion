@@ -58,6 +58,7 @@ object RoleplayToolkitUi {
             CompanionModules.Module.MEMORY_BANK -> memoryBank(activity)
             CompanionModules.Module.CHAT_MEMORY -> edit(activity, RoleplayToolkit.Slot.MEMORY)
             CompanionModules.Module.CONTEXT -> context(activity)
+            CompanionModules.Module.EVOLUTION -> evolution(activity)
             CompanionModules.Module.WIKIPEDIA -> wikipediaPrompt(activity) { packet -> research(activity, emptyMap(), packet) }
             CompanionModules.Module.WEB_SEARCH -> search(activity)
             CompanionModules.Module.MEMORY_BACKUP -> activity.startActivity(Intent(activity, MemoryBackupActivity::class.java))
@@ -357,14 +358,16 @@ object RoleplayToolkitUi {
         }
     }
 
-    private fun memoryProfiles(activity: Activity, entries: List<MemoryBank.Entry>) {
+    private fun memoryProfiles(activity: Activity, entries: List<MemoryBank.Entry>,
+                               heading: Int = R.string.memory_bank_title,
+                               onProfile: (String) -> Unit = { profileMenu(activity, entries, it) }) {
         val profiles = MemoryBank.profiles(entries)
         val labels = profiles + activity.getString(R.string.memory_bank_new)
-        showPrivate(activity, AlertDialog.Builder(activity).setTitle(R.string.memory_bank_title)
+        showPrivate(activity, AlertDialog.Builder(activity).setTitle(heading)
             .setItems(labels.toTypedArray()) { _, index ->
                 if (active(activity)) {
                     val profile = profiles.getOrNull(index)
-                    if (profile != null) profileMenu(activity, entries, profile)
+                    if (profile != null) onProfile(profile)
                     else {
                         val input = privateEditor(activity, MemoryBank.MAX_PROFILE, true)
                         val dialog = AlertDialog.Builder(activity).setTitle(R.string.memory_bank_profile)
@@ -374,11 +377,102 @@ object RoleplayToolkitUi {
                         if (dialog.isShowing) dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                             val name = input.text.toString().trim()
                             if (!MemoryBank.validProfile(name)) input.error = activity.getString(R.string.roleplay_invalid)
-                            else { dialog.dismiss(); profileMenu(activity, entries, name) }
+                            else { dialog.dismiss(); onProfile(name) }
                         }
                     }
                 }
             }.setNegativeButton(R.string.close, null).create())
+    }
+
+    private fun evolution(activity: Activity) {
+        val context = activity.applicationContext
+        ManualEditorWork.load(activity, { MemoryBankStore.load(context) }) { result ->
+            result.fold({ entries ->
+                memoryProfiles(activity, entries, R.string.evolution_title) { profile ->
+                    evolutionMenu(activity, entries, profile)
+                }
+            }, { toast(activity, R.string.roleplay_failed) })
+        }
+    }
+
+    private fun evolutionLabel(field: EvolutionPolicy.Field): Int = when (field) {
+        EvolutionPolicy.Field.IDENTITY -> R.string.evolution_identity
+        EvolutionPolicy.Field.GROWTH -> R.string.evolution_growth
+        EvolutionPolicy.Field.RELATIONSHIP -> R.string.evolution_relationship
+        EvolutionPolicy.Field.INTERESTS -> R.string.evolution_interests
+        EvolutionPolicy.Field.STATE -> R.string.evolution_state
+    }
+
+    private fun evolutionMenu(activity: Activity, entries: List<MemoryBank.Entry>, profile: String) {
+        val state = EvolutionPolicy.state(entries, profile) ?: return
+        val fields = EvolutionPolicy.Field.entries
+        val labels = fields.map { field ->
+            activity.getString(evolutionLabel(field)) + if (field in state) " •" else ""
+        } + listOf(activity.getString(R.string.evolution_packet), activity.getString(R.string.evolution_review),
+            activity.getString(R.string.evolution_event))
+        showPrivate(activity, AlertDialog.Builder(activity).setTitle(profile)
+            .setItems(labels.toTypedArray()) { _, index ->
+                if (active(activity)) {
+                    val field = fields.getOrNull(index)
+                    if (field != null) evolutionEdit(activity, entries, profile, field, state[field].orEmpty())
+                    else when (index - fields.size) {
+                        0 -> {
+                            val packet = EvolutionPolicy.packet(entries, profile)
+                            if (packet == null) toast(activity, R.string.evolution_empty)
+                            else previewContext(activity, packet)
+                        }
+                        1 -> evolutionReview(activity, entries, profile)
+                        2 -> memoryEdit(activity, entries, profile, null)
+                    }
+                }
+            }.setNegativeButton(R.string.close, null).create())
+    }
+
+    private fun evolutionEdit(activity: Activity, entries: List<MemoryBank.Entry>, profile: String,
+                              field: EvolutionPolicy.Field, old: String) {
+        val editor = privateEditor(activity, MemoryBank.MAX_BODY).apply { setText(old) }
+        val dialog = AlertDialog.Builder(activity).setTitle(evolutionLabel(field))
+            .setMessage(R.string.evolution_edit_help)
+            .setView(countedEditor(activity, editor, MemoryBank.MAX_BODY))
+            .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.roleplay_save, null).create()
+        showPrivate(activity, dialog)
+        if (!dialog.isShowing) return
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            if (!active(activity)) return@setOnClickListener
+            val entry = EvolutionPolicy.entry(profile, field, editor.text.toString())
+            if (entry == null || MemoryBank.put(entries, entry) == null) {
+                editor.error = activity.getString(R.string.memory_bank_invalid)
+            } else {
+                val context = activity.applicationContext
+                ManualEditorWork.run(activity, dialog, listOf(editor),
+                    { MemoryBankStore.put(context, entries, entry) }) { result ->
+                    if (result.isSuccess) {
+                        toast(activity, R.string.roleplay_saved)
+                        dialog.dismiss()
+                        evolution(activity)
+                    } else editor.error = activity.getString(R.string.roleplay_failed)
+                }
+            }
+        }
+    }
+
+    private fun evolutionReview(activity: Activity, entries: List<MemoryBank.Entry>, profile: String) {
+        val editor = privateEditor(activity, EvolutionPolicy.MAX_TRANSCRIPT)
+        val dialog = AlertDialog.Builder(activity).setTitle(R.string.evolution_review)
+            .setMessage(R.string.evolution_review_help)
+            .setView(countedEditor(activity, editor, EvolutionPolicy.MAX_TRANSCRIPT))
+            .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.confirm, null).create()
+        showPrivate(activity, dialog)
+        if (!dialog.isShowing) return
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            if (!active(activity)) return@setOnClickListener
+            val prompt = EvolutionPolicy.review(entries, profile, editor.text.toString())
+            if (prompt == null) editor.error = activity.getString(R.string.roleplay_context_invalid)
+            else {
+                dialog.dismiss()
+                previewContext(activity, prompt)
+            }
+        }
     }
 
     private fun profileMenu(activity: Activity, entries: List<MemoryBank.Entry>, profile: String) {

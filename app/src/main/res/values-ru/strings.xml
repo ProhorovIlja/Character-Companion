@@ -483,4 +483,16 @@
     <string name="module_center_empty">Модули не найдены</string>
     <string name="module_center_pinned">Закреплённые</string>
     <string name="module_center_pin">Закрепить %1$s</string>
+    <string name="evolution_title">Развитие персонажа</string>
+    <string name="evolution_identity">Основная личность</string>
+    <string name="evolution_growth">Развитие и приобретённый опыт</string>
+    <string name="evolution_relationship">Отношения</string>
+    <string name="evolution_interests">Интересы и цели</string>
+    <string name="evolution_state">Текущее состояние</string>
+    <string name="evolution_packet">Подготовить контекст развития</string>
+    <string name="evolution_review">Проанализировать разговор</string>
+    <string name="evolution_event">Записать важное событие</string>
+    <string name="evolution_empty">Сначала заполните хотя бы одно поле</string>
+    <string name="evolution_edit_help">Сохраняйте подтверждённые изменения выбранного профиля. Пустое значение не сохраняется; удалить запись можно через банк памяти. Поля занимают обычные записи банка.</string>
+    <string name="evolution_review_help">Вставьте отрывок разговора. Companion подготовит запрос для анализа, который можно скопировать в выбранную AI-модель. Проверьте её предложения и обновите поля вручную. Не вставляйте секреты.</string>
 </resources>

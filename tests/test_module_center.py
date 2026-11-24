@@ -10,7 +10,7 @@ class ModuleCenterTests(unittest.TestCase):
     def test_catalog_routes_and_labels(self):
         catalog = (JAVA / 'CompanionModules.kt').read_text()
         modules = set(re.findall(r'\b([A-Z_]+)\(Group\.[A-Z_]+\)', catalog))
-        self.assertEqual(len(modules), 15)
+        self.assertEqual(len(modules), 16)
         ui = (JAVA / 'RoleplayToolkitUi.kt').read_text()
         dispatch = ui.split('internal fun open(', 1)[1].split('private fun edit(', 1)[0]
         screen = (JAVA / 'ModuleCenterActivity.kt').read_text()

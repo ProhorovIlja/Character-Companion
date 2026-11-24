@@ -3,11 +3,11 @@ import dev.caicompanion.app.CompanionModules.Module as M
 
 fun verifyCompanionModules() {
     val all = C.matching("") { "" }
-    check(all.size == 15)
-    check(all.toSet().size == 15)
+    check(all.size == 16)
+    check(all.toSet().size == 16)
     check(C.Group.entries.all { group -> all.any { it.group == group } })
     check(all.filter { it.group == C.Group.CREATOR }.size == 5)
-    check(all.filter { it.group == C.Group.KNOWLEDGE }.size == 5)
+    check(all.filter { it.group == C.Group.KNOWLEDGE }.size == 6)
     check(all.filter { it.group == C.Group.UTILITIES }.size == 5)
     check(C.matching("  MEMORY  BANK ") { "" } == listOf(M.MEMORY_BANK))
     check(C.matching("ｗｉｋｉｐｅｄｉａ") { "" } == listOf(M.WIKIPEDIA))

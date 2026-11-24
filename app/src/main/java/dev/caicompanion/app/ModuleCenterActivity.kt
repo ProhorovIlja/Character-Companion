@@ -106,6 +106,7 @@ class ModuleCenterActivity : Activity() {
         CompanionModules.Module.MEMORY_BANK -> R.string.memory_bank_title
         CompanionModules.Module.CHAT_MEMORY -> R.string.roleplay_memory
         CompanionModules.Module.CONTEXT -> R.string.roleplay_context
+        CompanionModules.Module.EVOLUTION -> R.string.evolution_title
         CompanionModules.Module.WIKIPEDIA -> R.string.wiki_research_title
         CompanionModules.Module.WEB_SEARCH -> R.string.roleplay_web_search
         CompanionModules.Module.MEMORY_BACKUP -> R.string.memory_transfer_title

@@ -153,6 +153,7 @@ fun main() {
     verifyRecallContext()
     verifyWikipediaResearch()
     verifyCompanionModules()
+    verifyEvolution()
     verifyChatRefresh()
     verifyCharacterBackup()
     verifyCharx()
