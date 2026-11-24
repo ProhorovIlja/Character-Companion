@@ -33,6 +33,7 @@ android {
         targetSdk = 36
         versionCode = 38
         versionName = "0.38.0-rc1"
+        buildConfigField("boolean", "MANDY_EMBEDDED_PREVIEW", (mandyLlamaDir != null).toString())
         if (mandyLlamaDir != null) {
             ndk { abiFilters.add("arm64-v8a") }
             externalNativeBuild {

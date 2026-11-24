@@ -17,8 +17,9 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import java.util.UUID
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
-/** Offline workspace preview. No model endpoint is trusted or started by this screen. */
+/** Experimental embedded chat; no HTTP endpoints or automatic model loading. */
 class MandyWorkspaceActivity : Activity() {
     companion object {
         // Serialize explicitly requested disk operations across activity recreation.
@@ -27,7 +28,8 @@ class MandyWorkspaceActivity : Activity() {
     private data class Snapshot(val profiles: List<NativeCharacterLibrary.Profile>,
                                 val ticket: NativeChatWorkspace.Ticket?,
                                 val draft: NativeChatWorkspace.State,
-                                val rows: List<NativeConversation.Event>)
+                                val rows: List<NativeConversation.Event>,
+                                val models: List<NativeModelLibrary.Model>)
     private lateinit var library: NativeCharacterLibrary
     private lateinit var workspace: NativeChatWorkspace
     private lateinit var account: String
@@ -36,6 +38,9 @@ class MandyWorkspaceActivity : Activity() {
     private var current: Snapshot? = null
     private var editor: EditText? = null
     private var busy = false
+    private val stopped = AtomicBoolean(false)
+    private lateinit var cancelGeneration: Button
+    private fun modelLibrary() = NativeModelLibrary(applicationContext.noBackupFilesDir.toPath().resolve("mandy-models-v1"))
     private fun dp(n: Int) = (n * resources.displayMetrics.density + .5f).toInt()
     private fun alive() = !isFinishing && !isDestroyed
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,6 +62,11 @@ class MandyWorkspaceActivity : Activity() {
         root.addView(title)
         status = label("Offline workspace preview", 14f)
         root.addView(status)
+        cancelGeneration = Button(this).apply {
+            text = "Stop generation"; isAllCaps = false; visibility = View.GONE
+            setOnClickListener { stopped.set(true); isEnabled = false; status.text = "Stopping…" }
+        }
+        root.addView(cancelGeneration)
         val scroll = ScrollView(this).apply { isFillViewport = true }
         panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -87,12 +97,13 @@ class MandyWorkspaceActivity : Activity() {
     private fun snapshot(): Snapshot {
         val profiles = library.list()
         val ticket = workspace.selected()
-        if (ticket == null) return Snapshot(profiles, null, NativeChatWorkspace.State(), emptyList())
+        val models = if (BuildConfig.MANDY_EMBEDDED_PREVIEW) modelLibrary().list() else emptyList()
+        if (ticket == null) return Snapshot(profiles, null, NativeChatWorkspace.State(), emptyList(), models)
         library.resolve(ticket.key)
         val rows = AndroidConversationStore(applicationContext, account).use {
             it.page(ticket.key.character, ticket.key.chat, 50).asReversed()
         }
-        return Snapshot(profiles, ticket, workspace.state(ticket.key), rows)
+        return Snapshot(profiles, ticket, workspace.state(ticket.key), rows, models)
     }
     private fun suspendInputs(view: View, states: MutableMap<View, Boolean>) {
         states[view] = view.isEnabled
@@ -113,7 +124,7 @@ class MandyWorkspaceActivity : Activity() {
                 result.onSuccess {
                     current = it
                     render(it)
-                    status.text = "Local workspace • model not connected"
+                    status.text = if (BuildConfig.MANDY_EMBEDDED_PREVIEW) "Experimental local inference • select a trusted model per send" else "Local workspace • embedded build unavailable"
                 }.onFailure {
                     // Preserve the visible editor; do not reset or overwrite damaged files.
                     status.text = "Local operation failed. Saved data has not been reset."
@@ -168,12 +179,94 @@ class MandyWorkspaceActivity : Activity() {
             val name = if (it.role == "user") "You" else profile.name
             panel.addView(label(name + "\n" + it.text).apply { setTextIsSelectable(true) })
         }
-        if (s.draft.pending != null) panel.addView(label("A pending message is saved. Retry is unavailable until the model is connected."))
+        if (s.draft.pending != null) {
+            panel.addView(label("Pending message • " + s.draft.pending.text))
+            panel.addView(button("Discard pending retry") {
+                AlertDialog.Builder(this).setMessage("Discard retry state? Already committed messages remain in history.")
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .setPositiveButton("Discard") { _, _ -> saveAnd { workspace.discardPending(ticket, s.draft.pending.id) } }.show()
+            })
+        }
         val field = input("Message " + profile.name, 16000, s.draft.draft)
         editor = field
         panel.addView(field)
         panel.addView(button("Save draft") { saveAnd {} })
-        panel.addView(Button(this).apply { text = "Send • model unavailable"; isAllCaps = false; isEnabled = false })
+        if (BuildConfig.MANDY_EMBEDDED_PREVIEW) {
+            panel.addView(button("Refresh model inventory") { saveAnd {} })
+            if (s.models.isNotEmpty()) panel.addView(button(if (s.draft.pending == null) "Experimental send…" else "Retry pending…") { chooseModel(s) })
+            else panel.addView(label("Import a trusted model in AI models, then refresh."))
+        } else panel.addView(Button(this).apply { text = "Send • embedded build unavailable"; isAllCaps = false; isEnabled = false })
+    }
+    private fun chooseModel(s: Snapshot) {
+        val ticket = s.ticket ?: return
+        val draft = editor?.text?.toString() ?: return
+        if (s.draft.pending == null && draft.isBlank()) { editor?.error = "Enter a message"; return }
+        val labels = s.models.map { it.sha256 + "\nBytes: " + it.bytes }.toTypedArray()
+        AlertDialog.Builder(this).setTitle("Choose a trusted local model").setItems(labels) { _, index ->
+            val model = s.models[index]
+            AlertDialog.Builder(this).setTitle("Experimental inference")
+                .setMessage("Only continue if you trust the publisher of this file. Real model compatibility is not yet verified. This may be slow or fail. No network fallback.\nSHA-256: " + model.sha256)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton("Generate locally") { _, _ -> generate(ticket, draft, model.sha256, s.draft.pending != null) }.show()
+        }.setNegativeButton(android.R.string.cancel, null).show()
+    }
+    private fun generate(ticket: NativeChatWorkspace.Ticket, draft: String, sha: String, retry: Boolean) {
+        if (busy || !alive() || !BuildConfig.MANDY_EMBEDDED_PREVIEW || current?.ticket != ticket) return
+        busy = true
+        stopped.set(false)
+        val states = mutableMapOf<View, Boolean>()
+        suspendInputs(panel, states)
+        val preview = label("Verifying and loading model…")
+        panel.addView(preview)
+        cancelGeneration.visibility = View.VISIBLE
+        cancelGeneration.isEnabled = true
+        status.text = "Experimental generation"
+        disk.execute {
+            var saved = false
+            val text = StringBuilder()
+            var lastUpdate = 0L
+            val result = runCatching {
+                workspace.edit(ticket, draft)
+                saved = true
+                if (!retry) workspace.prepare(ticket)
+                AndroidConversationStore(applicationContext, account).use { history ->
+                    EmbeddedChatTurn.send(workspace, ticket, library, history, modelLibrary(), sha, stopped::get) { origin, part ->
+                        text.append(part)
+                        val now = System.nanoTime()
+                        if (now - lastUpdate >= 100_000_000L) {
+                            lastUpdate = now
+                            val visibleText = text.toString()
+                            runOnUiThread {
+                                if (alive() && busy && current?.ticket == origin && !stopped.get()) preview.text = visibleText
+                            }
+                        }
+                    }
+                }
+            }
+            val refreshed = if (saved) runCatching { snapshot() }.getOrNull() else null
+            runOnUiThread {
+                if (!alive()) return@runOnUiThread
+                busy = false
+                cancelGeneration.visibility = View.GONE
+                if (refreshed != null) {
+                    current = refreshed
+                    render(refreshed)
+                } else {
+                    panel.removeView(preview)
+                    if (!saved) states.forEach { (view, enabled) -> view.isEnabled = enabled }
+                }
+                status.text = when {
+                    saved && refreshed == null -> "Reload workspace before continuing. Saved data was not reset."
+                    result.isSuccess -> "Reply saved"
+                    stopped.get() -> "Stopped • check saved draft or pending message"
+                    else -> "Generation failed • check saved draft or retry state"
+                }
+            }
+        }
+    }
+    override fun onStop() {
+        stopped.set(true)
+        super.onStop()
     }
     private fun choose(s: Snapshot) {
         val choices = s.profiles.flatMap { profile -> profile.chats.map { chat -> profile to chat } }
@@ -221,7 +314,7 @@ class MandyWorkspaceActivity : Activity() {
     }
     @Deprecated("Legacy back callback for this preview")
     override fun onBackPressed() {
-        if (busy) return
+        if (busy) { stopped.set(true); return }
         if (editor?.text?.toString() != current?.draft?.draft && editor != null) {
             AlertDialog.Builder(this).setMessage("Unsaved draft. Save it before leaving?")
                 .setNegativeButton(android.R.string.cancel, null)
