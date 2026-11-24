@@ -59,6 +59,7 @@ internal sealed class ChatWindow : Window
     private readonly Button send = new() { Content = "Send", IsEnabled = false };
     private readonly Button stop = new() { Content = "Stop", IsEnabled = false };
     private readonly Button refresh = new() { Content = "Refresh", IsEnabled = false };
+    private readonly Button earlier = new() { Content = "Earlier messages", IsEnabled = false, Visibility = Visibility.Collapsed };
     private readonly Button dictate = new() { IsEnabled = false };
     private readonly Button keepSpeech = new() { Content = "Stop · keep draft" };
     private readonly Button sendSpeech = new() { Content = "Stop · send" };
@@ -281,7 +282,14 @@ internal sealed class ChatWindow : Window
         user.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(56,0,0,0)));
         items.Triggers.Add(user);
         history.ItemContainerStyle = items;
-        layout.Children.Add(history);
+        var historyArea = new DockPanel { LastChildFill = true, MaxWidth = 800 };
+        DockPanel.SetDock(earlier, Dock.Top);
+        earlier.HorizontalAlignment = HorizontalAlignment.Center;
+        earlier.Margin = new Thickness(0,4,0,4);
+        historyArea.Children.Add(earlier);
+        historyArea.Children.Add(history);
+        layout.Children.Add(historyArea);
+        earlier.Click += (_, _) => BrowseHistory();
         Content = layout;
         AutomationProperties.SetName(draft, "Message draft");
         AutomationProperties.SetName(history, "Conversation history");
@@ -611,6 +619,7 @@ internal sealed class ChatWindow : Window
         if (AutomationProperties.GetName(send) != action)
             SetActionIcon(send, pending != null ? "retry" : "send", action);
         refresh.IsEnabled = workspace != null && !busy;
+        earlier.IsEnabled = ready;
         bool recording = recorder != null;
         chooseSpeechExe.IsEnabled = chooseSpeechModel.IsEnabled = speechLanguage.IsEnabled = !busy;
         dictate.IsEnabled = ready && pending == null;
@@ -637,8 +646,109 @@ internal sealed class ChatWindow : Window
             new MessageRow(e.Role == "user" ? "You" : w.Character.Name, e.Text, e.Role == "user")).ToArray();
         if (history.Items.Count > 0) history.ScrollIntoView(history.Items[history.Items.Count - 1]);
         historyValid = true;
+        earlier.Visibility = rows.Count == 50 ? Visibility.Visible : Visibility.Collapsed;
         if (pending != null) draft.Text = pending.Text;
     }
+    private void BrowseHistory()
+    {
+        var w = workspace;
+        if (busy || !historyValid || w == null || closeRequested) return;
+        // Modal, read-only browser: never change the main composer, retry state,
+        // or active conversation while viewing historical pages.
+        var list = new ListBox
+        {
+            ItemTemplate = history.ItemTemplate, ItemContainerStyle = history.ItemContainerStyle,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Background = Brushes.Transparent, BorderThickness = new Thickness(0), FontSize = 16
+        };
+        VirtualizingPanel.SetIsVirtualizing(list, true);
+        VirtualizingPanel.SetVirtualizationMode(list, VirtualizationMode.Recycling);
+        ScrollViewer.SetCanContentScroll(list, true);
+        ScrollViewer.SetHorizontalScrollBarVisibility(list, ScrollBarVisibility.Disabled);
+        var older = new Button { Content = "Older", IsEnabled = false };
+        var latest = new Button { Content = "Latest", IsEnabled = false };
+        var copy = new Button { Content = "Copy selected message", IsEnabled = false };
+        var close = new Button { Content = "Close", IsCancel = true };
+        var pageStatus = new TextBlock { Text = "Opening history…", TextWrapping = TextWrapping.Wrap };
+        var controls = new StackPanel { Margin = new Thickness(8) };
+        controls.Children.Add(Buttons(latest, older, copy, close));
+        controls.Children.Add(pageStatus);
+        var panel = new DockPanel { Margin = new Thickness(12), LastChildFill = true };
+        DockPanel.SetDock(controls, Dock.Top);
+        panel.Children.Add(controls);
+        panel.Children.Add(list);
+        var dialog = new Window
+        {
+            Owner = this, Title = "Conversation history — " + w.Character.Name,
+            Width = 760, Height = 650, MinWidth = 420, MinHeight = 360,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false,
+            Content = panel
+        };
+        // Reused message template resolves dynamic colors within this window.
+        if (!SystemParameters.HighContrast)
+        {
+            foreach (var k in new[] { "canvas", "text", "bubble" })
+                if (Resources.Contains("MandyColor_" + k))
+                    dialog.Resources["MandyColor_" + k] = Resources["MandyColor_" + k];
+            if (dialog.Resources.Contains("MandyColor_canvas"))
+                dialog.SetResourceReference(BackgroundProperty, "MandyColor_canvas");
+            if (dialog.Resources.Contains("MandyColor_text"))
+            {
+                dialog.SetResourceReference(ForegroundProperty, "MandyColor_text");
+                list.SetResourceReference(Control.ForegroundProperty, "MandyColor_text");
+            }
+        }
+        bool loading = false, closed = false;
+        int page = 0;
+        (long Clock, string Id)? cursor = null;
+        dialog.Closing += (_, e) => { if (loading) e.Cancel = true; };
+        dialog.Closed += (_, _) => closed = true;
+        async Task LoadPage(bool reset)
+        {
+            if (loading || closed || (!reset && cursor == null)) return;
+            loading = true;
+            older.IsEnabled = latest.IsEnabled = copy.IsEnabled = close.IsEnabled = false;
+            try
+            {
+                var rows = await Task.Run(() => w.Page(reset ? null : cursor));
+                if (closed) return;
+                if (rows.Count == 0 && !reset)
+                {
+                    cursor = null;
+                    pageStatus.Text = "No earlier messages.";
+                    return;
+                }
+                page = reset ? 1 : page + 1;
+                cursor = rows.Count == 50 ? (rows[^1].Clock, rows[^1].Id) : null;
+                list.ItemsSource = rows.AsEnumerable().Reverse().Select(row =>
+                    new MessageRow(row.Role == "user" ? "You" : w.Character.Name, row.Text, row.Role == "user")).ToArray();
+                pageStatus.Text = $"Page {page} · {rows.Count} messages";
+            }
+            catch (Exception) { pageStatus.Text = "History could not be read. Saved messages were not changed."; }
+            finally
+            {
+                loading = false;
+                if (!closed)
+                {
+                    latest.IsEnabled = close.IsEnabled = true;
+                    older.IsEnabled = cursor != null;
+                    copy.IsEnabled = list.SelectedItem is MessageRow;
+                }
+            }
+        }
+        list.SelectionChanged += (_, _) => copy.IsEnabled = !loading && list.SelectedItem is MessageRow;
+        copy.Click += (_, _) =>
+        {
+            if (list.SelectedItem is not MessageRow row) return;
+            try { Clipboard.SetText(row.Text); pageStatus.Text = "Selected message copied."; }
+            catch (System.Runtime.InteropServices.ExternalException) { pageStatus.Text = "Clipboard unavailable."; }
+        };
+        latest.Click += async (_, _) => await LoadPage(true);
+        older.Click += async (_, _) => await LoadPage(false);
+        dialog.Loaded += async (_, _) => await LoadPage(true);
+        dialog.ShowDialog();
+    }
+
     private async Task OpenAsync(bool isNew)
     {
         if (busy || workspace != null) return;
