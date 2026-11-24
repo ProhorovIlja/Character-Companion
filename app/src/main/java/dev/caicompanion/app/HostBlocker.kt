@@ -1,6 +1,8 @@
 package dev.caicompanion.app
 
 import java.net.URI
+import java.net.IDN
+import java.text.Normalizer
 import java.util.Locale
 
 /** Stateless, exact host/suffix filter. O(number of labels), not O(number of rules). */
@@ -9,8 +11,13 @@ class HostBlocker(
     customRules: Collection<String> = emptyList(),
     excludedHosts: Collection<String> = emptyList()
 ) {
-    val blockedDomains: Set<String> = (baseRules + customRules).mapNotNull(::normalizeRule).toSet()
-    val allowDomains: Set<String> = excludedHosts.mapNotNull(::normalizeRule).toSet()
+    val blockedDomains: Set<String> = buildSet {
+        baseRules.forEach { normalizeRule(it)?.let(::add) }
+        customRules.forEach { normalizeRule(it)?.let(::add) }
+    }
+    val allowDomains: Set<String> = buildSet {
+        excludedHosts.forEach { normalizeRule(it)?.let(::add) }
+    }
 
     /** Returns the matched rule for statistics. Never returns full URLs. */
     fun matchedBlockedDomain(rawUrl: String?): String? {
@@ -35,7 +42,18 @@ class HostBlocker(
     companion object {
         private val rule = Regex("^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$")
         fun normalizeRule(input: String): String? {
-            val value = input.trim().trimEnd('.').lowercase(Locale.ROOT)
+            val raw = input.trim().removeSuffix(".")
+            if (raw.length !in 1..253 || raw.any { it.isWhitespace() || it.isISOControl() ||
+                    Character.getType(it) == Character.FORMAT.toInt() || it in "\u3002\uff0e\uff61" }) return null
+            val canonical = Normalizer.normalize(raw, Normalizer.Form.NFC).lowercase(Locale.ROOT)
+            val value = if (canonical.all { it.code < 128 }) canonical else {
+                // java.net.IDN uses legacy IDNA mappings. Reject lossy mappings (e.g. ß -> ss)
+                // rather than accidentally blocking a different hostname. Punycode input remains supported.
+                val ascii = runCatching { IDN.toASCII(canonical, IDN.USE_STD3_ASCII_RULES) }.getOrNull() ?: return null
+                val roundTrip = Normalizer.normalize(IDN.toUnicode(ascii), Normalizer.Form.NFC).lowercase(Locale.ROOT)
+                if (roundTrip != canonical) return null
+                ascii.lowercase(Locale.ROOT)
+            }
             return if (value.length <= 253 && value.contains('.') && rule.matches(value) &&
                 !value.contains("..") && !value.startsWith('#') && !value.startsWith('-') &&
                 value.split('.').all { it.isNotEmpty() && it.length <= 63 && !it.startsWith('-') && !it.endsWith('-') }

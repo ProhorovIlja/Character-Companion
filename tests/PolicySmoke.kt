@@ -261,6 +261,24 @@ fun main() {
     check(!filters.shouldBlock("https://example.com.evil.org"))
     check(filters.shouldBlock("http://tracker.test/a"))
     check(!filters.shouldBlock("https://www.foo.com"))
+    check(HostBlocker.normalizeRule("BÜCHER.example") == "xn--bcher-kva.example")
+    check(HostBlocker.normalizeRule("bu\u0308cher.example") == "xn--bcher-kva.example")
+    for (bad in listOf("faß.example", "ＦＯＯ.example", "foo\u3002example",
+        "foo\uff0eexample", "foo\uff61example", "ads.example..", "foo\u200b.example")) {
+        check(HostBlocker.normalizeRule(bad) == null)
+    }
+    val international = HostBlocker(listOf("bücher.example"), excludedHosts = listOf("allow.bücher.example"))
+    check(international.shouldBlock("https://sub.xn--bcher-kva.example/pixel"))
+    check(!international.shouldBlock("https://allow.xn--bcher-kva.example/pixel"))
+    val internationalRules = RuleListParser.parse("0.0.0.0 bücher.example BÜCHER.example\n@@||allow.bücher.example^\n||faß.example^\n||character.ai^")!!
+    check(internationalRules.blocked == setOf("xn--bcher-kva.example"))
+    check(internationalRules.allowed == setOf("allow.xn--bcher-kva.example"))
+    check(internationalRules.unsupported == 2)
+    check(RuleListParser.parse(internationalRules.canonicalText())!!.blocked == internationalRules.blocked)
+    check(RuleListParser.parse("0.0.0.0 bücher.example faß.example") == null)
+    val expandedDomains = (1..40000).joinToString("\n") { it.toString() + "é".repeat(35) + ".example" }
+    check(expandedDomains.length <= RuleListParser.MAX_CHARACTERS)
+    check(RuleListParser.parse(expandedDomains) == null)
     check(HostBlocker.normalizeRule("a..b") == null)
     check(HostBlocker.normalizeRule("https://a.com/") == null)
     check(HostBlocker.normalizeRule("dot.example") == "dot.example")

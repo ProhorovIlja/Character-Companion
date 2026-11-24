@@ -61,6 +61,10 @@ object RuleListParser {
             if (blocked.size + allowed.size > MAX_DOMAINS) return null
         }
         if (blocked.isEmpty() && allowed.isEmpty()) return null
+        // Punycode can expand imported Unicode domains. Reject lists that would exceed
+        // the storage/reimport limit after canonicalization, before allocating the text.
+        val canonicalLength = blocked.sumOf { it.length + 1 } + allowed.sumOf { it.length + 6 }
+        if (canonicalLength > MAX_CHARACTERS) return null
         return Rules(blocked.toSet(), allowed.toSet(), unsupported, examined)
     }
 }
