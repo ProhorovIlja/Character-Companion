@@ -1,0 +1,13 @@
+# Mandy AI — native Windows local inference client (source preview)
+
+The Windows C# project now contains Intelligence/LocalInferenceClient.cs. This is the first native managed inference transport for the independent companion, not a WPF chat screen or an embedded CUDA runtime. It is intended for the explicitly started, trusted llama.cpp server baseline described in WINDOWS_LOCAL_CHAT_BASELINE.md. No external package is added. No app startup behavior, browser compatibility mode, model downloads, storage or existing settings are changed.
+
+The transport accepts an explicit model alias, local port and private bearer key. It constructs a fixed numeric IPv4 loopback HTTP endpoint, disables proxies, redirects, cookies and decompression, bounds response headers, request size, SSE lines/events/stream and output text, and uses an overall linked cancellation deadline (1–120 seconds). It requires HTTP 200 and event-stream media type, one normal choice, strict UTF-8/JSON, unique object keys, a stop finish reason and [DONE]. Reasoning fields are ignored, tool/function deltas rejected, optional partial text callback is preview-only. A complete answer must be nonblank. The caller must persist only a successfully returned reply and must treat preview text as provisional. No WPF integration, SQLite commit/retry, trusted process ownership verification, DPAPI key storage or server supervision in this change. Local HTTP cannot authenticate the server itself; only use a trusted explicitly started listener on a private device. No remote fallback or network binding beyond client connections to loopback. No background work, timers outside active request deadlines, services or schedules.
+
+Validation: a standalone net10.0 smoke-test project links the production source and exercises synthetic SSE streams, bilingual output, CRLF and multiline events, bounded parsing, malformed frames, refusal and cancellation. **Not compiled or executed**: the environment lacks dotnet/csc/mcs, and an attempt to reach Microsoft's SDK download host failed DNS resolution. The existing Python reference's 36 tests were independently rerun successfully; these do not validate the new C# implementation. Run the C# source tests manually on a machine with .NET 10 SDK:
+
+    dotnet run --project windows/InferenceSmoke/CharacterCompanion.InferenceSmoke.csproj
+
+The source is based on the existing tested Python protocol and the pinned upstream llama.cpp server interface, not copied external code. Actual Windows 10/CUDA model inference, WPF wiring, packaging and hardware measurements remain pending. No executable produced.
+
+Upstream contract: https://github.com/ggml-org/llama.cpp/blob/dbaf582af41941ebbfc4384fb9fa1b40dff7a510/tools/server/README.md
