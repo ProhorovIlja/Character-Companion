@@ -46,6 +46,7 @@ class BrowserSessionActivity : Activity() {
         }
     }
 
+    private val settingsBackup = SettingsBackup(this)
     private lateinit var store: SettingsStore
     private var destination = BrowserSessionPolicy.HOME
     private val fg = Color.rgb(228, 231, 240)
@@ -86,6 +87,7 @@ class BrowserSessionActivity : Activity() {
         })
         column.addView(action(R.string.browser_mode_embedded) { returnToEmbedded() })
         column.addView(action(R.string.release_center) { ReleaseCenter.show(this) })
+        column.addView(action(R.string.section_data) { settingsBackup.show() })
         column.addView(action(R.string.device_compat_title) { DeviceRuntimeProbe.show(this, "browser") })
         column.addView(action(R.string.browser_mode_change_provider) {
             android.app.AlertDialog.Builder(this).setMessage(R.string.browser_mode_change_warning)
@@ -176,7 +178,13 @@ class BrowserSessionActivity : Activity() {
         super.onStop()
     }
 
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        settingsBackup.receive(requestCode, resultCode, data)
+    }
+
     override fun onDestroy() {
+        settingsBackup.close()
         ForegroundUpdateUi.cancel(this)
         super.onDestroy()
     }

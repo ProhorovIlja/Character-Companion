@@ -65,9 +65,7 @@ class MainActivity : Activity() {
         private const val HOME = "https://character.ai/"
         private const val FILE_PICKER = 701
         private const val MEDIA_PERMISSION = 702
-        private const val EXPORT_SETTINGS = 703
-        private const val IMPORT_SETTINGS = 704
-        private const val IMPORT_FILTER_LIST = 705
+            private const val IMPORT_FILTER_LIST = 705
         private const val EXPORT_FILTER_LIST = 706
         private val TEXT = Color.rgb(228, 231, 240)
         private val MUTED = Color.rgb(171, 178, 195)
@@ -75,6 +73,7 @@ class MainActivity : Activity() {
     }
 
     private lateinit var webView: WebView
+    private val settingsBackup = SettingsBackup(this)
     private lateinit var store: SettingsStore
     private lateinit var filter: FilterEngine
     private val loginProtection = LoginCompatibilitySession()
@@ -1252,8 +1251,8 @@ class MainActivity : Activity() {
             layout.addView(zoomBar)
         }
         if (section == R.string.section_data) {
-            addButton(layout, getString(R.string.export_settings)) { exportSettings() }
-            addButton(layout, getString(R.string.import_settings)) { importSettings() }
+            addButton(layout, getString(R.string.export_settings)) { settingsBackup.export() }
+            addButton(layout, getString(R.string.import_settings)) { settingsBackup.restore() }
             addButton(layout, getString(R.string.clear_cache)) { confirmClearCache() }
             addButton(layout, getString(R.string.clear_data)) { confirmClearSiteData() }
             addButton(layout, getString(R.string.voice_title)) {
@@ -1394,13 +1393,6 @@ class MainActivity : Activity() {
             }.show()
     }
 
-    private fun exportSettings() {
-        startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-            type = "application/json"
-            putExtra(Intent.EXTRA_TITLE, "character-companion-settings.json")
-        }, EXPORT_SETTINGS)
-    }
     private fun exportFilterList() {
         if (importedRules.size == 0) return
         startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
@@ -1424,50 +1416,6 @@ class MainActivity : Activity() {
                     if (saved) R.string.filter_export_success else R.string.filter_export_failure))
             }
         }, "manual-filter-export").start()
-    }
-
-    private fun importSettings() {
-        startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-            type = "application/json"
-        }, IMPORT_SETTINGS)
-    }
-
-    /** User-initiated SAF backup I/O must not block the UI thread on slow providers. */
-    private fun writeSettingsBackup(uri: Uri) {
-        // Serialize a bounded snapshot before background I/O so further UI changes stay independent.
-        val snapshot = runCatching { store.exportJson() }.getOrNull()
-        if (snapshot == null) { showToast(getString(R.string.export_failure)); return }
-        Thread({
-            val success = runCatching {
-                val output = contentResolver.openOutputStream(uri, "w")
-                    ?: throw java.io.IOException("Document provider returned no output stream")
-                output.bufferedWriter(Charsets.UTF_8).use { it.write(snapshot) }
-            }.isSuccess
-            runOnUiThread {
-                if (!destroyed) showToast(getString(if (success) R.string.export_success else R.string.export_failure))
-            }
-        }, "manual-backup-export").start()
-    }
-
-    private fun readSettingsBackup(uri: Uri) {
-        Thread({
-            val result = runCatching {
-                val contents = contentResolver.openInputStream(uri)?.bufferedReader()?.use {
-                    BoundedText.read(it, 200_000)
-                }
-                contents != null && store.importJson(contents)
-            }
-            runOnUiThread {
-                if (destroyed) return@runOnUiThread
-                if (result.getOrDefault(false)) {
-                    applySettings(reload = true)
-                    showToast(getString(R.string.import_success))
-                } else {
-                    showToast(getString(if (result.isFailure) R.string.import_failure else R.string.import_unsupported))
-                }
-            }
-        }, "manual-backup-import").start()
     }
 
     private fun navigateBack() {
@@ -1524,6 +1472,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        settingsBackup.close()
         ForegroundUpdateUi.cancel(this)
         voiceHandoff.clear()
         destroyed = true
@@ -1549,6 +1498,7 @@ class MainActivity : Activity() {
     @Deprecated("Legacy file chooser and Storage Access Framework results")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (settingsBackup.receive(requestCode, resultCode, data)) return
         when (requestCode) {
             VoiceComposerHandoff.REQUEST -> {
                 voiceHandoff.receive(resultCode, data)
@@ -1558,14 +1508,12 @@ class MainActivity : Activity() {
                 chooser?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data))
                 chooser = null
             }
-            EXPORT_SETTINGS -> if (resultCode == RESULT_OK) data?.data?.let(::writeSettingsBackup)
             IMPORT_FILTER_LIST -> if (resultCode == RESULT_OK) data?.data?.let { uri ->
                 importFilterList(uri)
             }
             EXPORT_FILTER_LIST -> if (resultCode == RESULT_OK) data?.data?.let { uri ->
                 writeFilterList(uri)
             }
-            IMPORT_SETTINGS -> if (resultCode == RESULT_OK) data?.data?.let(::readSettingsBackup)
         }
     }
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {

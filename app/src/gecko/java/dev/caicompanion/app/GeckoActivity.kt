@@ -86,6 +86,7 @@ class GeckoActivity : Activity() {
     private var backCallback: OnBackInvokedCallback? = null
     private val fg = Color.rgb(228, 231, 240)
     private val accent = Color.rgb(168, 184, 255)
+    private val settingsBackup = SettingsBackup(this)
     private val bg = Color.rgb(17, 19, 25)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -230,6 +231,7 @@ class GeckoActivity : Activity() {
         ShellMenu.show(this, anchor, listOf(
             ShellMenu.Action(R.string.settings) { showGeckoSettings() },
             ShellMenu.Action(R.string.release_center) { ReleaseCenter.show(this) },
+            ShellMenu.Action(R.string.section_data) { settingsBackup.show() },
             ShellMenu.Action(R.string.gecko_legacy) { confirmWebViewSwitch() },
             ShellMenu.Action(R.string.device_compat_title) { DeviceRuntimeProbe.show(this, "gecko") },
             ShellMenu.Action(R.string.forward, ready && canGoForward) { session.goForward() },
@@ -809,6 +811,7 @@ class GeckoActivity : Activity() {
     @Suppress("DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (settingsBackup.receive(requestCode, resultCode, data)) return
         if (requestCode == VoiceComposerHandoff.REQUEST) {
             voiceHandoff.receive(resultCode, data)
             if (started) deliverVoiceDraft()
@@ -1161,6 +1164,7 @@ class GeckoActivity : Activity() {
     }
 
     override fun onDestroy() {
+        settingsBackup.close()
         ForegroundUpdateUi.cancel(this)
         loginProtection.setVisible(false)
         voiceHandoff.clear()

@@ -161,7 +161,7 @@ class SettingsStore(context: Context) {
     }
 
     /** Manual SAF export. No cookies, chat text, auth tokens or WebView localStorage. */
-    fun exportJson(): String = JSONObject().apply {
+    fun exportJson(): String = synchronized(historyLock) { JSONObject().apply {
         put("schema", 1)
         put("application", "Character Companion for Android")
         put("startInHub", startInHub)
@@ -182,10 +182,10 @@ class SettingsStore(context: Context) {
         put("libraryOrder", libraryOrder.name)
         put("bookmarks", sanitizedBookmarkArray())
         put("libraryPins", JSONArray(pinnedBookmarks().sorted()))
-    }.toString(2)
+    }.toString(2) }
 
     fun importJson(contents: String): Boolean {
-        if (contents.length > 200_000) return false
+        if (contents.length > SettingsBackup.MAX_CHARS) return false
         val parsed = try { JSONObject(contents) } catch (_: Exception) { return false }
         if (parsed.optString("application") != "Character Companion for Android" ||
             parsed.optInt("schema") != 1) return false

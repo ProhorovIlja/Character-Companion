@@ -193,12 +193,13 @@ class Structure(unittest.TestCase):
     def test_manifest_has_minimum_permissions(self):
         manifest=(ROOT/'app/src/main/AndroidManifest.xml').read_text()
         permissions=set(re.findall(r'android.permission.[A-Z_]+',manifest))
-        self.assertEqual(permissions, {'android.permission.INTERNET','android.permission.RECORD_AUDIO','android.permission.CAMERA'})
+        self.assertEqual(permissions, {'android.permission.INTERNET','android.permission.RECORD_AUDIO','android.permission.CAMERA','android.permission.REQUEST_INSTALL_PACKAGES'})
 
     def test_import_memory_bound_and_atomicity(self):
         activity=(ROOT/'app/src/main/java/dev/caicompanion/app/MainActivity.kt').read_text()
         store=(ROOT/'app/src/main/java/dev/caicompanion/app/SettingsStore.kt').read_text()
-        self.assertIn('BoundedText.read(it, 200_000)', activity)
+        backup=(ROOT/'app/src/main/java/dev/caicompanion/app/SettingsBackup.kt').read_text()
+        self.assertIn('BoundedText.read(it, MAX_CHARS)', backup)
         self.assertNotIn('it.readText().take(200_001)', activity)
         self.assertIn('prefs.edit()\n            .putBoolean("blocking"', store)
         self.assertIn('OfflineBookmarkEditor.normalize(obj.optString("title"), u)', store)
@@ -340,10 +341,9 @@ class Structure(unittest.TestCase):
         self.assertIn('showNativeBookmarkActions(title, url)', activity)
         self.assertIn('R.string.hub_bookmark_confirm_delete', activity)
         self.assertIn('if (::webView.isInitialized) webView.onPause()\n        container.addView(panel', activity)
-        self.assertIn('private fun writeSettingsBackup(uri: Uri)', activity)
-        self.assertIn('private fun readSettingsBackup(uri: Uri)', activity)
-        self.assertIn('manual-backup-import', activity)
-        self.assertIn('manual-backup-export', activity)
+        backup=(ROOT/'app/src/main/java/dev/caicompanion/app/SettingsBackup.kt').read_text()
+        self.assertIn('manual-settings-backup', backup)
+        self.assertIn('settingsBackup.receive(requestCode, resultCode, data)', activity)
         self.assertIn('if (!activityResumed || nativeHub != null || !store.mediaAllowed', activity)
         self.assertIn('if (permissionOk && activityResumed && nativeHub == null', activity)
 
