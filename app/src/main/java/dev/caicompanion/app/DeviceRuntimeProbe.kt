@@ -1,6 +1,13 @@
 package dev.caicompanion.app
 
 import android.app.Activity
+import android.app.ActivityManager
+import android.app.AlertDialog
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.os.PowerManager
+import android.speech.SpeechRecognizer
+import android.widget.Toast
 import android.content.pm.PackageManager
 import android.os.Build
 import android.system.Os
@@ -47,6 +54,46 @@ object DeviceRuntimeProbe {
             morpheMicrogVersion = morpheLegacy.second
         )
     }
+    /** No listeners, wake locks, package inventory or background checks. */
+    fun capabilities(activity: Activity, renderer: String): DeviceRuntimeCapabilities.Snapshot {
+        val manager = activity.getSystemService(ActivityManager::class.java)
+        val power = activity.getSystemService(PowerManager::class.java)
+        val memory = runCatching {
+            manager?.let { service ->
+                ActivityManager.MemoryInfo().also { service.getMemoryInfo(it) }.totalMem / 1_048_576L
+            }
+        }.getOrNull()
+        return DeviceRuntimeCapabilities.Snapshot(
+            renderer = renderer,
+            totalRamMiB = memory,
+            appHeapClassMiB = runCatching { manager?.memoryClass }.getOrNull(),
+            lowRamDevice = runCatching { manager?.isLowRamDevice }.getOrNull(),
+            powerSave = runCatching { power?.isPowerSaveMode }.getOrNull(),
+            thermalStatus = runCatching { power?.currentThermalStatus }.getOrNull(),
+            localSpeechAvailable = if (Build.VERSION.SDK_INT >= 31) runCatching {
+                SpeechRecognizer.isOnDeviceRecognitionAvailable(activity)
+            }.getOrNull() else false
+        )
+    }
+
+    fun show(activity: Activity, renderer: String) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        val snapshot = capture(activity)
+        val report = DeviceCompatibility.format(snapshot) + "\n\n" +
+            DeviceRuntimeCapabilities.format(capabilities(activity, renderer))
+        AlertDialog.Builder(activity).setTitle(R.string.device_compat_title)
+            .setMessage(report)
+            .setNeutralButton(R.string.diagnostics_copy) { _, _ ->
+                runCatching {
+                    val clipboard = activity.getSystemService(ClipboardManager::class.java)
+                        ?: error("clipboard unavailable")
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Device compatibility", report))
+                }.onSuccess {
+                    Toast.makeText(activity, R.string.diagnostics_copied, Toast.LENGTH_SHORT).show()
+                }
+            }.setPositiveButton(R.string.confirm, null).show()
+    }
+
     /** Returns null visibility only when Android explicitly denies inspection. */
     private fun probePackage(pm: PackageManager, name: String): Pair<Boolean?, String?> = try {
         val info = if (Build.VERSION.SDK_INT >= 33) {

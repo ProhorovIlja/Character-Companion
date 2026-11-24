@@ -1,0 +1,28 @@
+import dev.caicompanion.app.DeviceRuntimeCapabilities as C
+
+fun verifyDeviceRuntimeCapabilities() {
+    val s = C.Snapshot("gecko", 7634, 256, false, true, 2, true)
+    val report = C.format(s)
+    check("Session renderer: GeckoView" in report)
+    check("OS-reported total RAM: 7634 MiB" in report)
+    check("App heap class: 256 MiB" in report)
+    check("Low-RAM device class: no" in report)
+    check("Battery saver active: yes" in report)
+    check("Thermal status: moderate" in report)
+    check("On-device speech service: yes (model and recognition untested)" in report)
+    check("not actual process or renderer memory usage" in report)
+    check("Android WebView" in C.format(s.copy(renderer = "legacy")))
+    check("external browser" in C.format(s.copy(renderer = "browser")))
+    val invalid = C.format(C.Snapshot("https://private.example", -1, Int.MAX_VALUE, null, null, 99, null))
+    check("https://" !in invalid)
+    check("OS-reported total RAM: unknown" in invalid)
+    check("App heap class: unknown" in invalid)
+    check("Thermal status: unknown" in invalid)
+    check("Battery saver active: unknown" in invalid)
+    check("On-device speech service: unknown" in invalid)
+    val labels = listOf("none", "light", "moderate", "severe", "critical", "emergency", "shutdown")
+    for (i in labels.indices) check(C.thermalLabel(i) == labels[i])
+    check(C.thermalLabel(-1) == "unknown")
+    check(C.thermalLabel(null) == "unknown")
+    println("DeviceRuntimeCapabilities: 25 checks passed")
+}

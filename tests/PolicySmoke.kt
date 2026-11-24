@@ -139,6 +139,7 @@ fun verifyLoginCompatibility() {
 }
 
 fun main() {
+    verifyDeviceRuntimeCapabilities()
     verifyReleasePolicy()
     verifyUpdateIntegrity()
     verifyLoginCompatibility()

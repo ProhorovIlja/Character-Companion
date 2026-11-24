@@ -710,18 +710,7 @@ class MainActivity : Activity() {
     }
     /** Manual Pixel/LineageOS compatibility check; never requests account or private data. */
     private fun showDeviceCompatibility() {
-        val snapshot = DeviceRuntimeProbe.capture(this)
-        val report = DeviceCompatibility.format(snapshot)
-        AlertDialog.Builder(this)
-            .setTitle(R.string.device_compat_title)
-            .setMessage(report)
-            .setNeutralButton(R.string.diagnostics_copy) { _, _ ->
-                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("Device compatibility", report))
-                showToast(getString(R.string.diagnostics_copied))
-            }
-            .setPositiveButton(R.string.confirm, null)
-            .show()
+        DeviceRuntimeProbe.show(this, "legacy")
     }
 
     private fun showPrivacyStats() {

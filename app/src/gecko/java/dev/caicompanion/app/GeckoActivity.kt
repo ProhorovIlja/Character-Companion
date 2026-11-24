@@ -225,6 +225,7 @@ class GeckoActivity : Activity() {
         ShellMenu.show(this, anchor, listOf(
             ShellMenu.Action(R.string.settings) { showGeckoSettings() },
             ShellMenu.Action(R.string.release_center) { ReleaseCenter.show(this) },
+            ShellMenu.Action(R.string.device_compat_title) { DeviceRuntimeProbe.show(this, "gecko") },
             ShellMenu.Action(R.string.forward, ready && canGoForward) { session.goForward() },
             ShellMenu.Action(R.string.reload, ready) { session.reload() },
             ShellMenu.Action(R.string.bookmark_add, ready) { saveCurrentBookmark() },
