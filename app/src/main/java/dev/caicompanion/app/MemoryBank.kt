@@ -26,8 +26,8 @@ object MemoryBank {
             s.none { it.isISOControl() && !(multiline && it in "\t\n\r") }
     fun validProfile(s: String) = valid(s, MAX_PROFILE) && fold(s).isNotBlank()
     fun validEntry(e: Entry) = validProfile(e.profile) && valid(e.title, MAX_TITLE) && valid(e.body, MAX_BODY, true)
-    private fun key(e: Entry) = fold(e.profile) to fold(e.title)
-    private fun validBank(entries: List<Entry>) = entries.size <= MAX_ENTRIES && entries.all(::validEntry) &&
+    internal fun key(e: Entry) = fold(e.profile) to fold(e.title)
+    internal fun validBank(entries: List<Entry>) = entries.size <= MAX_ENTRIES && entries.all(::validEntry) &&
         entries.map(::key).toSet().size == entries.size
     fun profiles(entries: List<Entry>): List<String> = entries.map { it.profile }.distinctBy(::fold).sortedBy(::fold)
     fun forProfile(entries: List<Entry>, profile: String): List<Entry> =

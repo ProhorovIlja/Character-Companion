@@ -48,7 +48,8 @@ object RoleplayToolkitUi {
         val slots = RoleplayToolkit.Slot.entries
         val labels = slots.map { activity.getString(title(it)) } + listOf(
             activity.getString(R.string.roleplay_context), activity.getString(R.string.roleplay_web_search),
-            activity.getString(R.string.roleplay_dice), activity.getString(R.string.memory_bank_title))
+            activity.getString(R.string.roleplay_dice), activity.getString(R.string.memory_bank_title),
+            activity.getString(R.string.memory_transfer_title))
         showPrivate(activity, AlertDialog.Builder(activity).setTitle(R.string.roleplay_title)
             .setItems(labels.toTypedArray()) { _, index ->
                 if (active(activity)) {
@@ -59,6 +60,7 @@ object RoleplayToolkitUi {
                         1 -> search(activity)
                         2 -> dice(activity)
                         3 -> memoryBank(activity)
+                        4 -> activity.startActivity(Intent(activity, MemoryBackupActivity::class.java))
                     }
                 }
             }.setNegativeButton(R.string.close, null).create())

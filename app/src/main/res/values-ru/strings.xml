@@ -459,4 +459,13 @@
     <string name="recall_context_add_fields">Добавить общие поля к выбранным воспоминаниям</string>
     <string name="recall_context_choose">%1$s — выберите записи (не поместилось: %2$d)</string>
     <string name="recall_context_empty">Выберите хотя бы одно подходящее воспоминание</string>
+    <string name="memory_transfer_title">Резервная копия памяти</string>
+    <string name="memory_transfer_warning">Файл содержит все локальные воспоминания всех профилей в открытом виде. Храните его в безопасном месте. Импорт добавляет новые записи, не заменяя существующие. История чатов и аккаунт Character.AI не входят в файл.</string>
+    <string name="memory_transfer_export">Экспортировать память</string>
+    <string name="memory_transfer_import">Импортировать память</string>
+    <string name="memory_transfer_capacity">Недостаточно места в банке памяти. Ничего не изменено.</string>
+    <string name="memory_transfer_review">Новых: %1$d. Дубликатов: %2$d. Конфликтов: %3$d. Существующие записи сохранятся. Продолжить?</string>
+    <string name="memory_transfer_exported">Экспортировано записей: %1$d</string>
+    <string name="memory_transfer_imported">Добавлено записей: %1$d</string>
+    <string name="memory_transfer_invalid">Не удалось прочитать резервную копию или локальную память. Ничего не импортировано.</string>
 </resources>

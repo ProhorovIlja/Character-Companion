@@ -34,6 +34,14 @@ object MemoryBankStore {
         check(current == expected)
         save(context, MemoryBank.put(current, entry) ?: error("Invalid or full memory bank"))
     }
+    @Synchronized fun merge(context: Context, expected: List<MemoryBank.Entry>,
+                            incoming: List<MemoryBank.Entry>): MemoryBankBackup.Merge {
+        val current = load(context)
+        check(current == expected)
+        val plan = MemoryBankBackup.merge(current, incoming) ?: error("Invalid or full memory bank")
+        if (plan.added > 0) save(context, plan.entries)
+        return plan
+    }
     @Synchronized fun remove(context: Context, entry: MemoryBank.Entry) {
         save(context, MemoryBank.remove(load(context), entry) ?: error("Memory changed"))
     }

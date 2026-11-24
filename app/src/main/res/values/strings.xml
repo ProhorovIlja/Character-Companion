@@ -459,4 +459,13 @@
     <string name="recall_context_add_fields">Add optional shared fields to selected memories</string>
     <string name="recall_context_choose">%1$s — select memories (over budget: %2$d)</string>
     <string name="recall_context_empty">Select at least one valid memory</string>
+    <string name="memory_transfer_title">Memory backup</string>
+    <string name="memory_transfer_warning">The file contains all local memories from every profile in plaintext. Keep it somewhere safe. Import adds new entries without replacing existing ones. Character.AI account and chat history are not included.</string>
+    <string name="memory_transfer_export">Export memories</string>
+    <string name="memory_transfer_import">Import memories</string>
+    <string name="memory_transfer_capacity">Not enough memory bank capacity. Nothing changed.</string>
+    <string name="memory_transfer_review">New: %1$d. Duplicates: %2$d. Conflicts: %3$d. Existing entries will be kept. Continue?</string>
+    <string name="memory_transfer_exported">Exported records: %1$d</string>
+    <string name="memory_transfer_imported">Added records: %1$d</string>
+    <string name="memory_transfer_invalid">Could not read backup or local memory. Nothing imported.</string>
 </resources>
