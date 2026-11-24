@@ -121,8 +121,8 @@ internal sealed class ChatWindow : Window
             composerSurface.BorderBrush = new SolidColorBrush(Color.FromRgb(66,66,66));
         }
         composer.Children.Add(composerSurface);
-        // Appearance is a session choice in the standalone preview. No settings file or restart.
-        var amoled = new CheckBox { Content = "Material AMOLED", IsChecked = true, Margin = new Thickness(0,8,0,8) };
+        var savedAppearance = ReadAppearance();
+        var amoled = new CheckBox { Content = "Material AMOLED", IsChecked = savedAppearance.Black, Margin = new Thickness(0,8,0,8) };
         AutomationProperties.SetName(amoled, "Material AMOLED appearance (off: graphite dark)");
         amoled.IsEnabled = !SystemParameters.HighContrast && Application.Current.Resources.MergedDictionaries.Count > 0;
         var colors = DefaultColors(true);
@@ -140,7 +140,13 @@ internal sealed class ChatWindow : Window
             composerSurface.SetResourceReference(Border.BackgroundProperty, "MandyColor_composer");
             composerSurface.SetResourceReference(Border.BorderBrushProperty, "MandyColor_outline");
         }
-        void ApplyAppearance() => ApplyColors(DefaultColors(amoled.IsChecked == true));
+        void ApplyAppearance()
+        {
+            if (!amoled.IsEnabled || SystemParameters.HighContrast) return;
+            var next = DefaultColors(amoled.IsChecked == true);
+            if (WriteAppearance(amoled.IsChecked == true, next)) ApplyColors(next);
+            else status.Text = "Could not save appearance. Existing colors retained.";
+        }
         amoled.Checked += (_, _) => ApplyAppearance();
         amoled.Unchecked += (_, _) => ApplyAppearance();
         settings.Children.Add(amoled);
@@ -149,10 +155,14 @@ internal sealed class ChatWindow : Window
         {
             if (SystemParameters.HighContrast) return;
             var edited = EditColors(colors, DefaultColors(amoled.IsChecked == true));
-            if (edited != null) ApplyColors(edited);
+            if (edited != null)
+            {
+                if (WriteAppearance(amoled.IsChecked == true, edited)) ApplyColors(edited);
+                else status.Text = "Could not save appearance. Existing colors retained.";
+            }
         };
         settings.Children.Add(customColors);
-        ApplyAppearance();
+        ApplyColors(savedAppearance.Values);
         draft.Padding = new Thickness(12,8,12,8);
         draft.FontSize = 16;
         draft.Background = Brushes.Transparent;
@@ -305,6 +315,66 @@ internal sealed class ChatWindow : Window
         double x = L(a), y = L(b);
         return (Math.Max(x, y) + .05) / (Math.Min(x, y) + .05);
     }
+    private static string? ColorError(Dictionary<string, Color> candidate)
+    {
+        if (ColorRoles.Any(role => !candidate.ContainsKey(role.Key))) return "Missing color role.";
+        foreach (string surface in new[] { "canvas", "composer", "bubble" })
+            if (Contrast(candidate["text"], candidate[surface]) < 4.5)
+                return "Message text requires 4.5:1 contrast against " + surface;
+        foreach (string surface in new[] { "canvas", "composer" })
+        {
+            if (Contrast(candidate["muted"], candidate[surface]) < 4.5)
+                return "Secondary text requires 4.5:1 contrast against " + surface;
+            if (Contrast(candidate["icons"], candidate[surface]) < 3.0)
+                return "Icons require 3:1 contrast against " + surface;
+        }
+        if (Contrast(candidate["accent"], candidate["composer"]) < 3.0)
+            return "Send button requires 3:1 contrast against composer.";
+        return null;
+    }
+
+    // One small, versioned per-user registry value, only colors. No credentials or chat data.
+    private const string AppearanceKey = @"Software\MandyAI\NativePreview";
+    private static (bool Black, Dictionary<string, Color> Values) ReadAppearance()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(AppearanceKey, false);
+            var raw = key?.GetValue("AppearanceV1") as string;
+            if (raw != null && raw.Length <= 100)
+            {
+                var parts = raw.Split('|');
+                if (parts.Length == 10 && parts[0] == "1" && (parts[1] == "0" || parts[1] == "1") &&
+                    parts.Skip(2).All(value => System.Text.RegularExpressions.Regex.IsMatch(value, @"\A#[0-9a-fA-F]{6}\z")))
+                {
+                    var values = ColorRoles.Select((role, i) =>
+                        (role.Key, Value: (Color)ColorConverter.ConvertFromString(parts[i+2])))
+                        .ToDictionary(x => x.Key, x => x.Value);
+                    if (ColorError(values) == null) return (parts[1] == "1", values);
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException or FormatException or ArgumentException) { }
+        return (true, DefaultColors(true));
+    }
+    private static bool WriteAppearance(bool black, Dictionary<string, Color> values)
+    {
+        if (ColorError(values) != null) return false;
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(AppearanceKey, true);
+            if (key == null) return false;
+            string raw = "1|" + (black ? "1" : "0") + "|" + string.Join("|", ColorRoles.Select(role =>
+            {
+                Color c = values[role.Key];
+                return $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+            }));
+            key.SetValue("AppearanceV1", raw, RegistryValueKind.String);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException or ArgumentException) { return false; }
+    }
+
     private Dictionary<string, Color>? EditColors(Dictionary<string, Color> existing, Dictionary<string, Color> defaults)
     {
         var panel = new StackPanel { Margin = new Thickness(16) };
@@ -337,18 +407,8 @@ internal sealed class ChatWindow : Window
                 { warning.Text = "Enter a six-digit hexadecimal color."; field.Value.Focus(); return; }
                 candidate.Add(field.Key, (Color)ColorConverter.ConvertFromString(field.Value.Text));
             }
-            foreach (string surface in new[] { "canvas", "composer", "bubble" })
-                if (Contrast(candidate["text"], candidate[surface]) < 4.5)
-                { warning.Text = "Message text requires 4.5:1 contrast against " + surface; return; }
-            foreach (string surface in new[] { "canvas", "composer" })
-            {
-                if (Contrast(candidate["muted"], candidate[surface]) < 4.5)
-                { warning.Text = "Secondary text requires 4.5:1 contrast against " + surface; return; }
-                if (Contrast(candidate["icons"], candidate[surface]) < 3.0)
-                { warning.Text = "Icons require 3:1 contrast against " + surface; return; }
-            }
-            if (Contrast(candidate["accent"], candidate["composer"]) < 3.0)
-            { warning.Text = "Send button requires 3:1 contrast against composer."; return; }
+            var error = ColorError(candidate);
+            if (error != null) { warning.Text = error; return; }
             result = candidate; dialog.DialogResult = true;
         };
         return dialog.ShowDialog() == true ? result : null;
