@@ -468,4 +468,11 @@
     <string name="memory_transfer_exported">Экспортировано записей: %1$d</string>
     <string name="memory_transfer_imported">Добавлено записей: %1$d</string>
     <string name="memory_transfer_invalid">Не удалось прочитать резервную копию или локальную память. Ничего не импортировано.</string>
+    <string name="wiki_research_title">Wikipedia</string>
+    <string name="wiki_research_privacy">Только введённый запрос отправляется в выбранный языковой раздел Wikipedia. Выберите нужные выдержки и проверьте их перед добавлением в контекст. Не вводите секреты.</string>
+    <string name="wiki_research_language">Язык Wikipedia</string>
+    <string name="wiki_research_failed">Не удалось выполнить запрос. Повторите вручную позднее.</string>
+    <string name="wiki_research_empty">Нет подходящих выдержек</string>
+    <string name="wiki_research_select">Выберите источники</string>
+    <string name="wiki_research_choose_one">Выберите хотя бы один источник</string>
 </resources>

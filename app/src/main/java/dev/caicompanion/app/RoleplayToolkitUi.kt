@@ -49,7 +49,7 @@ object RoleplayToolkitUi {
         val labels = slots.map { activity.getString(title(it)) } + listOf(
             activity.getString(R.string.roleplay_context), activity.getString(R.string.roleplay_web_search),
             activity.getString(R.string.roleplay_dice), activity.getString(R.string.memory_bank_title),
-            activity.getString(R.string.memory_transfer_title))
+            activity.getString(R.string.memory_transfer_title), activity.getString(R.string.wiki_research_title))
         showPrivate(activity, AlertDialog.Builder(activity).setTitle(R.string.roleplay_title)
             .setItems(labels.toTypedArray()) { _, index ->
                 if (active(activity)) {
@@ -61,6 +61,7 @@ object RoleplayToolkitUi {
                         2 -> dice(activity)
                         3 -> memoryBank(activity)
                         4 -> activity.startActivity(Intent(activity, MemoryBackupActivity::class.java))
+                        5 -> wikipediaPrompt(activity) { packet -> research(activity, emptyMap(), packet) }
                     }
                 }
             }.setNegativeButton(R.string.close, null).create())
@@ -213,14 +214,28 @@ object RoleplayToolkitUi {
             addView(characterCounter(activity, editor, limit))
         }
 
-    private fun research(activity: Activity, slots: Map<RoleplayToolkit.Slot, String>) {
+    private fun research(activity: Activity, slots: Map<RoleplayToolkit.Slot, String>, initial: String = "") {
         val editor = privateEditor(activity, CharacterContext.MAX_PACKET)
         editor.setHint(R.string.roleplay_research_hint)
+        editor.setText(initial)
         val dialog = AlertDialog.Builder(activity).setTitle(R.string.roleplay_context)
             .setMessage(R.string.roleplay_research_help).setView(countedEditor(activity, editor, CharacterContext.MAX_PACKET))
-            .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.confirm, null).create()
+            .setNegativeButton(R.string.cancel, null).setNeutralButton(R.string.wiki_research_title, null)
+            .setPositiveButton(R.string.confirm, null).create()
         showPrivate(activity, dialog)
         if (!dialog.isShowing) return
+        dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+            if (active(activity)) wikipediaPrompt(activity) { packet ->
+                if (active(activity) && dialog.isShowing) {
+                    val combined = WikipediaResearch.append(editor.text.toString(), packet)
+                    if (combined == null) editor.error = activity.getString(R.string.roleplay_context_invalid)
+                    else {
+                        editor.setText(combined)
+                        editor.setSelection(editor.length())
+                    }
+                }
+            }
+        }
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             if (!active(activity)) return@setOnClickListener
             val packet = CharacterContext.compose(slots, editor.text.toString())
@@ -243,6 +258,62 @@ object RoleplayToolkitUi {
         if (!dialog.isShowing) return
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             if (active(activity)) copy(activity, editor.text.toString())
+        }
+    }
+
+    private fun wikipediaPrompt(activity: Activity, selectedPacket: (String) -> Unit) {
+        if (!active(activity)) return
+        val input = privateEditor(activity, CharacterContext.MAX_QUERY, singleLine = true)
+        input.setHint(R.string.roleplay_query_hint)
+        val dialog = AlertDialog.Builder(activity).setTitle(R.string.wiki_research_title)
+            .setMessage(R.string.wiki_research_privacy).setView(input)
+            .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.confirm, null).create()
+        showPrivate(activity, dialog)
+        if (!dialog.isShowing) return
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            if (!active(activity)) return@setOnClickListener
+            val raw = input.text.toString()
+            if (WikipediaResearch.endpoint(WikipediaResearch.Language.EN, raw) == null) {
+                input.error = activity.getString(R.string.roleplay_invalid)
+                return@setOnClickListener
+            }
+            val languages = WikipediaResearch.Language.entries
+            showPrivate(activity, AlertDialog.Builder(activity).setTitle(R.string.wiki_research_language)
+                .setItems(arrayOf("English", "Русский", "Svenska")) { _, index ->
+                    val language = languages.getOrNull(index) ?: return@setItems
+                    if (active(activity) && dialog.isShowing) {
+                        ManualEditorWork.run(activity, dialog, listOf(input),
+                            { WikipediaResearchClient.search(language, raw) }) { response ->
+                            val sources = response.getOrNull()
+                            if (sources == null) input.error = activity.getString(R.string.wiki_research_failed)
+                            else if (sources.isEmpty()) input.error = activity.getString(R.string.wiki_research_empty)
+                            else {
+                                dialog.dismiss()
+                                chooseWikipediaSources(activity, language, sources, selectedPacket)
+                            }
+                        }
+                    }
+                }.setNegativeButton(R.string.cancel, null).create())
+        }
+    }
+
+    private fun chooseWikipediaSources(activity: Activity, language: WikipediaResearch.Language,
+                                       sources: List<WikipediaResearch.Source>, selectedPacket: (String) -> Unit) {
+        val selected = BooleanArray(sources.size)
+        val labels = sources.map { it.title + "\n" + it.extract }
+        val dialog = AlertDialog.Builder(activity).setTitle(R.string.wiki_research_select)
+            .setMultiChoiceItems(labels.toTypedArray(), selected) { _, index, checked -> selected[index] = checked }
+            .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.confirm, null).create()
+        showPrivate(activity, dialog)
+        if (!dialog.isShowing) return
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            if (!active(activity)) return@setOnClickListener
+            val packet = WikipediaResearch.packet(language, sources.filterIndexed { index, _ -> selected[index] })
+            if (packet == null) toast(activity, R.string.wiki_research_choose_one)
+            else {
+                dialog.dismiss()
+                selectedPacket(packet)
+            }
         }
     }
 
