@@ -159,8 +159,7 @@ class MainActivity : Activity() {
         lastUrl = initialShare ?: (if (store.resumePage) store.lastVisited.ifBlank { HOME } else HOME)
         // An explicit Android Share request must take priority over the offline startup hub.
         if (store.browserSessionPreferred) {
-            BrowserSessionActivity.enter(this, initialShare ?: HOME, openNow = initialShare != null)
-            return
+            if (BrowserSessionActivity.enter(this, initialShare ?: HOME, openNow = initialShare != null)) return
         }
         if (NativeStartupPolicy.useHub(store.startInHub, initialShare)) showNativeHub()
         else openFirstPartyPage(lastUrl)

@@ -23,6 +23,8 @@ import android.view.inputmethod.EditorInfo
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.WindowManager
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
@@ -60,6 +62,8 @@ class VoiceDraftActivity : Activity() {
     private var permissionPending = false
     private var resumed = false
     private var allowInsert = false
+    private var backCallback: OnBackInvokedCallback? = null
+    private var discardDialog: AlertDialog? = null
     private lateinit var cancelListenButton: Button
     private val recognitionGuard = VoiceRecognitionGuard()
     // Only an explicit save action creates a document. Never save a transcript to Bundle.
@@ -123,6 +127,10 @@ class VoiceDraftActivity : Activity() {
         languageSpinner.adapter = adapter
         root.addView(languageSpinner)
         editor = EditText(this).apply {
+            // Do not request keyboard learning or Android autofill for private drafts.
+            isSaveEnabled = false
+            isSaveFromParentEnabled = false
+            importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
             hint = getString(R.string.voice_hint)
             setTextColor(Color.rgb(228, 231, 240))
             setHintTextColor(Color.rgb(175, 170, 165))
@@ -133,7 +141,8 @@ class VoiceDraftActivity : Activity() {
             minLines = 5
             maxLines = 16
             // Prevent landscape IMEs from replacing the editor with a full-screen form.
-            imeOptions = imeOptions or EditorInfo.IME_FLAG_NO_EXTRACT_UI
+            imeOptions = imeOptions or EditorInfo.IME_FLAG_NO_EXTRACT_UI or
+                EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
             filters = arrayOf(android.text.InputFilter.LengthFilter(VoiceDraftPolicy.MAX_CHARS))
         }
         // Only retain the draft in the Activity's in-memory non-configuration instance.
@@ -175,10 +184,17 @@ class VoiceDraftActivity : Activity() {
             setText(R.string.voice_system)
             setOnClickListener { confirmSystemRecognizer() }
         })
-        val actions = LinearLayout(this).apply { gravity = Gravity.CENTER }
+        val stackedActions = resources.configuration.screenWidthDp < 360 ||
+            resources.configuration.fontScale >= 1.25f
+        val actions = LinearLayout(this).apply {
+            gravity = Gravity.CENTER
+            orientation = if (stackedActions) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
+        }
         fun action(label: Int, handler: () -> Unit) {
             actions.addView(Button(this).apply { setText(label); setOnClickListener { handler() } },
-                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                if (stackedActions) LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT)
+                else LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         }
         action(R.string.voice_copy) { copyDraft() }
         action(R.string.voice_save) { saveDraft() }
@@ -189,7 +205,7 @@ class VoiceDraftActivity : Activity() {
                 setText(R.string.voice_insert_return)
                 setOnClickListener {
                     val draft = VoiceComposerPolicy.validDraft(editor.text.toString())
-                    if (listening || systemRecognitionPending || draft == null) {
+                    if (listening || systemRecognitionPending || permissionPending || draft == null) {
                         status.setText(R.string.voice_finish_first)
                     } else {
                         setResult(RESULT_OK, Intent().putExtra(EXTRA_DRAFT, draft))
@@ -203,6 +219,38 @@ class VoiceDraftActivity : Activity() {
             setText(R.string.voice_copy_return)
             setOnClickListener { copyAndReturn() }
         })
+        if (Build.VERSION.SDK_INT >= 33) {
+            val callback = OnBackInvokedCallback { confirmExit() }
+            backCallback = callback
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(
+                OnBackInvokedDispatcher.PRIORITY_DEFAULT, callback)
+        }
+    }
+
+    private fun confirmExit() {
+        if (isFinishing || isDestroyed || discardDialog?.isShowing == true) return
+        if (listening || systemRecognitionPending || permissionPending || pendingSaveText != null ||
+            editor.text.isNotBlank()) {
+            val dialog = AlertDialog.Builder(this)
+                .setMessage(R.string.voice_discard_confirm)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.voice_discard) { _, _ ->
+                    stopListening()
+                    finish()
+                }.create()
+            discardDialog = dialog
+            dialog.setOnDismissListener { discardDialog = null }
+            dialog.show()
+        } else finish()
+    }
+
+    @Deprecated("Legacy Android back navigation")
+    override fun onBackPressed() { confirmExit() }
+
+    private fun draftActionReady(): Boolean {
+        if (!listening && !systemRecognitionPending && !permissionPending) return true
+        status.setText(R.string.voice_action_wait)
+        return false
     }
 
     private fun dp(px: Int) = (px * resources.displayMetrics.density + 0.5f).toInt()
@@ -363,6 +411,7 @@ class VoiceDraftActivity : Activity() {
 
     /** Copy only on an explicit tap. Android clipboard is accessible outside this app. */
     private fun copyDraft(): Boolean {
+        if (!draftActionReady()) return false
         val content = editor.text.toString()
         if (content.isBlank()) {
             status.setText(R.string.voice_copy_empty)
@@ -393,6 +442,7 @@ class VoiceDraftActivity : Activity() {
     }
 
     private fun saveDraft() {
+        if (!draftActionReady()) return
         val snapshot = editor.text.toString().takeIf { it.isNotBlank() } ?: return
         if (pendingSaveText != null) return
         // SAF picker can outlive an Activity recreation. Keep the exact user-approved
@@ -414,7 +464,7 @@ class VoiceDraftActivity : Activity() {
     }
 
     private fun clearDraft() {
-        if (editor.text.isBlank()) return
+        if (!draftActionReady() || editor.text.isBlank()) return
         AlertDialog.Builder(this)
             .setMessage(R.string.voice_clear_confirm)
             .setNegativeButton(android.R.string.cancel, null)
@@ -479,6 +529,12 @@ class VoiceDraftActivity : Activity() {
     }
 
     override fun onDestroy() {
+        discardDialog?.dismiss()
+        discardDialog = null
+        if (Build.VERSION.SDK_INT >= 33) backCallback?.let {
+            onBackInvokedDispatcher.unregisterOnBackInvokedCallback(it)
+        }
+        backCallback = null
         finishListening()
         super.onDestroy()
     }

@@ -26,16 +26,23 @@ class BrowserSessionActivity : Activity() {
         private const val EXTRA_PAGE = "safe_page"
         private const val EXTRA_OPEN = "open_now"
 
-        fun enter(activity: Activity, page: String?, openNow: Boolean) {
-            if (activity.isFinishing || activity.isDestroyed) return
+        fun enter(activity: Activity, page: String?, openNow: Boolean): Boolean {
+            if (activity.isFinishing || activity.isDestroyed) return false
             val store = SettingsStore(activity)
             store.browserSessionPreferred = true
-            activity.startActivity(Intent(activity, BrowserSessionActivity::class.java).apply {
-                putExtra(EXTRA_PAGE, BrowserSessionPolicy.safeTabUrl(page))
-                putExtra(EXTRA_OPEN, openNow)
-                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            })
-            activity.finish()
+            return try {
+                activity.startActivity(Intent(activity, BrowserSessionActivity::class.java).apply {
+                    putExtra(EXTRA_PAGE, BrowserSessionPolicy.safeTabUrl(page))
+                    putExtra(EXTRA_OPEN, openNow)
+                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                })
+                activity.finish()
+                true
+            } catch (_: RuntimeException) {
+                store.browserSessionPreferred = false
+                Toast.makeText(activity, R.string.browser_mode_open_failed, Toast.LENGTH_LONG).show()
+                false
+            }
         }
     }
 
@@ -78,8 +85,9 @@ class BrowserSessionActivity : Activity() {
             android.app.AlertDialog.Builder(this).setMessage(R.string.browser_mode_change_warning)
                 .setNegativeButton(R.string.cancel, null)
                 .setPositiveButton(R.string.browser_mode_change_provider) { _, _ ->
+                    val previous = store.browserSessionProvider
                     store.browserSessionProvider = ""
-                    openTab()
+                    if (!openTab()) store.browserSessionProvider = previous
                 }.show()
         })
         column.addView(action(R.string.shell_session_info) {
@@ -97,13 +105,18 @@ class BrowserSessionActivity : Activity() {
     }
 
     private fun consumeLaunch(incoming: Intent?, allowOpen: Boolean) {
-        destination = BrowserSessionPolicy.safeTabUrl(incoming?.getStringExtra(EXTRA_PAGE))
+        val supplied = incoming?.getStringExtra(EXTRA_PAGE)
+        destination = BrowserSessionPolicy.safeTabUrl(supplied ?: if (!allowOpen)
+            lastNonConfigurationInstance as? String else null)
         val openNow = allowOpen && incoming?.getBooleanExtra(EXTRA_OPEN, false) == true
         setIntent(Intent(this, BrowserSessionActivity::class.java))
         if (openNow) openTab()
     }
 
-    private fun openTab() {
+    @Deprecated("Retain only a sanitized public destination during configuration changes")
+    override fun onRetainNonConfigurationInstance(): Any = BrowserSessionPolicy.safeTabUrl(destination)
+
+    private fun openTab(): Boolean {
         // Pin the preferred Custom Tabs provider so an installed app link handler
         // cannot consume the first-party URL before the browser session opens.
         val pinned = store.browserSessionProvider.takeIf { it.isNotBlank() }
@@ -112,7 +125,7 @@ class BrowserSessionActivity : Activity() {
         if (provider == null) {
             Toast.makeText(this, if (pinned == null) R.string.browser_mode_no_provider
                 else R.string.browser_mode_provider_unavailable, Toast.LENGTH_LONG).show()
-            return
+            return false
         }
         try {
             val colors = CustomTabColorSchemeParams.Builder()
@@ -122,24 +135,30 @@ class BrowserSessionActivity : Activity() {
             tab.intent.setPackage(provider)
             tab.launchUrl(this, Uri.parse(BrowserSessionPolicy.safeTabUrl(destination)))
             store.browserSessionProvider = provider
+            return true
         } catch (_: ActivityNotFoundException) {
             Toast.makeText(this, R.string.browser_mode_no_provider, Toast.LENGTH_LONG).show()
         } catch (_: SecurityException) {
             Toast.makeText(this, R.string.browser_mode_no_provider, Toast.LENGTH_LONG).show()
         }
+        return false
     }
 
     private fun returnToEmbedded() {
         val launcher = packageManager.getLaunchIntentForPackage(packageName)
         if (launcher == null) {
-            Toast.makeText(this, R.string.browser_mode_restart, Toast.LENGTH_LONG).show()
-            store.browserSessionPreferred = false
-            finish()
+            Toast.makeText(this, R.string.browser_mode_switch_failed, Toast.LENGTH_LONG).show()
             return
         }
         store.browserSessionPreferred = false
-        startActivity(launcher.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
-        finish()
+        try {
+            startActivity(launcher.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
+            finish()
+        } catch (_: RuntimeException) {
+            // Stay in this session if Android cannot launch the embedded Activity.
+            store.browserSessionPreferred = true
+            Toast.makeText(this, R.string.browser_mode_switch_failed, Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()

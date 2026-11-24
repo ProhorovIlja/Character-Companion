@@ -15,9 +15,16 @@ class VoiceComposerHandoff {
     private var ticket: VoiceComposerPolicy.Ticket? = null
     private var awaiting = false
     private var pending: String? = null
+    // If the fallback Activity cannot be opened, keep the draft in process memory.
+    // A later explicit Voice tap recovers it; focus changes never retry insertion.
+    private val recovery = VoiceComposerPolicy.RecoveryDraft()
 
     fun launch(activity: Activity, page: String?) {
         if (awaiting || pending != null || activity.isFinishing || activity.isDestroyed) return
+        if (recovery.hasDraft) {
+            reopenRecovery(activity)
+            return
+        }
         val next = VoiceComposerPolicy.Ticket(page)
         ticket = next
         awaiting = true
@@ -26,7 +33,7 @@ class VoiceComposerHandoff {
         } catch (_: RuntimeException) {
             awaiting = false
             ticket = null
-            Toast.makeText(activity, R.string.voice_handoff_unavailable, Toast.LENGTH_LONG).show()
+            Toast.makeText(activity, R.string.voice_editor_open_failed, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -34,7 +41,11 @@ class VoiceComposerHandoff {
     fun invalidate() { ticket?.invalidate() }
 
     fun receive(resultCode: Int, data: Intent?) {
+        val wasAwaiting = awaiting
         awaiting = false
+        // A recreated parent can receive the result, but cannot inherit an insertion ticket.
+        if (!wasAwaiting) ticket = null
+        if (pending != null || recovery.hasDraft) return
         pending = if (resultCode == Activity.RESULT_OK)
             VoiceComposerPolicy.validDraft(data?.getStringExtra(VoiceDraftActivity.EXTRA_DRAFT)) else null
         if (pending == null) ticket = null
@@ -52,9 +63,20 @@ class VoiceComposerHandoff {
             Toast.makeText(activity, R.string.voice_handoff_check, Toast.LENGTH_LONG).show()
         } else {
             // No automatic clipboard or retry into a different field. Preserve words for review.
-            activity.startActivity(VoiceDraftActivity.handoffIntent(activity, false, draft))
-            Toast.makeText(activity, R.string.voice_handoff_unavailable, Toast.LENGTH_LONG).show()
+            recovery.preserve(draft)
+            reopenRecovery(activity)
         }
+    }
+
+    private fun reopenRecovery(activity: Activity) {
+        val opened = recovery.open { draft ->
+            try {
+                activity.startActivity(VoiceDraftActivity.handoffIntent(activity, false, draft))
+                true
+            } catch (_: RuntimeException) { false }
+        }
+        Toast.makeText(activity, if (opened) R.string.voice_handoff_unavailable
+            else R.string.voice_handoff_recover, Toast.LENGTH_LONG).show()
     }
 
     private fun tryInsert(renderer: View, draft: String): Boolean = runCatching {
@@ -71,5 +93,5 @@ class VoiceComposerHandoff {
         connection.commitText(draft, 1)
     }.getOrDefault(false)
 
-    fun clear() { ticket = null; awaiting = false; pending = null }
+    fun clear() { ticket = null; awaiting = false; pending = null; recovery.clear() }
 }

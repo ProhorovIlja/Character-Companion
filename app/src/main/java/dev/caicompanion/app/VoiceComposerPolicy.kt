@@ -27,6 +27,24 @@ object VoiceComposerPolicy {
             !it.any { c -> c == '\u0000' }
     }
 
+    /** Process-local recovery slot. Never overwrites an unsent draft or retries insertion. */
+    class RecoveryDraft {
+        private var text: String? = null
+        val hasDraft: Boolean get() = text != null
+        fun preserve(draft: String?): Boolean {
+            if (hasDraft) return false
+            text = validDraft(draft)
+            return hasDraft
+        }
+        fun open(launchEditor: (String) -> Boolean): Boolean {
+            val draft = text ?: return false
+            if (!launchEditor(draft)) return false
+            text = null
+            return true
+        }
+        fun clear() { text = null }
+    }
+
     /** A navigation or renderer restart revokes permission even if the URL later repeats. */
     class Ticket(page: String?) {
         private var expected = chatPage(page)

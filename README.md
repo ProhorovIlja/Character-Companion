@@ -1,3 +1,5 @@
+**0.37.0-rc1 (source):** safer private draft recovery, discard confirmation, keyboard-learning opt-out, adaptive voice actions, and browser-session launch recovery. Android compilation and device verification pending.
+
 **0.36.0-rc1 (source):** private, explicitly requested focused-editor dictation handoff in both embedded engines; safe draft fallback, fixed Unicode cursor behavior and browser-provider continuity. Hardware validation required. [Details](docs/ANDROID_VOICE_HANDOFF_0.36.md).
 
 **0.35.0-rc1 (source):** compact chat-first Android shell, shared icon navigation, grouped settings, streamlined browser-session screen, finish/cancel dictation and safer bookmark handling. [Design and QA notes](docs/ANDROID_COMPACT_UI_0.35.md). Build/device QA pending.

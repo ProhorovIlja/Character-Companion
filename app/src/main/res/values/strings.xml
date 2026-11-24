@@ -236,4 +236,11 @@
     <string name="browser_mode_change_provider">Change session browser</string>
     <string name="browser_mode_change_warning">Use the current default compatible browser instead? Its account and cookies may differ.</string>
     <string name="browser_mode_provider_unavailable">Your previous session browser is unavailable. Restore it or explicitly change session browser.</string>
+    <string name="voice_discard_confirm">Close this editor and discard the current unsent draft or recording?</string>
+    <string name="voice_discard">Discard and close</string>
+    <string name="voice_action_wait">Finish or cancel recognition before copying, saving or clearing the draft.</string>
+    <string name="voice_editor_open_failed">Could not open the voice editor. Try again.</string>
+    <string name="voice_handoff_recover">Could not reopen the editor. Tap Voice again to recover the draft while the app stays open.</string>
+    <string name="browser_mode_open_failed">Could not open browser-session mode. Embedded mode is still available.</string>
+    <string name="browser_mode_switch_failed">Could not open embedded mode. Your browser session is still available.</string>
 </resources>

@@ -36,8 +36,8 @@ class GeckoFlavorTests(unittest.TestCase):
         self.assertIn('create("legacy")', build)
         self.assertIn('abiFilters.add("arm64-v8a")', build)
         self.assertIn('maven.mozilla.org/maven2/', settings)
-        self.assertEqual(build.count('versionCode = 36'), 1)
-        self.assertEqual(build.count('versionName = "0.36.0-rc1"'), 1)
+        self.assertEqual(build.count('versionCode = 37'), 1)
+        self.assertEqual(build.count('versionName = "0.37.0-rc1"'), 1)
 
     def test_gecko_navigation_is_first_party_and_fail_closed(self):
         src = (ROOT/'app/src/gecko/java/dev/caicompanion/app/GeckoActivity.kt').read_text()

@@ -16,8 +16,11 @@ class RendererRecoveryBudget(
 
     private fun prune(elapsedRealtime: Long) {
         require(elapsedRealtime >= 0)
-        if (restarts.isNotEmpty() && elapsedRealtime < restarts.peekLast()) restarts.clear()
-        while (restarts.isNotEmpty() && elapsedRealtime - restarts.peekFirst() >= windowMillis) {
+        val latest = restarts.peekLast()
+        if (latest != null && elapsedRealtime < latest) restarts.clear()
+        while (true) {
+            val earliest = restarts.peekFirst() ?: break
+            if (elapsedRealtime - earliest < windowMillis) break
             restarts.removeFirst()
         }
     }

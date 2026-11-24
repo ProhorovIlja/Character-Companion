@@ -92,8 +92,7 @@ class GeckoActivity : Activity() {
         if (settings.browserSessionPreferred) {
             val shared = sharedLink(intent)
             if (intent?.action == Intent.ACTION_SEND) setIntent(Intent(Intent.ACTION_MAIN))
-            BrowserSessionActivity.enter(this, shared ?: HOME, openNow = shared != null)
-            return
+            if (BrowserSessionActivity.enter(this, shared ?: HOME, openNow = shared != null)) return
         }
         if (settings.protectScreen) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         root = LinearLayout(this).apply {

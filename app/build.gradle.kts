@@ -19,8 +19,8 @@ android {
         applicationId = "dev.caicompanion.app"
         minSdk = 29
         targetSdk = 36
-        versionCode = 36
-        versionName = "0.36.0-rc1"
+        versionCode = 37
+        versionName = "0.37.0-rc1"
     }
     flavorDimensions += "browserEngine"
     productFlavors {
