@@ -293,6 +293,23 @@ internal sealed class ChatWindow : Window
         Content = layout;
         AutomationProperties.SetName(draft, "Message draft");
         AutomationProperties.SetName(history, "Conversation history");
+        var copyMessage = new MenuItem { Header = "Copy selected message" };
+        var historyMenu = new ContextMenu();
+        historyMenu.Items.Add(copyMessage);
+        history.ContextMenu = historyMenu;
+        historyMenu.Opened += (_, _) => copyMessage.IsEnabled = history.SelectedItem is MessageRow;
+        void CopySelected()
+        {
+            if (history.SelectedItem is not MessageRow row) return;
+            try { Clipboard.SetText(row.Text); status.Text = "Selected message copied."; }
+            catch (System.Runtime.InteropServices.ExternalException) { status.Text = "Clipboard unavailable."; }
+        }
+        copyMessage.Click += (_, _) => CopySelected();
+        history.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key == Key.C && Keyboard.Modifiers == ModifierKeys.Control && history.SelectedItem is MessageRow)
+            { e.Handled = true; CopySelected(); }
+        };
         AutomationProperties.SetName(liveReply, "Incomplete streamed reply");
         AutomationProperties.SetName(key, "Local server API key");
         AutomationProperties.SetName(settingsButton, "Show or hide settings");
