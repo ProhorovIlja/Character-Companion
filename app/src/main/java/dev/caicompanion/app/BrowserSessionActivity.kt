@@ -170,6 +170,16 @@ class BrowserSessionActivity : Activity() {
         }
     }
 
+    override fun onStop() {
+        ForegroundUpdateUi.cancel(this)
+        super.onStop()
+    }
+
+    override fun onDestroy() {
+        ForegroundUpdateUi.cancel(this)
+        super.onDestroy()
+    }
+
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
     private fun action(label: Int, callback: () -> Unit): Button = Button(this).apply {
         setText(label); isAllCaps = false; setTextColor(fg)

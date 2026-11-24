@@ -17,13 +17,14 @@ object ReleaseCenter {
 
     fun show(activity: Activity) {
         if (activity.isFinishing || activity.isDestroyed) return
-        AlertDialog.Builder(activity).setTitle(R.string.release_center)
+        val menu = AlertDialog.Builder(activity).setTitle(R.string.release_center)
             .setMessage(activity.getString(R.string.release_current,
                 BuildConfig.VERSION_NAME, BuildConfig.FLAVOR) + "\n\n" +
                 activity.getString(R.string.release_info))
             .setPositiveButton(R.string.release_check) { _, _ -> check(activity) }
             .setNeutralButton(R.string.release_open) { _, _ -> open(activity) }
-            .setNegativeButton(R.string.close, null).show()
+            .setNegativeButton(R.string.close, null).create()
+        ForegroundUpdateUi.show(activity, menu)
     }
 
     private fun open(activity: Activity) {
@@ -42,8 +43,8 @@ object ReleaseCenter {
         val dialog = AlertDialog.Builder(activity).setTitle(R.string.release_center)
             .setMessage(R.string.release_checking)
             .setNegativeButton(R.string.cancel, null).create()
-        dialog.setOnDismissListener { cancelled.set(true) }
-        dialog.show()
+        ForegroundUpdateUi.show(activity, dialog) { cancelled.set(true) }
+        if (!dialog.isShowing) return
         // One bounded request following a button press. No retries, periodic checks, or token storage.
         Thread {
             var connection: HttpsURLConnection? = null
@@ -116,7 +117,7 @@ object ReleaseCenter {
                         UpdateDownload.start(activity, selectedTag, selected)
                     }
                 }
-                details.show()
+                ForegroundUpdateUi.show(activity, details.create())
             }
         }.start()
     }

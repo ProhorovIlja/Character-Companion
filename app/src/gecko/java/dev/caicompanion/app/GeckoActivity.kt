@@ -1047,6 +1047,7 @@ class GeckoActivity : Activity() {
     }
 
     override fun onStop() {
+        ForegroundUpdateUi.cancel(this)
         // Revoke unresolved prompts when hidden; do not auto-grant on return.
         started = false
         revokeMediaPermissions()
@@ -1085,6 +1086,7 @@ class GeckoActivity : Activity() {
     }
 
     override fun onDestroy() {
+        ForegroundUpdateUi.cancel(this)
         loginProtection.setVisible(false)
         voiceHandoff.clear()
         revokeMediaPermissions()

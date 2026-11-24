@@ -1434,6 +1434,7 @@ class MainActivity : Activity() {
         deliverVoiceDraft()
     }
     override fun onStop() {
+        ForegroundUpdateUi.cancel(this)
         // Do not revoke while an Android permission dialog merely pauses the Activity.
         // Revoke a pending WebRTC request when the application actually becomes hidden.
         denyPendingMedia()
@@ -1454,6 +1455,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        ForegroundUpdateUi.cancel(this)
         voiceHandoff.clear()
         destroyed = true
         loginProtection.setVisible(false)
