@@ -887,12 +887,19 @@ class MainActivity : Activity() {
             filters = arrayOf(InputFilter.LengthFilter(80))
         }
         layout.addView(search)
+        val orderLabels = intArrayOf(R.string.library_order_saved, R.string.library_order_newest, R.string.library_order_title)
+        val sort = Button(this).apply {
+            isAllCaps = false
+            setTextColor(TEXT)
+            setBackgroundResource(R.drawable.settings_action)
+        }
+        layout.addView(sort)
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         layout.addView(list)
         var index = NativeLibrarySearch.Index(store.listBookmarks())
         var rendered: List<Pair<String, String>>? = null
         fun refresh(query: String) {
-            val saved = index.filter(query)
+            val saved = index.filter(query, order = store.libraryOrder)
             if (saved == rendered) return
             rendered = saved
             list.removeAllViews()
@@ -930,6 +937,19 @@ class MainActivity : Activity() {
             }
             override fun afterTextChanged(s: Editable?) {}
         })
+        fun updateSortLabel() {
+            sort.text = getString(R.string.library_order_format, getString(orderLabels[store.libraryOrder.ordinal]))
+        }
+        updateSortLabel()
+        sort.setOnClickListener {
+            AlertDialog.Builder(this).setTitle(R.string.library_order)
+                .setSingleChoiceItems(orderLabels.map { getString(it) }.toTypedArray(), store.libraryOrder.ordinal) { dialog, choice ->
+                    store.libraryOrder = NativeLibrarySearch.Order.entries[choice]
+                    updateSortLabel()
+                    refresh(search.text.toString())
+                    dialog.dismiss()
+                }.setNegativeButton(R.string.cancel, null).show()
+        }
         refreshNativeBookmarks = {
             index = NativeLibrarySearch.Index(store.listBookmarks())
             refresh(search.text.toString())

@@ -93,6 +93,10 @@ class SettingsStore(context: Context) {
             .apply()
     }
 
+    var libraryOrder: NativeLibrarySearch.Order
+        get() = NativeLibrarySearch.order(prefs.getString("library_order", null))
+        set(v) = prefs.edit().putString("library_order", v.name).apply()
+
     private fun bookmarks(): JSONArray = try {
         JSONArray(prefs.getString("bookmarks", "[]"))
     } catch (_: Exception) { JSONArray() }
@@ -107,12 +111,19 @@ class SettingsStore(context: Context) {
     }
     fun addBookmark(title: String, url: String): Boolean {
         val normalized = OfflineBookmarkEditor.normalize(title, url) ?: return false
-        val data = listBookmarks().filterNot { it.second == normalized.second }.takeLast(99).toMutableList()
-        data.add(normalized)
-        writeBookmarks(data)
+        synchronized(historyLock) {
+            val data = listBookmarks().filterNot { it.second == normalized.second }.takeLast(99).toMutableList()
+            data.add(normalized)
+            writeBookmarks(data)
+        }
         return true
     }
-    fun removeBookmark(url: String) = writeBookmarks(listBookmarks().filterNot { it.second == UrlPolicy.sanitizeBookmark(url) })
+    fun removeBookmark(url: String) {
+        val canonical = UrlPolicy.sanitizeBookmark(url) ?: return
+        synchronized(historyLock) {
+            writeBookmarks(listBookmarks().filterNot { it.second == canonical })
+        }
+    }
     private fun writeBookmarks(items: List<Pair<String, String>>) {
         val array = JSONArray()
         items.takeLast(100).forEach { (title, url) ->
@@ -146,6 +157,7 @@ class SettingsStore(context: Context) {
         put("textZoom", textZoom)
         put("customRules", customRules)
         put("excludeRules", excludeRules)
+        put("libraryOrder", libraryOrder.name)
         put("bookmarks", sanitizedBookmarkArray())
     }.toString(2)
 
@@ -164,7 +176,7 @@ class SettingsStore(context: Context) {
         }
         // Publish one atomic preference transaction: a crash cannot leave a half-imported profile.
         val bookmarkArray = JSONArray()
-        saved.takeLast(100).forEach { (title, url) ->
+        saved.asReversed().distinctBy { it.second }.asReversed().takeLast(100).forEach { (title, url) ->
             bookmarkArray.put(JSONObject().put("title", title).put("url", url))
         }
         synchronized(historyLock) {
@@ -185,6 +197,7 @@ class SettingsStore(context: Context) {
             .putInt("text_zoom", parsed.optInt("textZoom", 100).coerceIn(75, 175))
             .putString("custom_rules", parsed.optString("customRules").take(12_000))
             .putString("exclude_rules", parsed.optString("excludeRules").take(12_000))
+            .putString("library_order", NativeLibrarySearch.order(parsed.optString("libraryOrder")).name)
             .putString("bookmarks", bookmarkArray.toString())
             .apply()
         }

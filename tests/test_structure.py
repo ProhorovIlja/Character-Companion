@@ -322,7 +322,7 @@ class Structure(unittest.TestCase):
         self.assertIn('private fun showNativeHub()', activity)
         self.assertIn('private fun closeNativeHub(loadIfBlank: Boolean = true)', activity)
         self.assertIn('NativeLibrarySearch.Index(store.listBookmarks())', activity)
-        self.assertIn('val saved = index.filter(query)', activity)
+        self.assertIn('val saved = index.filter(query, order = store.libraryOrder)', activity)
         self.assertIn('if (saved == rendered) return', activity)
         self.assertIn('private fun syncRendererLifecycle()', activity)
         self.assertIn('NativeWorkspaceNavigation.shouldResumeRenderer(activityResumed, nativeHub != null)', activity)

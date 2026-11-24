@@ -278,4 +278,9 @@
     <string name="release_install">Открыть установщик Android</string>
     <string name="release_install_permission">Android запрещает установку из этого приложения. Вы можете изменить разрешение в системных настройках, затем снова проверить и скачать обновление.</string>
     <string name="release_install_settings">Открыть настройки установки</string>
+    <string name="library_order">Порядок библиотеки</string>
+    <string name="library_order_format">Сортировка: %1$s</string>
+    <string name="library_order_saved">Порядок сохранения</string>
+    <string name="library_order_newest">Недавно сохранённые</string>
+    <string name="library_order_title">По названию</string>
 </resources>

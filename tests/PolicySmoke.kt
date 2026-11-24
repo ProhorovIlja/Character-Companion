@@ -173,6 +173,16 @@ fun main() {
         "NOT SAFE" to "https://evil.example/chat/c",
         "Duplicate" to "https://character.ai/chat/a"
     )
+    val orderedLibrary = NativeLibrarySearch.Index(listOf(
+        "Zebra" to "https://character.ai/chat/a",
+        "Alpha" to "https://character.ai/chat/b",
+        "Beta" to "https://character.ai/chat/c"))
+    check(orderedLibrary.filter("", order = NativeLibrarySearch.Order.NEWEST).map { it.first } ==
+        listOf("Beta", "Alpha", "Zebra"))
+    check(orderedLibrary.filter("", order = NativeLibrarySearch.Order.TITLE).map { it.first } ==
+        listOf("Alpha", "Beta", "Zebra"))
+    check(orderedLibrary.filter("", 1, NativeLibrarySearch.Order.TITLE).single().first == "Alpha")
+    check(NativeLibrarySearch.order("bad") == NativeLibrarySearch.Order.SAVED)
     val cachedLibrary = NativeLibrarySearch.Index(library)
     check(cachedLibrary.filter("") == NativeLibrarySearch.filter(library, ""))
     val normalizedLibrary = NativeLibrarySearch.Index(listOf(

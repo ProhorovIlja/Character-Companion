@@ -305,14 +305,17 @@ class GeckoActivity : Activity() {
         val entries = mutableListOf<String>()
         val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, entries)
         val list = ListView(this).apply { this.adapter = adapter }
+        val orderLabels = intArrayOf(R.string.library_order_saved, R.string.library_order_newest, R.string.library_order_title)
+        val sort = Button(this).apply { isAllCaps = false }
         layout.addView(search)
+        layout.addView(sort)
         layout.addView(empty)
         layout.addView(list, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, dp(300)))
         var visible = emptyList<Pair<String, String>>()
         var index = NativeLibrarySearch.Index(settings.listBookmarks())
         val searchOnly: () -> Unit = {
-            val next = index.filter(search.text.toString())
+            val next = index.filter(search.text.toString(), order = settings.libraryOrder)
             if (next != visible) {
                 visible = next
                 adapter.setNotifyOnChange(false)
@@ -321,6 +324,19 @@ class GeckoActivity : Activity() {
                 adapter.notifyDataSetChanged()
             }
             empty.visibility = if (visible.isEmpty()) View.VISIBLE else View.GONE
+        }
+        fun updateSortLabel() {
+            sort.text = getString(R.string.library_order_format, getString(orderLabels[settings.libraryOrder.ordinal]))
+        }
+        updateSortLabel()
+        sort.setOnClickListener {
+            AlertDialog.Builder(this).setTitle(R.string.library_order)
+                .setSingleChoiceItems(orderLabels.map { getString(it) }.toTypedArray(), settings.libraryOrder.ordinal) { dialog, choice ->
+                    settings.libraryOrder = NativeLibrarySearch.Order.entries[choice]
+                    updateSortLabel()
+                    searchOnly()
+                    dialog.dismiss()
+                }.setNegativeButton(R.string.cancel, null).show()
         }
         val refresh: () -> Unit = {
             index = NativeLibrarySearch.Index(settings.listBookmarks())

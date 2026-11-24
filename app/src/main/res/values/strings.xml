@@ -278,4 +278,9 @@
     <string name="release_install">Open Android installer</string>
     <string name="release_install_permission">Android does not allow installs from this app. You can change that permission in system settings, then check and download the update again.</string>
     <string name="release_install_settings">Open installation settings</string>
+    <string name="library_order">Library order</string>
+    <string name="library_order_format">Sort: %1$s</string>
+    <string name="library_order_saved">Saved order</string>
+    <string name="library_order_newest">Recently saved first</string>
+    <string name="library_order_title">Name (A–Z)</string>
 </resources>
