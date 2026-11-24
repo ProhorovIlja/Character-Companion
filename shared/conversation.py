@@ -1,6 +1,7 @@
 """Foreground reference chat: local streaming provider and immutable SQLite history."""
 import http.client
 import json
+import re
 import uuid
 
 from . import continuity as wire
@@ -18,21 +19,26 @@ def units(text):
 
 
 class LocalProvider:
-    """Only numeric IPv4 loopback; no redirects, proxies, credentials or cloud fallback."""
-    def __init__(self, model, port=8080, timeout=30):
+    """Only numeric IPv4 loopback; no redirects, proxies or cloud fallback. Optional local bearer key."""
+    def __init__(self, model, port=8080, timeout=30, api_key=None):
         if not isinstance(model, str) or not model.strip() or len(model) > 256:
             raise ValueError('invalid model')
         if type(port) is not int or not 1 <= port <= 65535 or not 1 <= timeout <= 120:
             raise ValueError('invalid connection settings')
+        if api_key is not None and (not isinstance(api_key, str) or not re.fullmatch(r"[A-Za-z0-9_-]{32,128}", api_key)):
+            raise ValueError("invalid local API key")
         self.model, self.port, self.timeout = model, port, timeout
+        self._api_key = api_key
 
     def stream(self, messages):
         body = json.dumps(dict(model=self.model, messages=messages, stream=True,
                                max_tokens=1024), ensure_ascii=False).encode('utf-8')
         conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=self.timeout)
         try:
-            conn.request('POST', '/v1/chat/completions', body,
-                         {'Content-Type': 'application/json', 'Accept': 'text/event-stream'})
+            headers = {'Content-Type': 'application/json', 'Accept': 'text/event-stream'}
+            if self._api_key is not None:
+                headers['Authorization'] = 'Bearer ' + self._api_key
+            conn.request('POST', '/v1/chat/completions', body, headers)
             with conn.getresponse() as response:
                 if response.status != 200 or response.getheader('Content-Type', '').split(';')[0].strip().lower() != 'text/event-stream':
                     raise ChatError('local provider rejected streaming request')
