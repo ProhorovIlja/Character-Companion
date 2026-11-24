@@ -1,0 +1,13 @@
+# Foreground Windows native preview build helper
+
+The legacy Windows build script targets the Chromium-based client. scripts/build_mandy_windows.py instead targets the separate browser-free Mandy.NativePreview project. It is a command-line helper only, with no workflow configuration, trigger, scheduled task, background process, SDK installer or automatic upload.
+
+Run with Python 3.11+ and an already selected stable .NET 10 SDK on a trusted Windows x64 build machine. A GitHub-hosted Windows runner is one appropriate environment; no developer SDK needs to be installed on the user's personal devices for eventual self-contained deployment. Default invocation checks prerequisites only. The build path is explicit:
+    python scripts/build_mandy_windows.py
+    python scripts/build_mandy_windows.py --build --output <new-output-directory>
+
+The helper runs InferenceSmoke and HistorySmoke before publishing. On successful tests, it publishes the WPF project as self-contained win-x64, with trimming, single-file and ReadyToRun disabled pending measurement. NuGet audit is enabled; warnings are not necessarily fatal, so inspect actual restore/audit results before distribution. It checks required nonempty runtime components, the x64 PE32+ apphost header, and rejects named legacy browser components. It adds SHA256SUMS.txt and BUILD_INFO.txt to a temporary staging folder, then renames it to a new output directory on success. Assumes a trusted checkout/output directory with no concurrent mutation, not a full PE, dependency, supply-chain or signature verification. Keep the whole output folder together. The runtime is included, but a trusted local inference server and model are still needed separately; no installer, model or inference server is bundled here.
+
+Validation: six actual Python unit tests passed in the Linux host using synthetic PE headers and mocked dotnet invocations, including smoke failure, failed audit, required files, architecture, output preservation, and checksum consistency. Exact tested script/test blob hashes verified. No .NET SDK, actual restore, real smoke execution, Windows app publish, signed package, device validation or measured runtime performance. In particular the expected native SQLite DLL layout must be verified on a real publish. No Android code changes.
+
+Research: https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-publish ; https://learn.microsoft.com/en-us/dotnet/core/deploying/ ; https://docs.github.com/en/actions/reference/runners/github-hosted-runners . Actual cloud build invocation still requires a separately authorized execution mechanism. This commit does not create or launch one.
