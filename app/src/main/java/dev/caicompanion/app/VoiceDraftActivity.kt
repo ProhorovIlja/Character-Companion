@@ -413,15 +413,15 @@ class VoiceDraftActivity : Activity() {
             created.setRecognitionListener(object : RecognitionListener {
                 private fun active() = recognitionGuard.isCurrent(sessionToken)
                 override fun onReadyForSpeech(params: Bundle?) {
-                    if (active()) status.setText(R.string.voice_listening)
+                    if (active() && !finishingRecognition) status.setText(R.string.voice_listening)
                 }
                 override fun onBeginningOfSpeech() {
-                    if (active()) status.setText(R.string.voice_listening)
+                    if (active() && !finishingRecognition) status.setText(R.string.voice_listening)
                 }
                 override fun onRmsChanged(rmsdB: Float) {}
                 override fun onBufferReceived(buffer: ByteArray?) {}
                 override fun onEndOfSpeech() {
-                    if (active()) status.setText(R.string.voice_processing)
+                    if (active()) markRecognitionProcessing()
                 }
                 override fun onError(error: Int) {
                     if (!recognitionGuard.finish(sessionToken)) return
@@ -439,13 +439,12 @@ class VoiceDraftActivity : Activity() {
                 }
                 override fun onResults(results: Bundle?) {
                     if (!recognitionGuard.finish(sessionToken)) return
-                    val candidate = VoiceRecognitionOptions.candidate(
-                        results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION))
+                    val alternatives = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     finishListening()
-                    acceptRecognition(candidate)
+                    acceptRecognition(alternatives)
                 }
                 override fun onPartialResults(partialResults: Bundle?) {
-                    if (!active() || !resumed) return
+                    if (!active() || !resumed || finishingRecognition) return
                     val preview = VoiceRecognitionOptions.preview(
                         partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION))
                     speechPreview.text = preview?.let { getString(R.string.voice_live_preview, it) }.orEmpty()
@@ -466,12 +465,16 @@ class VoiceDraftActivity : Activity() {
         }
     }
 
-    private fun requestFinalTranscript() {
-        if (!listening || finishingRecognition) return
-        val current = recognizer ?: return
+    private fun markRecognitionProcessing() {
         finishingRecognition = true
         listenButton.isEnabled = false
         status.setText(R.string.voice_processing)
+    }
+
+    private fun requestFinalTranscript() {
+        if (!listening || finishingRecognition) return
+        val current = recognizer ?: return
+        markRecognitionProcessing()
         try { current.stopListening() }
         catch (_: RuntimeException) {
             finishListening()
@@ -528,13 +531,13 @@ class VoiceDraftActivity : Activity() {
             }.show()
     }
 
-    private fun acceptRecognition(candidate: String?) {
+    private fun acceptRecognition(alternatives: List<String>?) {
         // An unfocused EditText may report -1 for selection; in that case append
         // rather than discarding the user's recognized words without explanation.
         val original = editor.text.toString()
         val start = editor.selectionStart.takeIf { it >= 0 } ?: original.length
         val end = editor.selectionEnd.takeIf { it >= 0 } ?: start
-        val edit = VoiceDraftPolicy.insert(original, candidate, start, end)
+        val edit = VoiceRecognitionOptions.edit(original, alternatives, start, end)
         if (edit == null) status.setText(R.string.voice_empty_or_full)
         else {
             editor.setText(edit.text)
@@ -640,7 +643,7 @@ class VoiceDraftActivity : Activity() {
                 if (!systemRecognitionPending) return
                 systemRecognitionPending = false
                 if (resultCode == RESULT_OK) acceptRecognition(
-                    VoiceRecognitionOptions.candidate(data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)))
+                    data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS))
             }
             SAVE_TEXT_REQUEST -> {
                 val snapshot = pendingSaveText

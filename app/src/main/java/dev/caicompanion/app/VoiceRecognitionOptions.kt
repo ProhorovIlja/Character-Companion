@@ -11,6 +11,12 @@ object VoiceRecognitionOptions {
     fun candidate(values: List<String>?): String? = values?.asSequence()?.take(5)
         ?.map { it.trim() }?.firstOrNull { it.isNotEmpty() && VoiceDraftPolicy.validText(it) }
 
+    /** Prefer the first valid alternative that actually fits the current draft and selection. */
+    fun edit(current: String, values: List<String>?, start: Int, end: Int): VoiceDraftPolicy.Edit? =
+        values?.asSequence()?.take(5)?.mapNotNull {
+            VoiceDraftPolicy.insert(current, it, start, end)
+        }?.firstOrNull()
+
     /** Preview only, bounded by code points so truncation cannot split an emoji. */
     fun preview(values: List<String>?): String? = candidate(values)?.let { text ->
         val count = text.codePointCount(0, text.length)

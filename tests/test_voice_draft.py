@@ -30,7 +30,7 @@ class VoiceDraft(unittest.TestCase):
         self.assertNotIn('httpURLConnection', ACTIVITY)
 
     def test_draft_does_not_automatically_send_or_persist(self):
-        self.assertIn('VoiceDraftPolicy.insert(original, candidate, start, end)', ACTIVITY)
+        self.assertIn('VoiceRecognitionOptions.edit(original, alternatives, start, end)', ACTIVITY)
         self.assertIn('Intent.ACTION_CREATE_DOCUMENT', ACTIVITY)
         self.assertIn('ClipData.newPlainText', ACTIVITY)
         self.assertIn('override fun onPause()', ACTIVITY)
@@ -43,7 +43,7 @@ class VoiceDraft(unittest.TestCase):
     def test_stale_recognition_callbacks_cannot_mutate_a_new_session(self):
         self.assertIn('val sessionToken = recognitionGuard.start()', ACTIVITY)
         self.assertIn('if (!recognitionGuard.finish(sessionToken)) return', ACTIVITY)
-        self.assertGreaterEqual(ACTIVITY.count('if (active())'), 3)
+        self.assertGreaterEqual(ACTIVITY.count('if (active()'), 3)
         self.assertIn('recognitionGuard.cancel()\n        runCatching { recognizer?.cancel() }', ACTIVITY)
         self.assertIn('fun finish(token: Long): Boolean', GUARD)
         self.assertIn('if (!isCurrent(token)) return false', GUARD)
@@ -149,7 +149,12 @@ class VoiceDraft(unittest.TestCase):
         self.assertNotIn('acceptRecognition(', block)
         self.assertIn('speechPreview.text = ""', ACTIVITY)
         self.assertIn('languageSpinner.isEnabled = false', ACTIVITY)
-        self.assertIn('VoiceRecognitionOptions.candidate', ACTIVITY)
+        self.assertIn('VoiceRecognitionOptions.edit', ACTIVITY)
+        self.assertIn('!active() || !resumed || finishingRecognition', block)
+        self.assertIn('if (active()) markRecognitionProcessing()', ACTIVITY)
+        self.assertIn('if (active() && !finishingRecognition)', ACTIVITY)
+        self.assertIn('if (!listening || finishingRecognition) return', ACTIVITY)
+        self.assertIn('listenButton.isEnabled = false', ACTIVITY.split('private fun markRecognitionProcessing()', 1)[1].split('private fun requestFinalTranscript()', 1)[0])
 
     def test_locales_expose_same_strings(self):
         en = ET.parse(ROOT/'app/src/main/res/values/strings.xml').getroot()
