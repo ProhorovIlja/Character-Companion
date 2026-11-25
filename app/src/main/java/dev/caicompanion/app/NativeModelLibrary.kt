@@ -29,7 +29,8 @@ class NativeModelLibrary(private val root: Path, private val maxBytes: Long,
             val b = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN)
             require(bytes.size == headerBytes && b.getInt(0) == 0x67676d6c) { "Not a Whisper GGML file" }
             require((1..10).all { b.getInt(it * 4) > 0 } && b.getInt(44) >= 0 &&
-                b.getInt(12) == b.getInt(28)) { "Invalid Whisper header" }
+                b.getInt(12) == b.getInt(28) &&
+                b.getInt(12) % b.getInt(16) == 0 && b.getInt(28) % b.getInt(32) == 0) { "Invalid Whisper header" }
             return
         }
         require(bytes.size == 24 && bytes.copyOfRange(0, 4).contentEquals(byteArrayOf(71, 71, 85, 70))) { "Not a GGUF file" }
