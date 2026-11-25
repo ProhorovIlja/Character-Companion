@@ -20,6 +20,19 @@ fun main() {
             }.exceptionOrNull()
             verify(error is IOException && error.message == "Unsupported local model chat template")
         }
+        verify(runCatching { EmbeddedLlama.openVerified(model) { true }.close() }.exceptionOrNull() is IOException)
+        var checksAfterLoad = 0
+        verify(runCatching { EmbeddedLlama.openVerified(model) { ++checksAfterLoad == 2 }.close() }.exceptionOrNull() is IOException)
+        val loadFailure = IllegalStateException("test post-load callback failure")
+        var loadChecks = 0
+        val failedLoad = runCatching {
+            EmbeddedLlama.openVerified(model) {
+                if (++loadChecks == 2) throw loadFailure
+                false
+            }.close()
+        }
+        verify(failedLoad.exceptionOrNull() === loadFailure)
+        // The stub refuses a new load if a previous model was leaked.
         EmbeddedLlama.openVerified(model) { false }.use { engine ->
             fun success(seed: Int, cap: Int) {
                 val streamed = StringBuilder()
