@@ -4,14 +4,15 @@
 #include <cstdlib>
 #include <cstring>
 #include <vector>
+#include <thread>
 using llama_token = int;
 enum ggml_log_level { GGML_LOG_LEVEL_NONE };
 struct llama_vocab {};
 struct llama_model { llama_vocab vocab; const char* tmpl = "stub"; };
-struct llama_context { unsigned limit; unsigned decoded = 0; };
+struct llama_context { unsigned limit; unsigned decoded; bool (*abort_callback)(void*); void* abort_callback_data; };
 struct llama_sampler { unsigned seed = 0; int sampled = 0; std::vector<llama_sampler*> children; };
 struct llama_model_params { int n_gpu_layers; bool check_tensors; };
-struct llama_context_params { unsigned n_ctx, n_batch, n_ubatch, n_seq_max; int n_threads, n_threads_batch; bool offload_kqv, op_offload; };
+struct llama_context_params { unsigned n_ctx, n_batch, n_ubatch, n_seq_max; int n_threads, n_threads_batch; bool offload_kqv, op_offload; bool (*abort_callback)(void*); void* abort_callback_data; };
 struct llama_sampler_chain_params {};
 struct llama_chat_message { const char* role; const char* content; };
 struct llama_batch { llama_token* tokens; int n; };
@@ -30,11 +31,27 @@ inline const llama_vocab* llama_model_get_vocab(const llama_model* p) {return &p
 inline int llama_chat_apply_template(const char* tmpl,const llama_chat_message*,size_t,bool,char* out,size_t cap) {if (!tmpl || std::strcmp(tmpl,"stub")) return -1; if(out && cap) out[0]='x'; return 1;}
 inline int llama_tokenize(const llama_vocab*,const char*,int,llama_token* out,int cap,bool,bool) {if(cap<2) return -2; out[0]=100;out[1]=100; return 2;}
 inline llama_context_params llama_context_default_params() { return {}; }
-inline llama_context* llama_init_from_model(llama_model*,llama_context_params p) {return new llama_context{p.n_ctx};}
+inline llama_context* llama_init_from_model(llama_model*,llama_context_params p) {return new llama_context{p.n_ctx, 0, p.abort_callback, p.abort_callback_data};}
 inline unsigned llama_n_ctx(const llama_context* c) {return c->limit;}
 inline void llama_free(llama_context* c) {delete c;}
 inline llama_batch llama_batch_get_one(llama_token* t,int n) {return {t,n};}
-inline int llama_decode(llama_context* c,llama_batch b) {c->decoded+=b.n; return c->decoded>c->limit ? 1:0;}
+inline int llama_decode(llama_context* c,llama_batch b) {
+    if (!c->abort_callback) return 1; // ensure production installs the decode callback
+    if (c->decoded == 0) {
+        bool worker_stop = true;
+        std::thread worker([&] { worker_stop = c->abort_callback(c->abort_callback_data); });
+        worker.join();
+        if (worker_stop) std::abort(); // no cancellation latched yet
+    }
+    if (c->abort_callback(c->abort_callback_data)) {
+        bool worker_stop = false;
+        std::thread worker([&] { worker_stop = c->abort_callback(c->abort_callback_data); });
+        worker.join();
+        if (!worker_stop) std::abort(); // latched stop visible on worker
+        return 2;
+    }
+    c->decoded+=b.n; return c->decoded>c->limit ? 1:0;
+}
 inline llama_sampler_chain_params llama_sampler_chain_default_params(){return {};}
 inline llama_sampler* llama_sampler_chain_init(llama_sampler_chain_params){return new llama_sampler;}
 inline void llama_sampler_free(llama_sampler* p){for(auto c:p->children) llama_sampler_free(c);delete p;}
