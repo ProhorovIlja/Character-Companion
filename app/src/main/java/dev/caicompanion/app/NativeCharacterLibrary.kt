@@ -73,6 +73,11 @@ class NativeCharacterLibrary(root: Path, account: String) {
         val old = get(id)
         return old.copy(chats = old.chats + Chat(UUID.randomUUID().toString(), title)).also(::save)
     }
+    @Synchronized fun renameChat(id: String, chatId: String, title: String): Profile {
+        val old = get(id)
+        require(old.chats.any { it.id == chatId }) { "Unknown conversation" }
+        return old.copy(chats = old.chats.map { if (it.id == chatId) it.copy(title = title) else it }).also(::save)
+    }
     @Synchronized fun resolve(key: NativeChatWorkspace.Key): Profile = get(key.character).also {
         require(it.chats.any { chat -> chat.id == key.chat }) { "Unknown conversation" }
     }
