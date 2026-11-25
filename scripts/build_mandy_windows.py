@@ -21,7 +21,7 @@ PROJECT = 'windows/Mandy.NativePreview/Mandy.NativePreview.csproj'
 REQUIRED = ('Mandy.NativePreview.exe', 'Mandy.NativePreview.dll',
             'Mandy.NativePreview.runtimeconfig.json', 'Mandy.NativePreview.deps.json',
             'coreclr.dll', 'hostfxr.dll', 'hostpolicy.dll',
-            'PresentationFramework.dll', 'e_sqlite3.dll')
+            'PresentationFramework.dll', 'e_sqlite3.dll', 'System.Speech.dll')
 
 
 def require(ok, message):
