@@ -42,6 +42,18 @@ fun main() {
         verify(ModelPickerPage.read(models).entries.first().label.startsWith("Unnamed GGUF model"))
         Files.write(models[1].path, byteArrayOf(0,1,2))
         verify(ModelPickerPage.read(models).entries[1].label.contains("Architecture: Unknown"))
+        verify(ModelPickerPage.clampOffset(32, 17) == 16)
+        verify(ModelPickerPage.clampOffset(32, 0) == 0)
+        verify(ModelPickerPage.clampOffset(16, 33) == 16)
+        verify(ModelPickerPage.clampOffset(0, 1) == 0)
+        verify(runCatching { ModelPickerPage.clampOffset(1, 33) }.isFailure)
+        verify(runCatching { ModelPickerPage.clampOffset(0, -1) }.isFailure)
+        val speech = ModelPickerPage.read(models, 32, speech = true)
+        verify(speech.entries.single().model == models.last() && speech.entries.single().label.startsWith("Whisper GGML model"))
+        verify(!speech.entries.single().label.contains("qwen3"))
+        verify(speech.entries.single().label.contains(models.last().sha256))
+        verify(first.entries.first().label.contains("GGUF v3"))
+        verify(first.entries.first().label.contains("File type ID: 15"))
         println("PASS: $checks model picker assertions")
     } finally { root.toFile().deleteRecursively() }
 }
