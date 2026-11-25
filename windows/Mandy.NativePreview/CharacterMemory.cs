@@ -90,10 +90,11 @@ internal sealed class CharacterMemory
     };
     private static HashSet<string> Terms(string text) => Words.Matches(text.Normalize(NormalizationForm.FormKC).ToLowerInvariant())
         .Select(m => m.Value).Where(w => w.Length >= 3 && !StopWords.Contains(w)).ToHashSet(StringComparer.Ordinal);
-    internal static string Compose(State state, string identity, string query)
+    internal static string Compose(State state, string identity, string query, int contextUnits = 12000)
     {
         Validate(state);
-        int limit = Math.Min(8000, 12000 - query.Length);
+        if (contextUnits is < 256 or > 64000) throw new ArgumentOutOfRangeException(nameof(contextUnits));
+        int limit = Math.Min(8000, contextUnits - query.Length);
         var result = new StringBuilder(identity);
         bool Add(string value)
         {
