@@ -61,7 +61,11 @@ try
     var previews = new List<string>();
     var result = await turn.SendAsync(request, previews.Add);
     Check(result.Text == "Hello 🌙" && result.Clock == 2 && previews.SequenceEqual(new[] { "Hello" }));
+    // Replaying an old turn must not consume a new draft that happens to match it.
+    using (var h = new LocalHistory(turnPath, account)) h.SaveDraft(character, chat, request.Text);
     Check(await turn.SendAsync(request) == result && calls == 1);
+    using (var h = new LocalHistory(turnPath, account))
+        Check(h.ReadDraft(character, chat) == request.Text && h.Page(character, chat).Count == 2);
     var next = request with { MessageId = Guid.NewGuid().ToString(), Text = "Again" };
     var failed = new LocalChatTurn(turnPath, (_, _, _) => Task.FromException<string>(new IOException("fixture failure")));
     try { await failed.SendAsync(next); Check(false); } catch (IOException) { Check(true); }
@@ -93,7 +97,25 @@ try
     });
     try { await longTurn.SendAsync(longRequest); Check(false); }
     catch (ArgumentException) { Check(!File.Exists(longPath)); }
-    Check((await longTurn.SendAsync(longRequest with { ContextUnits = 24000 })).Text == "Long request accepted");
+    var longReply = await longTurn.SendAsync(longRequest with { ContextUnits = 24000 });
+    Check(longReply.Text == "Long request accepted");
+    var replay = new LocalChatTurn(longPath, (_, _, _) => throw new Exception("Unexpected inference on recovery."));
+    Check(await replay.SendAsync(longRequest) == longReply);
+    try { await replay.SendAsync(longRequest with { Chat = Guid.NewGuid().ToString() }); Check(false); }
+    catch (InvalidDataException) { Check(true); }
+    try { await replay.SendAsync(longRequest with { Text = new string('y', 16000) }); Check(false); }
+    catch (InvalidDataException) { Check(true); }
+    var fresh = longRequest with { MessageId = Guid.NewGuid().ToString() };
+    try { await replay.SendAsync(fresh); Check(false); }
+    catch (ArgumentException) { Check(true); }
+    using (var h = new LocalHistory(longPath, account))
+        Check(h.Find(fresh.MessageId) == null && h.Page(character, chat).Count == 2);
+    using (var stop = new CancellationTokenSource())
+    {
+        stop.Cancel();
+        try { await replay.SendAsync(longRequest, cancellationToken: stop.Token); Check(false); }
+        catch (OperationCanceledException) { Check(true); }
+    }
     var client = new LocalInferenceClient("mandy-local", 8080, new string('a', 48));
     Reject<ArgumentOutOfRangeException>(() => new LocalChatTurn(longPath, client, 0));
     Reject<ArgumentOutOfRangeException>(() => new LocalChatTurn(longPath, client, 1025));
