@@ -9,7 +9,10 @@ import java.nio.charset.CodingErrorAction
 class EmbeddedTextSink(private val stopped: () -> Boolean, private val emit: (String) -> Unit) {
     private val decoder = Charsets.UTF_8.newDecoder()
         .onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT)
-    private var tail = ByteArray(0)
+    // Per-turn scratch buffers: grow only for an unusually large native fragment.
+    // Input stays in write mode between callbacks, retaining at most 3 UTF-8 bytes.
+    private var input = ByteBuffer.allocate(256)
+    private var output = CharBuffer.allocate(258)
     private val text = StringBuilder()
     private var done = false
     fun isCancelled(): Boolean = stopped() || Thread.currentThread().isInterrupted
@@ -20,8 +23,19 @@ class EmbeddedTextSink(private val stopped: () -> Boolean, private val emit: (St
         decode(bytes, false)
     }
     private fun decode(bytes: ByteArray, end: Boolean) {
-        val input = ByteBuffer.wrap(tail + bytes)
-        val output = CharBuffer.allocate(input.remaining() + 2)
+        val needed = input.position() + bytes.size
+        if (needed > input.capacity()) {
+            val larger = ByteBuffer.allocate(minOf(65539, maxOf(needed, input.capacity() * 2)))
+            input.flip()
+            larger.put(input)
+            input = larger
+        }
+        input.put(bytes)
+        input.flip()
+        if (needed + 2 > output.capacity()) {
+            output = CharBuffer.allocate(minOf(65541, maxOf(needed + 2, output.capacity() * 2)))
+        }
+        output.clear()
         val result = decoder.decode(input, output, end)
         if (result.isError) result.throwException()
         check(result.isUnderflow)
@@ -30,8 +44,8 @@ class EmbeddedTextSink(private val stopped: () -> Boolean, private val emit: (St
             if (flush.isError) flush.throwException()
             check(flush.isUnderflow && !input.hasRemaining())
         }
-        tail = ByteArray(input.remaining()).also { input.get(it) }
-        check(tail.size <= 3)
+        check(input.remaining() <= 3)
+        input.compact()
         output.flip()
         val fragment = output.toString()
         if (fragment.length > 16000 - text.length) throw IOException("Reply too large")
