@@ -25,6 +25,14 @@ class MandyModelActivity : Activity() {
     private lateinit var importButton: Button
     private lateinit var cancelButton: Button
     private lateinit var speechButton: Button
+    private lateinit var textTab: Button
+    private lateinit var speechTab: Button
+    private lateinit var previousPage: Button
+    private lateinit var nextPage: Button
+    private lateinit var pageLabel: TextView
+    private var speechInventory = false
+    private var page: ModelPickerPage.Page? = null
+    private var readingPage = false
     private var busy = false
     private var pendingImport: Pair<Int, String?>? = null
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,13 +56,28 @@ class MandyModelActivity : Activity() {
             text = "Cancel import"; isAllCaps = false; isEnabled = false
             setOnClickListener { stopped.set(true); text = "Cancelling…" }
         }
-        panel.addView(status); panel.addView(importButton); panel.addView(speechButton); panel.addView(cancelButton); panel.addView(inventory)
+        fun navButton(title: String, action: () -> Unit) = Button(this).apply {
+            text = title; isAllCaps = false; setOnClickListener { action() }
+        }
+        textTab = navButton("Intelligence") { refresh(false, 0) }
+        speechTab = navButton("Speech") { refresh(true, 0) }
+        previousPage = navButton("Previous") { page?.takeIf { it.hasPrevious }?.let { refresh(speechInventory, it.offset - ModelPickerPage.PAGE_SIZE) } }
+        nextPage = navButton("Next") { page?.takeIf { it.hasNext }?.let { refresh(speechInventory, it.offset + ModelPickerPage.PAGE_SIZE) } }
+        pageLabel = TextView(this)
+        fun row(first: Button, second: Button) = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(first, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(second, LinearLayout.LayoutParams(0, -2, 1f))
+        }
+        panel.addView(status); panel.addView(importButton); panel.addView(speechButton); panel.addView(cancelButton)
+        panel.addView(row(textTab, speechTab)); panel.addView(pageLabel)
+        panel.addView(row(previousPage, nextPage)); panel.addView(inventory)
         setContentView(ScrollView(this).apply { addView(panel) })
         refresh()
     }
     @Suppress("DEPRECATION")
     private fun chooseImport(speech: Boolean) {
-        if (busy || pendingImport != null || isFinishing || isDestroyed) return
+        if (busy || readingPage || pendingImport != null || isFinishing || isDestroyed) return
         val request = if (speech) PICK_SPEECH else PICK_MODEL
         val field = android.widget.EditText(this).apply {
             hint = "Optional trusted SHA-256 (64 hex digits)"
@@ -82,54 +105,56 @@ class MandyModelActivity : Activity() {
             .setPositiveButton("Choose file", null).create()
         dialog.show()
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-            if (busy || pendingImport != null || isFinishing || isDestroyed) return@setOnClickListener
+            if (busy || readingPage || pendingImport != null || isFinishing || isDestroyed) return@setOnClickListener
             val value = field.text.toString().trim().lowercase(java.util.Locale.ROOT)
             if (value.isNotEmpty() && !value.matches(Regex("[0-9a-f]{64}"))) {
                 field.error = "Use exactly 64 hexadecimal digits"
                 return@setOnClickListener
             }
             pendingImport = request to value.ifEmpty { null }
+            updateInventoryControls()
             dialog.dismiss()
             try { startActivityForResult(AndroidModelImport.picker(speech), request) }
-            catch (_: Exception) { pendingImport = null; status.text = "No document picker available." }
+            catch (_: Exception) { pendingImport = null; updateInventoryControls(); status.text = "No document picker available." }
         }
     }
-    private fun refresh() {
+    private fun updateInventoryControls() {
+        val ready = !busy && !readingPage && pendingImport == null
+        importButton.isEnabled = ready
+        speechButton.isEnabled = ready
+        textTab.isEnabled = ready && speechInventory
+        speechTab.isEnabled = ready && !speechInventory
+        previousPage.isEnabled = ready && page?.hasPrevious == true
+        nextPage.isEnabled = ready && page?.hasNext == true
+    }
+
+    private fun refresh(speech: Boolean = speechInventory, requestedOffset: Int = page?.offset ?: 0) {
+        if (busy || readingPage || pendingImport != null || isFinishing || isDestroyed) return
+        readingPage = true
+        updateInventoryControls()
+        pageLabel.text = "Reading local inventory…"
         worker.execute {
             val result = runCatching {
-                fun describe(models: List<NativeModelLibrary.Model>, gguf: Boolean = false): String {
-                    if (models.isEmpty()) return "No imported models."
-                    val lines = models.take(32).map { model ->
-                        val size = String.format(java.util.Locale.ROOT, "%.2f GiB", model.bytes / 1073741824.0)
-                        val summary = if (gguf) runCatching {
-                            java.nio.file.Files.newInputStream(model.path, java.nio.file.LinkOption.NOFOLLOW_LINKS).use {
-                                GgufSummary.read(it)
-                            }
-                        }.getOrNull() else null
-                        buildString {
-                            if (gguf) {
-                                append(summary?.name ?: "Unnamed GGUF model")
-                                append("\nArchitecture: ").append(summary?.architecture ?: "Unknown")
-                                summary?.let {
-                                    append("\nGGUF version: ").append(it.version)
-                                    it.kind?.let { kind -> append(" · Type: ").append(kind) }
-                                    it.fileType?.let { type -> append(" · File type ID: ").append(type) }
-                                }
-                                append("\nMetadata preview only · compatibility not verified\n")
-                            }
-                            append("Size: ").append(size).append(" (").append(model.bytes).append(" bytes)")
-                            append("\nSHA-256: ").append(model.sha256)
-                        }
-                    }.joinToString("\n\n")
-                    return if (models.size > 32) lines + "\n\nShowing 32 of " + models.size + " imported files." else lines
-                }
-                "Text models (GGUF)\n" + describe(AndroidModelImport.library(applicationContext).list(), gguf = true) +
-                    "\n\nSpeech models (Whisper GGML)\n" + describe(AndroidModelImport.library(applicationContext, speech = true).list())
+                val models = AndroidModelImport.library(applicationContext, speech = speech).list()
+                ModelPickerPage.read(models, ModelPickerPage.clampOffset(requestedOffset, models.size), speech = speech)
             }
             runOnUiThread {
-                if (!isFinishing && !isDestroyed) inventory.text = result.fold(
-                    { it },
-                    { "Model inventory unavailable. Files have not been reset." })
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                readingPage = false
+                speechInventory = speech
+                page = result.getOrNull()
+                val loaded = page
+                val heading = if (speech) "Speech · Whisper GGML" else "Intelligence · GGUF"
+                pageLabel.text = if (loaded == null) "$heading · unavailable"
+                    else if (loaded.total == 0) "$heading · 0 models"
+                    else "$heading · ${loaded.offset + 1}–${loaded.offset + loaded.entries.size} of ${loaded.total}"
+                inventory.text = when {
+                    loaded == null -> "Model inventory unavailable. Files have not been reset."
+                    loaded.entries.isEmpty() -> "No imported models."
+                    else -> loaded.entries.joinToString("\n\n") { it.label } +
+                        "\n\nInventory only · compatibility not verified"
+                }
+                updateInventoryControls()
             }
         }
     }
@@ -139,12 +164,13 @@ class MandyModelActivity : Activity() {
         val selection = pendingImport ?: return
         if (requestCode != selection.first) return
         pendingImport = null
+        if (!isFinishing && !isDestroyed) updateInventoryControls()
         if (resultCode != RESULT_OK || busy || isFinishing || isDestroyed) return
         val speech = requestCode == PICK_SPEECH
         val uri = data?.data ?: return
         if (uri.scheme != "content") { status.text = "Select one readable model file."; return }
         stopped.set(false)
-        busy = true; importButton.isEnabled = false; speechButton.isEnabled = false; cancelButton.isEnabled = true
+        busy = true; updateInventoryControls(); cancelButton.isEnabled = true
         status.text = "Importing and hashing…"
         worker.execute {
             val posted = AtomicBoolean(false)
@@ -166,12 +192,13 @@ class MandyModelActivity : Activity() {
             }
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
-                busy = false; importButton.isEnabled = true; speechButton.isEnabled = true; cancelButton.isEnabled = false; cancelButton.text = "Cancel import"
+                busy = false; cancelButton.isEnabled = false; cancelButton.text = "Cancel import"
+                updateInventoryControls()
                 status.text = if (result.isSuccess) {
                     if (selection.second != null) "Imported · expected SHA-256 matched · not loaded"
                     else "Imported · SHA-256 recorded · not loaded"
                 } else "Import failed or cancelled. Check format, storage and expected SHA-256. Existing models preserved."
-                refresh()
+                refresh(speech, 0)
             }
         }
     }
