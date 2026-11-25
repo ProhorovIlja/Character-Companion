@@ -12,7 +12,8 @@ fun main() {
         Files.write(path, byteArrayOf(1))
         val model = NativeModelLibrary.Model("0".repeat(64), 1, path)
         val messages = listOf(NativeConversation.Message("system", "Identity"), NativeConversation.Message("user", "Hello"))
-        for (name in listOf("unsupported.gguf", "missing.gguf")) {
+        for (name in listOf("unsupported.gguf", "missing.gguf", "drops-system.gguf",
+            "drops-assistant.gguf", "reordered.gguf", "duplicate.gguf", "oversized.gguf", "embedded-nul.gguf")) {
             val invalid = root.resolve(name)
             Files.write(invalid, byteArrayOf(1))
             val error = runCatching {
