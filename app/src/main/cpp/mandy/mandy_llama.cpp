@@ -87,7 +87,14 @@ Java_dev_caicompanion_app_EmbeddedLlama_nativeLoad(JNIEnv * env, jobject, jbyteA
         params.check_tensors = true;
         Model model(llama_model_load_from_file(name.c_str(), params), llama_model_free);
         require(model && !llama_model_has_encoder(model.get()) && llama_model_has_decoder(model.get()));
-        require(llama_model_chat_template(model.get(), nullptr) != nullptr);
+        const char * tmpl = llama_model_chat_template(model.get(), nullptr);
+        // The pinned lightweight formatter supports only a fixed template set.
+        // Probe the required system/user conversation before retaining a model.
+        const llama_chat_message probe[] = {{"system", "Identity"}, {"user", "Hello"}};
+        if (!tmpl || llama_chat_apply_template(tmpl, probe, 2, true, nullptr, 0) <= 0) {
+            fail(env, "Unsupported local model chat template");
+            return 0;
+        }
         return static_cast<jlong>(reinterpret_cast<intptr_t>(model.release()));
     } catch (...) { fail(env, "Cannot load supported local model"); return 0; }
 }
