@@ -161,10 +161,32 @@ class MandyWorkspaceActivity : Activity() {
     }
     private fun iconColor() = customColors["icons"] ?: ShellAppearance.color(this, R.attr.shellText)
     private fun colorHex(color: Int) = String.format(java.util.Locale.ROOT, "#%06X", color and 0xffffff)
+    @Suppress("DEPRECATION")
+    private fun applySystemBars() {
+        // The root paints the same opaque canvas under the system bars; its existing
+        // insets listener keeps interactive controls out of bars, cutouts and the IME.
+        val canvasColor = chatColor(R.attr.shellBackground)
+        val darkIcons = contrast(android.graphics.Color.BLACK, canvasColor) >=
+            contrast(android.graphics.Color.WHITE, canvasColor)
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (Build.VERSION.SDK_INT < 35) {
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
+            window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        }
+        // minSdk 29. Retain OS protection if accessibility/device policy overrides it.
+        window.isNavigationBarContrastEnforced = false
+        window.isStatusBarContrastEnforced = false
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = darkIcons
+            isAppearanceLightNavigationBars = darkIcons
+        }
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(canvasColor))
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(if (amoled()) R.style.AppTheme_MandyAmoled else R.style.AppTheme_MandyGraphite)
         super.onCreate(savedInstanceState)
         if (appearancePrefs().all["custom"] == true) customColors = savedPalette()
+        applySystemBars()
         if (SettingsStore(this).protectScreen) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
