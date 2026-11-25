@@ -65,6 +65,31 @@ fun main() {
         val limited = NativeModelLibrary(root.resolve("limited"), maxBytes = 99, format = NativeModelLibrary.Format.WHISPER)
         reject { limited.import(ByteArrayInputStream(speech)) }
         checkIt(limited.list().isEmpty())
+        // Simulate another importer publishing after the final existence check.
+        // For this fixed 300000-byte input the eighth cancellation check is just
+        // before publication. Use a deliberately old timestamp to detect replacement.
+        for (corrupt in listOf(false, true)) {
+            val raceRoot = Files.createDirectory(root.resolve("race-$corrupt"))
+            val race = NativeModelLibrary(raceRoot)
+            val destination = raceRoot.resolve("$sha.gguf")
+            val competing = if (corrupt) wrong else bytes
+            val competingStamp = java.nio.file.attribute.FileTime.fromMillis(1000000L)
+            var calls = 0
+            val result = runCatching {
+                race.import(ByteArrayInputStream(bytes), cancelled = {
+                    if (++calls == 8) {
+                        check(!Files.exists(destination))
+                        Files.write(destination, competing)
+                        Files.setLastModifiedTime(destination, competingStamp)
+                    }
+                    false
+                })
+            }
+            checkIt(if (corrupt) result.exceptionOrNull() is IllegalArgumentException else result.getOrNull()?.sha256 == sha)
+            checkIt(Files.readAllBytes(destination).contentEquals(competing))
+            checkIt(Files.getLastModifiedTime(destination) == competingStamp)
+            checkIt(Files.newDirectoryStream(raceRoot, "*.part").use { !it.iterator().hasNext() })
+        }
         println("PASS $checks known-digest import checks")
     } finally { root.toFile().deleteRecursively() }
 }
