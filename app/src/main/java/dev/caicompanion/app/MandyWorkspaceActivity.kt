@@ -1026,6 +1026,17 @@ class MandyWorkspaceActivity : Activity() {
         val draft = editor?.text?.toString() ?: return
         if (s.draft.pending == null && draft.isBlank()) { editor?.error = "Enter a message"; return }
         if (!resumed || busy || !alive() || current?.ticket != ticket || current !== s) return
+        // Check the fixed client text budget before model approval or pending-state creation.
+        // Existing pending replies retain their retry/recovery path.
+        if (s.draft.pending == null) {
+            val profile = s.profiles.firstOrNull { it.id == ticket.key.character } ?: return
+            val available = TurnBudget.availableForMessage(profile.identity.length)
+            if (draft.length > available) {
+                editor?.error = "Message exceeds the current context allowance (" + available + " UTF-16 units). Shorten the draft."
+                status.text = "Draft preserved; no message submitted"
+                return
+            }
+        }
         val preset = performancePreset()
         val approved = approvedModel?.takeIf { it.first == ticket && s.models.any { model -> model.sha256 == it.second } }
         if (approved != null) {
