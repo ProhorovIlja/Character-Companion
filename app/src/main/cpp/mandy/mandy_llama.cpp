@@ -1,5 +1,6 @@
 #include <jni.h>
 #include "llama.h"
+#include "chat_template_probe.h"
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
@@ -117,10 +118,8 @@ Java_dev_caicompanion_app_EmbeddedLlama_nativeLoadV2(JNIEnv * env, jobject, jbyt
         cb.check();
         require(model && !llama_model_has_encoder(model.get()) && llama_model_has_decoder(model.get()));
         const char * tmpl = llama_model_chat_template(model.get(), nullptr);
-        // The pinned lightweight formatter supports only a fixed template set.
-        // Probe the required system/user conversation before retaining a model.
-        const llama_chat_message probe[] = {{"system", "Identity"}, {"user", "Hello"}};
-        if (!tmpl || llama_chat_apply_template(tmpl, probe, 2, true, nullptr, 0) <= 0) {
+        // Positive formatting length alone does not prove role preservation.
+        if (!mandy_chat_template_supported(tmpl)) {
             fail(env, "Unsupported local model chat template");
             return 0;
         }
