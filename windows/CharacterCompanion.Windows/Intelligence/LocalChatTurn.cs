@@ -13,8 +13,12 @@ internal sealed class LocalChatTurn
     private readonly Generate generate;
     private int active;
 
-    internal LocalChatTurn(string path, LocalInferenceClient client)
-        : this(path, (messages, preview, stop) => client.CompleteAsync(messages, onText: preview, cancellationToken: stop)) {}
+    internal LocalChatTurn(string path, LocalInferenceClient client, int outputTokens = 512)
+        : this(path, (messages, preview, stop) => client.CompleteAsync(messages, outputTokens: outputTokens, onText: preview, cancellationToken: stop))
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        if (outputTokens is < 1 or > 1024) throw new ArgumentOutOfRangeException(nameof(outputTokens));
+    }
     internal LocalChatTurn(string path, Generate generate)
     {
         if (!Path.IsPathFullyQualified(path)) throw new ArgumentException("Choose an absolute local database path.");
