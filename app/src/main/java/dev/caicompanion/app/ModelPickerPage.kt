@@ -12,17 +12,32 @@ object ModelPickerPage {
         val hasPrevious: Boolean get() = offset > 0
         val hasNext: Boolean get() = total - offset > entries.size
     }
-    fun read(models: List<NativeModelLibrary.Model>, offset: Int = 0): Page {
+    /** Clamp a requested page after an inventory change, including an empty inventory. */
+    fun clampOffset(requested: Int, total: Int): Int {
+        require(requested >= 0 && requested % PAGE_SIZE == 0 && total >= 0)
+        val last = if (total == 0) 0 else (total - 1) / PAGE_SIZE * PAGE_SIZE
+        return minOf(requested, last)
+    }
+    fun read(models: List<NativeModelLibrary.Model>, offset: Int = 0, speech: Boolean = false): Page {
         require(offset >= 0 && offset % PAGE_SIZE == 0 && (offset < models.size || offset == 0))
         val entries = models.drop(offset).take(PAGE_SIZE).map { model ->
-            val summary = try {
+            val summary = if (speech) null else try {
                 Files.newInputStream(model.path, LinkOption.NOFOLLOW_LINKS).use { GgufSummary.read(it) }
             } catch (_: java.io.IOException) { null }
               catch (_: SecurityException) { null }
             val label = buildString {
-                append(summary?.name ?: "Unnamed GGUF model")
-                append("\nArchitecture: ").append(summary?.architecture ?: "Unknown")
-                append(" · ").append(String.format(Locale.ROOT, "%.2f GiB", model.bytes / 1073741824.0))
+                if (speech) append("Whisper GGML model")
+                else {
+                    append(summary?.name ?: "Unnamed GGUF model")
+                    append("\nArchitecture: ").append(summary?.architecture ?: "Unknown")
+                    summary?.let {
+                        append("\nGGUF v").append(it.version)
+                        it.kind?.let { kind -> append(" · Type: ").append(kind) }
+                        it.fileType?.let { type -> append(" · File type ID: ").append(type) }
+                    }
+                }
+                append("\nSize: ").append(String.format(Locale.ROOT, "%.2f GiB", model.bytes / 1073741824.0))
+                append(" (").append(model.bytes).append(" bytes)")
                 append("\nSHA-256: ").append(model.sha256)
             }
             Entry(model, label)
