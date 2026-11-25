@@ -12,7 +12,7 @@ data class GenerationMetrics internal constructor(val promptTokens: Int, val out
 class EmbeddedLlama private constructor() : Closeable {
     private var handle = 0L
     private var generating = false
-    private external fun nativeLoad(path: ByteArray): Long
+    private external fun nativeLoadV2(path: ByteArray, sink: EmbeddedTextSink): Long
     private external fun nativeGenerateV3(handle: Long, roles: Array<ByteArray>, contents: Array<ByteArray>,
                                         contextTokens: Int, outputTokens: Int, seed: Int, threads: Int, sink: EmbeddedTextSink): LongArray
     private external fun nativeClose(handle: Long)
@@ -32,7 +32,8 @@ class EmbeddedLlama private constructor() : Closeable {
             if (cancelled() || Thread.currentThread().isInterrupted) throw IOException("Model load cancelled")
             System.loadLibrary("mandy_llama")
             val engine = EmbeddedLlama()
-            engine.handle = engine.nativeLoad(model.path.toAbsolutePath().toString().toByteArray(Charsets.UTF_8))
+            engine.handle = engine.nativeLoadV2(model.path.toAbsolutePath().toString().toByteArray(Charsets.UTF_8),
+                EmbeddedTextSink(cancelled) { error("Unexpected output during model loading") })
             check(engine.handle != 0L)
             // Ownership transfers only after the final cancellation check succeeds.
             try {
