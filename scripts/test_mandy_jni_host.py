@@ -38,7 +38,7 @@ def main():
                             '-Wl,--version-script=' + str(exports), '-o', str(library)], cwd=ROOT, check=True)
             symbols = subprocess.check_output([tools['nm'], '--dynamic', '--defined-only', '--format=posix', str(library)], text=True)
             expected = {'Java_dev_caicompanion_app_EmbeddedLlama_' + name
-                        for name in ('nativeLoad', 'nativeClose', 'nativeGenerateV3')}
+                        for name in ('nativeLoadV2', 'nativeClose', 'nativeGenerateV3')}
             rows = [line.split() for line in symbols.splitlines() if line.strip()]
             if len(rows) != len(expected) or {row[0] for row in rows if len(row) >= 2 and row[1] == 'T'} != expected:
                 raise ValueError('Unexpected llama JNI export set')
