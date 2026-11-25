@@ -66,19 +66,31 @@ class NativeModelLibrary(private val root: Path, private val maxBytes: Long = 8L
     @Synchronized fun import(input: InputStream, expectedBytes: Long? = null, expectedSha: String? = null,
                              cancelled: () -> Boolean = { false }, progress: (Long) -> Unit = {}): Model {
         require(expectedBytes == null || expectedBytes in (headerBytes + 1L)..maxBytes)
-        if (expectedSha != null) path(expectedSha)
+        fun checkActive() {
+            if (cancelled() || Thread.currentThread().isInterrupted) throw IOException("Model operation cancelled")
+        }
+        val knownTarget = expectedSha?.let(::path)
+        checkActive()
+        // If the caller supplied the digest of an existing model, validate both
+        // streams without staging another potentially multi-gigabyte copy.
+        if (knownTarget != null && Files.exists(knownTarget, LinkOption.NOFOLLOW_LINKS)) {
+            val (actual, size) = inspect(input, null, expectedBytes, cancelled, progress)
+            require(actual == expectedSha) { "Model digest mismatch" }
+            return verify(actual, cancelled).also { require(it.bytes == size); checkActive() }
+        }
         if (expectedBytes != null && Files.getFileStore(root).usableSpace < expectedBytes) throw IOException("Insufficient storage")
         val temp = Files.createTempFile(root, ".model-", ".part")
         try {
             val (sha, size) = FileOutputStream(temp.toFile()).use { stream ->
                 inspect(input, stream, expectedBytes, cancelled, progress).also { stream.fd.sync() }
             }
+            checkActive()
             require(expectedSha == null || expectedSha == sha) { "Model digest mismatch" }
             val target = path(sha)
             if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
-                return verify(sha, cancelled).also { require(it.bytes == size) }
+                return verify(sha, cancelled).also { require(it.bytes == size); checkActive() }
             }
-            if (cancelled()) throw IOException("Model operation cancelled")
+            checkActive()
             Files.move(temp, target, StandardCopyOption.ATOMIC_MOVE)
             return Model(sha, size, target)
         } finally { Files.deleteIfExists(temp) }
