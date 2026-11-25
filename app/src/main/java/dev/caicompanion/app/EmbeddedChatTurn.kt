@@ -21,8 +21,8 @@ object EmbeddedChatTurn {
         val profile = characters.resolve(ticket.key)
         require(workspace.visible(ticket)) { "Stale session" }
         val pending = checkNotNull(workspace.state(ticket.key).pending)
-        val identity = memory?.compose(profile.id, profile.identity, pending.text) ?: profile.identity
-        return workspace.sendPending(ticket, history, identity, cancelled, onText) { messages, stop, emit ->
+        val identity = memory?.compose(profile.id, profile.identity, pending.text, preset.contextUnits) ?: profile.identity
+        return workspace.sendPendingWithBudget(ticket, history, identity, preset.contextUnits, cancelled, onText) { messages, stop, emit ->
             // Open only if inference is needed. A completed retry needs no model load.
             val run: (EmbeddedLlama) -> String = { engine ->
                 engine.generate(messages, contextTokens = preset.contextTokens, outputTokens = preset.outputTokens,
