@@ -1,12 +1,14 @@
 #include <jni.h>
 #include "llama.h"
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <chrono>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -47,6 +49,9 @@ struct Callbacks {
     jobject sink;
     jmethodID stop;
     jmethodID emit;
+    const std::thread::id owner = std::this_thread::get_id();
+    std::atomic<bool> stopped{false};
+    std::chrono::steady_clock::time_point next_poll{};
     Callbacks(JNIEnv * e, jobject s) : env(e), sink(s) {
         require(s != nullptr);
         jclass cls = env->GetObjectClass(s);
@@ -56,10 +61,26 @@ struct Callbacks {
         env->DeleteLocalRef(cls);
         require(stop && emit && !env->ExceptionCheck());
     }
-    void check() {
+    // JNIEnv and the sink local reference are valid only on the calling thread.
+    // Worker callbacks may observe the latched stop, never invoke Java.
+    bool poll() noexcept {
+        if (stopped.load()) return true;
+        if (std::this_thread::get_id() != owner) return false;
         const auto cancelled = env->CallBooleanMethod(sink, stop);
-        require(!env->ExceptionCheck() && !cancelled);
+        if (env->ExceptionCheck() || cancelled) stopped.store(true);
+        return stopped.load();
     }
+    static bool abort(void * data) noexcept {
+        auto & cb = *static_cast<Callbacks *>(data);
+        if (cb.stopped.load()) return true;
+        if (std::this_thread::get_id() != cb.owner) return false;
+        const auto now = std::chrono::steady_clock::now();
+        // Avoid a JNI round trip for every GGML graph node.
+        if (now < cb.next_poll) return false;
+        cb.next_poll = now + std::chrono::milliseconds(10);
+        return cb.poll();
+    }
+    void check() { require(!poll()); }
     void output(const char * data, int n) {
         check();
         if (!n) return;
@@ -182,6 +203,8 @@ Java_dev_caicompanion_app_EmbeddedLlama_nativeGenerateV3(JNIEnv * env, jobject, 
         params.n_threads_batch = threads;
         params.offload_kqv = false;
         params.op_offload = false;
+        params.abort_callback = Callbacks::abort;
+        params.abort_callback_data = &cb;
         Context ctx(llama_init_from_model(model, params), llama_free);
         require(ctx && llama_n_ctx(ctx.get()) >= static_cast<uint32_t>(prompt_tokens + output_tokens));
         const auto init_end = Clock::now();
