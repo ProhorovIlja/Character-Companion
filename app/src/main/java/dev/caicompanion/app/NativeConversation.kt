@@ -63,8 +63,19 @@ object NativeConversation {
         validateText(identity)
         require(identity.length <= 8000 && contextUnits in 256..64000)
         Event(id, device, character, chat, 1, "user", mode, text)
-        require(identity.length + text.length <= contextUnits)
         checkActive()
+        // A completed turn may need recovery after a crash between reply commit
+        // and pending-state cleanup. A smaller preset must not block replay.
+        if (identity.length + text.length > contextUnits) {
+            val saved = history.find(replyId(id))
+            require(saved != null) { "Message exceeds context allowance" }
+            val original = checkNotNull(history.find(id)) { "Saved reply has no user event" }
+            require(original == Event(id, device, character, chat, original.clock, "user", mode, text))
+            validateReply(original, saved)
+            checkActive()
+            onText(saved.text)
+            return saved
+        }
         val user = history.appendUser(id, device, character, chat, mode, text)
         require(user == Event(id, device, character, chat, user.clock, "user", mode, text))
         val replyId = replyId(id)
