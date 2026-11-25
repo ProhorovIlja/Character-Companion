@@ -36,6 +36,23 @@ class BuildGate(unittest.TestCase):
         self.package([(build.LIB, elf())])
         build.check_package(self.apk)
 
+    def test_lightweight_native_layout(self):
+        self.package([(build.LIB, elf())])
+        build.check_package(self.apk, flavor='legacy')
+
+    def test_lightweight_rejects_bundled_gecko(self):
+        for name in ('libxul.so', 'libmozglue.so'):
+            with self.subTest(name=name):
+                self.package([(build.LIB, elf()), ('lib/arm64-v8a/' + name, elf())])
+                with self.assertRaisesRegex(ValueError, 'Unexpected bundled Gecko'):
+                    build.check_package(self.apk, flavor='legacy')
+                build.check_package(self.apk, flavor='gecko')
+
+    def test_unknown_embedded_flavor(self):
+        self.package([(build.LIB, elf())])
+        with self.assertRaisesRegex(ValueError, 'Unsupported flavor'):
+            build.check_package(self.apk, flavor='unknown')
+
     def test_missing_native_engine(self):
         self.package([('lib/arm64-v8a/libother.so', elf())])
         with self.assertRaises(ValueError):
