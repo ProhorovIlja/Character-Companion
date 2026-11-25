@@ -585,6 +585,54 @@ internal sealed class ChatWindow : Window
         catch (Exception ex) when (ex is System.Text.Json.JsonException or InvalidOperationException or FormatException or ArgumentException) { return null; }
     }
 
+    // Stage a single color in the editor; Cancel leaves the parent field unchanged.
+    private Color? PickRoleColor(Window owner, string role, Color initial)
+    {
+        var panel = new StackPanel { Margin = new Thickness(16) };
+        var preview = new TextBlock { FontSize = 18, FontWeight = FontWeights.SemiBold,
+            TextAlignment = TextAlignment.Center, Padding = new Thickness(12) };
+        var sample = new Border { CornerRadius = new CornerRadius(10), MinHeight = 62,
+            BorderThickness = new Thickness(1), BorderBrush = SystemColors.ControlDarkBrush, Child = preview };
+        panel.Children.Add(sample);
+        byte[] channels = { initial.R, initial.G, initial.B };
+        string[] names = { "Red", "Green", "Blue" };
+        Color Selected() => Color.FromRgb(channels[0], channels[1], channels[2]);
+        void Refresh()
+        {
+            var color = Selected();
+            sample.Background = new SolidColorBrush(color);
+            preview.Foreground = Contrast(Colors.Black, color) >= Contrast(Colors.White, color)
+                ? Brushes.Black : Brushes.White;
+            preview.Text = $"#{color.R:X2}{color.G:X2}{color.B:X2}";
+        }
+        for (int i = 0; i < channels.Length; i++)
+        {
+            int index = i;
+            var label = new TextBlock { Text = names[index] + " · " + channels[index],
+                Margin = new Thickness(0,12,0,4) };
+            var slider = new Slider { Minimum = 0, Maximum = 255, Value = channels[index],
+                TickFrequency = 1, IsSnapToTickEnabled = true, SmallChange = 1, LargeChange = 16 };
+            AutomationProperties.SetName(slider, names[index] + " channel");
+            slider.ValueChanged += (_, _) =>
+            {
+                channels[index] = (byte)Math.Round(slider.Value);
+                label.Text = names[index] + " · " + channels[index];
+                Refresh();
+            };
+            panel.Children.Add(label);
+            panel.Children.Add(slider);
+        }
+        var apply = new Button { Content = "Use color", IsDefault = true };
+        var cancel = new Button { Content = "Cancel", IsCancel = true };
+        panel.Children.Add(Buttons(apply, cancel));
+        var picker = new Window { Owner = owner, Title = role, Width = 380,
+            SizeToContent = SizeToContent.Height, WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ShowInTaskbar = false, Content = panel };
+        apply.Click += (_, _) => picker.DialogResult = true;
+        Refresh();
+        return picker.ShowDialog() == true ? Selected() : null;
+    }
+
     private NamedTheme? EditColors(Dictionary<string, Color> existing, Dictionary<string, Color> defaults, string activeName)
     {
         var panel = new StackPanel { Margin = new Thickness(16) };
@@ -611,7 +659,7 @@ internal sealed class ChatWindow : Window
             AutomationProperties.SetName(box, role.Label);
             fields.Add(role.Key, box);
             var swatch = new Border { Width = 34, Height = 34, CornerRadius = new CornerRadius(6),
-                BorderThickness = new Thickness(1), BorderBrush = SystemColors.ControlDarkBrush, Margin = new Thickness(0,0,10,0) };
+                BorderThickness = new Thickness(1), BorderBrush = SystemColors.ControlDarkBrush };
             void RefreshSwatch()
             {
                 swatch.Background = System.Text.RegularExpressions.Regex.IsMatch(box.Text, @"\A#[0-9a-fA-F]{6}\z")
@@ -619,15 +667,24 @@ internal sealed class ChatWindow : Window
             }
             box.TextChanged += (_, _) => RefreshSwatch();
             RefreshSwatch();
+            var pick = new Button { Content = swatch, Padding = new Thickness(2),
+                Margin = new Thickness(0,0,8,0), ToolTip = "Choose " + role.Label };
+            AutomationProperties.SetName(pick, "Choose " + role.Label);
+            pick.Click += (_, _) =>
+            {
+                Color initial = System.Text.RegularExpressions.Regex.IsMatch(box.Text, @"\A#[0-9a-fA-F]{6}\z")
+                    ? (Color)ColorConverter.ConvertFromString(box.Text) : existing[role.Key];
+                if (PickRoleColor(dialog, role.Label, initial) is Color color) box.Text = Hex(color);
+            };
             var row = new DockPanel();
-            DockPanel.SetDock(swatch, Dock.Left);
-            row.Children.Add(swatch); row.Children.Add(box);
+            DockPanel.SetDock(pick, Dock.Left);
+            row.Children.Add(pick); row.Children.Add(box);
             var group = new StackPanel();
             group.Children.Add(new TextBlock { Text = role.Label, Margin = new Thickness(0,8,0,4) });
             group.Children.Add(row);
             panel.Children.Add(group);
         }
-        var warning = new TextBlock { Text = "Use #RRGGBB. Contrast is checked before applying.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0,12,0,8) };
+        var warning = new TextBlock { Text = "Choose a color swatch or enter #RRGGBB. Contrast is checked before applying.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0,12,0,8) };
         panel.Children.Add(warning);
         if (library == null) warning.Text = "Saved theme library is unreadable; existing entries will not be replaced.";
         loadSaved.Click += (_, _) =>
