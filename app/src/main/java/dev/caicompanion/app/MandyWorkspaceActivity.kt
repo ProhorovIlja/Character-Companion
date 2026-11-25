@@ -110,7 +110,7 @@ class MandyWorkspaceActivity : Activity() {
     private fun dp(n: Int) = (n * resources.displayMetrics.density + .5f).toInt()
     private fun alive() = !isFinishing && !isDestroyed
     private fun appearancePrefs() = getSharedPreferences("mandy_appearance_v1", MODE_PRIVATE)
-    private fun amoled() = appearancePrefs().getBoolean("amoled", true)
+    private fun amoled() = (appearancePrefs().all["amoled"] as? Boolean) ?: true
     private data class ColorRole(val key: String, val title: String, val attr: Int)
     private val colorRoles = listOf(
         ColorRole("canvas", "Chat background", R.attr.shellBackground),
@@ -144,7 +144,7 @@ class MandyWorkspaceActivity : Activity() {
     private fun savedPalette(): Map<String, Int> {
         val prefs = appearancePrefs()
         val p = colorRoles.mapNotNull { role ->
-            val value = prefs.getString("color_" + role.key, null)
+            val value = prefs.all["color_" + role.key] as? String
             if (value != null && value.matches(Regex("#[0-9a-fA-F]{6}")))
                 role.key to android.graphics.Color.parseColor(value) else null
         }.toMap()
@@ -164,7 +164,7 @@ class MandyWorkspaceActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(if (amoled()) R.style.AppTheme_MandyAmoled else R.style.AppTheme_MandyGraphite)
         super.onCreate(savedInstanceState)
-        if (appearancePrefs().getBoolean("custom", false)) customColors = savedPalette()
+        if (appearancePrefs().all["custom"] == true) customColors = savedPalette()
         if (SettingsStore(this).protectScreen) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -555,7 +555,32 @@ class MandyWorkspaceActivity : Activity() {
             val base = if (role.key == "icons") iconColor() else chatColor(role.attr)
             val field = input(role.title, 7, colorHex(saved[role.key] ?: base), single = true)
             fields.addView(label(role.title, 14f))
-            fields.addView(field)
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+            }
+            val swatch = View(this).apply {
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
+            fun refreshSwatch() {
+                val value = field.text.toString().trim()
+                val valid = value.matches(Regex("#[0-9a-fA-F]{6}"))
+                swatch.background = GradientDrawable().apply {
+                    cornerRadius = dp(8).toFloat()
+                    setColor(if (valid) android.graphics.Color.parseColor(value) else android.graphics.Color.TRANSPARENT)
+                    setStroke(dp(1), ShellAppearance.color(this@MandyWorkspaceActivity, R.attr.shellOutline))
+                }
+                swatch.alpha = if (valid) 1f else .35f
+            }
+            field.addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(text: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                override fun onTextChanged(text: CharSequence?, start: Int, before: Int, count: Int) { refreshSwatch() }
+                override fun afterTextChanged(text: android.text.Editable?) = Unit
+            })
+            row.addView(swatch, LinearLayout.LayoutParams(dp(40), dp(40)).apply { marginEnd = dp(12) })
+            row.addView(field, LinearLayout.LayoutParams(0, -2, 1f))
+            fields.addView(row)
+            refreshSwatch()
             field
         }
         val warning = label("Use #RRGGBB. Text and action contrast is checked before applying.", 13f)
