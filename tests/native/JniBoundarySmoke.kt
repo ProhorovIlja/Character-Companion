@@ -72,5 +72,6 @@ fun main() {
             success(2, 2) // engine reusable after failure/cancellation
         }
         println("PASS $checks host JNI boundary checks (simulated backend)")
+        residentModelSmoke()
     } finally { root.toFile().deleteRecursively() }
 }
