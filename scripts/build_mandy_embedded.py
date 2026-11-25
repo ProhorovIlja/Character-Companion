@@ -108,7 +108,7 @@ def check_package(apk, whisper_sha=None, flavor='gecko'):
             with archive.open(WHISPER_LIB) as stream:
                 require(hashlib.file_digest(stream, 'sha256').hexdigest() == whisper_sha, 'Packaged speech library digest mismatch')
         require(archive.testzip() is None, 'APK ZIP integrity failure')
-    _, errors = audit(apk, 'gecko' if flavor == 'gecko' else 'legacy')
+    _, errors = audit(apk, flavor)
     require(not errors, 'ELF audit failed: ' + '; '.join(errors))
 
 
