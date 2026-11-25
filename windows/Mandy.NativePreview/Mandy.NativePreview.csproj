@@ -12,6 +12,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.15" />
     <PackageReference Include="NAudio" Version="3.3.0" />
+    <PackageReference Include="System.Speech" Version="10.0.15" />
     <Compile Include="../CharacterCompanion.Windows/Speech/MicrophoneRecorder.cs" Link="Speech/MicrophoneRecorder.cs" />
     <Compile Include="../CharacterCompanion.Windows/Speech/Pcm16Resampler.cs" Link="Speech/Pcm16Resampler.cs" />
     <Compile Include="../CharacterCompanion.Windows/Speech/WhisperCliTranscriber.cs" Link="Speech/WhisperCliTranscriber.cs" />
