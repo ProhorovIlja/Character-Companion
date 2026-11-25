@@ -64,6 +64,7 @@ internal sealed class ChatWindow : Window
     private readonly Button saveDraft = new() { Content = "Save draft", IsEnabled = false };
     private string lastSavedDraft = "";
     private readonly Button earlier = new() { Content = "Earlier messages", IsEnabled = false, Visibility = Visibility.Collapsed };
+    private readonly Button attach = new() { IsEnabled = false };
     private readonly Button dictate = new() { IsEnabled = false };
     private readonly Button keepSpeech = new() { Content = "Stop · keep draft" };
     private readonly Button sendSpeech = new() { Content = "Stop · send" };
@@ -230,7 +231,9 @@ internal sealed class ChatWindow : Window
         DockPanel.SetDock(primaryActions, Dock.Right);
         composerActions.Children.Add(primaryActions);
         SetActionIcon(dictate, "mic", "Dictate");
-        var mediaActions = Buttons(Unavailable("attach", "Attach", "Multimodal attachments are not implemented in this preview."), dictate);
+        SetActionIcon(attach, "attach", "Import text document");
+        attach.Click += async (_, _) => await ImportTextAsync();
+        var mediaActions = Buttons(attach, dictate);
         normalMedia = mediaActions;
         speechActions = Buttons(cancelSpeech, keepSpeech, sendSpeech);
         speechActions.Visibility = Visibility.Collapsed;
@@ -788,7 +791,7 @@ internal sealed class ChatWindow : Window
 
         bool recording = recorder != null;
         chooseSpeechExe.IsEnabled = chooseSpeechModel.IsEnabled = speechLanguage.IsEnabled = !busy;
-        dictate.IsEnabled = ready && pending == null;
+        attach.IsEnabled = dictate.IsEnabled = ready && pending == null && !closeRequested;
         if (normalMedia != null) normalMedia.Visibility = recording ? Visibility.Collapsed : Visibility.Visible;
         if (speechActions != null) speechActions.Visibility = recording ? Visibility.Visible : Visibility.Collapsed;
         keepSpeech.IsEnabled = sendSpeech.IsEnabled = recording && !speechFinishing;
@@ -1223,6 +1226,74 @@ internal sealed class ChatWindow : Window
             historyValid = false;
             status.Text = "Conversation operation failed. Refresh the original conversation before continuing.";
         }
+        finally { Finish(); }
+    }
+
+    private async Task ImportTextAsync()
+    {
+        var w = workspace;
+        if (busy || w == null || !historyValid || pending != null || closeRequested) return;
+        string original = draft.Text;
+        int start = draft.SelectionStart, end = start + draft.SelectionLength;
+        var profile = w.Character;
+        var picker = new OpenFileDialog
+        {
+            Filter = "Plain text (*.txt;*.md)|*.txt;*.md",
+            CheckFileExists = true, Multiselect = false,
+            Title = "Choose a UTF-8 text document"
+        };
+        if (picker.ShowDialog(this) != true || closeRequested || workspace != w ||
+            w.Character != profile || draft.Text != original || busy) return;
+        busy = true;
+        operation = new CancellationTokenSource();
+        UpdateControls();
+        var token = operation.Token;
+        status.Text = "Reading selected text document…";
+        try
+        {
+            string path = picker.FileName;
+            string text = await Task.Run(async () =>
+            {
+                token.ThrowIfCancellationRequested();
+                if (!Path.IsPathFullyQualified(path) || path.StartsWith(@"\\") ||
+                    (File.GetAttributes(path) & (FileAttributes.Directory | FileAttributes.ReparsePoint | FileAttributes.Device)) != 0)
+                    throw new IOException("Select a regular local file.");
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096,
+                    FileOptions.Asynchronous | FileOptions.SequentialScan);
+                if (stream.Length > TextAttachment.MaxBytes) throw new InvalidDataException("File too large.");
+                return await TextAttachment.ReadAsync(stream, token);
+            }, token);
+            token.ThrowIfCancellationRequested();
+            if (closeRequested || workspace != w || w.Character != profile || draft.Text != original) return;
+            var change = TextAttachment.Insert(original, start, end, text);
+            var panel = new StackPanel { Margin = new Thickness(16) };
+            panel.Children.Add(new TextBlock { Text = "Review the selected text. Insert adds it to the editable local draft, not a sent message.", TextWrapping = TextWrapping.Wrap });
+            var preview = new TextBox { Text = text, IsReadOnly = true, TextWrapping = TextWrapping.Wrap,
+                AcceptsReturn = true, MinHeight = 180, MaxHeight = 360, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+            AutomationProperties.SetName(preview, "Document preview");
+            panel.Children.Add(preview);
+            var insert = new Button { Content = "Insert into draft", IsDefault = true };
+            var cancel = new Button { Content = "Cancel", IsCancel = true };
+            panel.Children.Add(Buttons(insert, cancel));
+            var dialog = new Window { Owner = this, Title = "Import text document", Width = 520,
+                SizeToContent = SizeToContent.Height, WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ShowInTaskbar = false, Content = panel };
+            insert.Click += (_, _) => dialog.DialogResult = true;
+            if (dialog.ShowDialog() != true || closeRequested || token.IsCancellationRequested ||
+                workspace != w || w.Character != profile || draft.Text != original)
+            {
+                status.Text = "Import cancelled. Draft preserved.";
+                return;
+            }
+            // Preserve the reviewed text visibly even if saving the draft fails.
+            draft.Text = change.Text;
+            draft.Select(change.Caret, 0);
+            await Task.Run(() => w.SaveDraft(change.Text));
+            lastSavedDraft = change.Text;
+            status.Text = "Document text saved to draft.";
+        }
+        catch (OperationCanceledException) { status.Text = "Import cancelled. Draft preserved."; }
+        catch (Exception) { status.Text = "Document import or save failed. Check the composer. Use UTF-8 text within 6,000 characters."; }
         finally { Finish(); }
     }
 
