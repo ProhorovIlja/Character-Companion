@@ -12,6 +12,7 @@ import zipfile
 
 from check_apk_native import audit, check_elf
 from check_mandy_permissions import check_permissions
+from check_mandy_exports import audit_apk_exports
 from check_whisper_linkage import audit_linkage, ndk_tools
 
 PIN = 'dbaf582af41941ebbfc4384fb9fa1b40dff7a510'
@@ -148,11 +149,11 @@ def main():
     try:
         sdk, llama = args.sdk.resolve(), args.llama.resolve()
         java, wrapper, tools, suffix = preflight(root, sdk, llama, args.flavor)
+        nm, _ = ndk_tools(sdk)
         whisper = args.whisper.resolve() if args.whisper else None
         if whisper is not None:
             check_whisper_checkout(whisper)
             check_whisper_toolchain(sdk, suffix)
-            ndk_tools(sdk)
         print('PREFLIGHT=PASSED', flush=True)
         if not args.build:
             return 0
@@ -170,6 +171,8 @@ def main():
                 arguments += ['-PmandyWhisperJniDir=' + str(stage), '-PmandyWhisperSha256=' + whisper_sha]
             subprocess.run(arguments, cwd=root, env=env, check=True)
             check_package(apk, whisper_sha, args.flavor)
+            audit_apk_exports(apk, nm)
+            print('MANDY_JNI_EXPORT_GATE=PASSED', flush=True)
         certs = output([java, '-jar', tools / 'lib/apksigner.jar', 'verify', '--verbose', '--print-certs', apk])
         require('CN=Android Debug' in certs, 'Expected debug signing identity')
         badging = output([tools / ('aapt' + suffix), 'dump', 'badging', apk])
