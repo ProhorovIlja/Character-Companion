@@ -97,9 +97,33 @@ class MandyModelActivity : Activity() {
     private fun refresh() {
         worker.execute {
             val result = runCatching {
-                fun describe(models: List<NativeModelLibrary.Model>): String =
-                    if (models.isEmpty()) "No imported models." else models.joinToString("\n\n") { "SHA-256: " + it.sha256 + "\nBytes: " + it.bytes }
-                "Text models (GGUF)\n" + describe(AndroidModelImport.library(applicationContext).list()) +
+                fun describe(models: List<NativeModelLibrary.Model>, gguf: Boolean = false): String {
+                    if (models.isEmpty()) return "No imported models."
+                    val lines = models.take(32).map { model ->
+                        val size = String.format(java.util.Locale.ROOT, "%.2f GiB", model.bytes / 1073741824.0)
+                        val summary = if (gguf) runCatching {
+                            java.nio.file.Files.newInputStream(model.path, java.nio.file.LinkOption.NOFOLLOW_LINKS).use {
+                                GgufSummary.read(it)
+                            }
+                        }.getOrNull() else null
+                        buildString {
+                            if (gguf) {
+                                append(summary?.name ?: "Unnamed GGUF model")
+                                append("\nArchitecture: ").append(summary?.architecture ?: "Unknown")
+                                summary?.let {
+                                    append("\nGGUF version: ").append(it.version)
+                                    it.kind?.let { kind -> append(" · Type: ").append(kind) }
+                                    it.fileType?.let { type -> append(" · File type ID: ").append(type) }
+                                }
+                                append("\nMetadata preview only · compatibility not verified\n")
+                            }
+                            append("Size: ").append(size).append(" (").append(model.bytes).append(" bytes)")
+                            append("\nSHA-256: ").append(model.sha256)
+                        }
+                    }.joinToString("\n\n")
+                    return if (models.size > 32) lines + "\n\nShowing 32 of " + models.size + " imported files." else lines
+                }
+                "Text models (GGUF)\n" + describe(AndroidModelImport.library(applicationContext).list(), gguf = true) +
                     "\n\nSpeech models (Whisper GGML)\n" + describe(AndroidModelImport.library(applicationContext, speech = true).list())
             }
             runOnUiThread {
