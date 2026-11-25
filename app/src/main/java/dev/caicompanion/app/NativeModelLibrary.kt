@@ -5,7 +5,7 @@ import java.io.InputStream
 import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
+import java.nio.file.FileAlreadyExistsException
 import java.nio.file.LinkOption
 import java.security.MessageDigest
 
@@ -92,7 +92,15 @@ class NativeModelLibrary(private val root: Path, private val maxBytes: Long,
                 return verify(sha, cancelled).also { require(it.bytes == size); checkActive() }
             }
             checkActive()
-            Files.move(temp, target, StandardCopyOption.ATOMIC_MOVE)
+            // Publish the already synced file without replacing a competing
+            // destination. ATOMIC_MOVE alone permits replacement on some providers.
+            try {
+                Files.createLink(target, temp)
+            } catch (_: FileAlreadyExistsException) {
+                return verify(sha, cancelled).also { require(it.bytes == size); checkActive() }
+            } catch (unsupported: UnsupportedOperationException) {
+                throw IOException("Model storage requires atomic no-replacement publication", unsupported)
+            }
             return Model(sha, size, target)
         } finally { Files.deleteIfExists(temp) }
     }
