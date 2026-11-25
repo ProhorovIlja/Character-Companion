@@ -14,12 +14,18 @@ def fixture(directory):
     directory.mkdir()
     for name in build.REQUIRED:
         (directory / name).write_bytes(b'fixture')
-    exe = bytearray(90)
+    exe = bytearray(1024)
     exe[:2] = b'MZ'
     struct.pack_into('<I', exe, 60, 64)
     exe[64:68] = b'PE\x00\x00'
-    struct.pack_into('<H', exe, 68, 0x8664)
+    struct.pack_into('<HHIIIHH', exe, 68, 0x8664, 1, 0, 0, 0, 240, 0x0002)
     struct.pack_into('<H', exe, 88, 0x20b)
+    struct.pack_into('<I', exe, 104, 4096)
+    struct.pack_into('<II', exe, 144, 8192, 512)
+    exe[328:333] = b'.text'
+    struct.pack_into('<IIII', exe, 336, 1, 4096, 512, 512)
+    struct.pack_into('<I', exe, 364, 0x60000020)
+    exe[512] = 0xc3
     (directory / build.REQUIRED[0]).write_bytes(exe)
 
 
@@ -51,6 +57,35 @@ class PreviewBuild(unittest.TestCase):
             path.write_bytes(data)
             with self.assertRaisesRegex(ValueError, 'x64'):
                 build.audit(stage)
+
+    def test_truncated_apphost(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            stage = Path(tmp) / 'publish'
+            fixture(stage)
+            path = stage / build.REQUIRED[0]
+            data = path.read_bytes()
+            for length in (90, 327, 367, 1023):
+                with self.subTest(length=length):
+                    path.write_bytes(data[:length])
+                    with self.assertRaises(ValueError):
+                        build.audit(stage)
+
+    def test_invalid_apphost_structure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            stage = Path(tmp) / 'publish'
+            fixture(stage)
+            path = stage / build.REQUIRED[0]
+            original = path.read_bytes()
+            for offset, fmt, value in ((70, '<H', 0), (86, '<H', 0x2002),
+                                       (84, '<H', 2), (104, '<I', 0),
+                                       (144, '<I', 4096), (148, '<I', 64),
+                                       (348, '<I', 1024), (364, '<I', 0x40000040)):
+                with self.subTest(offset=offset):
+                    data = bytearray(original)
+                    struct.pack_into(fmt, data, offset, value)
+                    path.write_bytes(data)
+                    with self.assertRaises(ValueError):
+                        build.audit(stage)
 
     def test_order_and_manifest(self):
         with tempfile.TemporaryDirectory() as tmp:
