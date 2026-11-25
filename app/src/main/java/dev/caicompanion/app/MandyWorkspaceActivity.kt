@@ -619,6 +619,7 @@ class MandyWorkspaceActivity : Activity() {
             options += "Edit character" to { editProfile(profile) }
             options += "Memory & relationship" to { editMemory(profile, s.memory) }
             options += "New conversation" to { createChat(profile) }
+            options += "Rename conversation" to { renameChat(s, profile) }
             options += "Save draft" to { saveAnd {} }
             if (BuildConfig.MANDY_EMBEDDED_PREVIEW && s.models.isNotEmpty() &&
                 s.rows.lastOrNull()?.role == "character" && s.draft.pending == null) {
@@ -1168,6 +1169,24 @@ class MandyWorkspaceActivity : Activity() {
                     val p = library.create(n, i, "First conversation")
                     workspace.select(NativeChatWorkspace.Key(p.id, p.chats.single().id))
                 } else library.edit(profile.id, n, i)
+            }
+        }
+    }
+    private fun renameChat(s: Snapshot, profile: NativeCharacterLibrary.Profile) {
+        val ticket = s.ticket ?: return
+        if (busy || !alive() || !resumed || current !== s) return
+        val chat = profile.chats.firstOrNull { it.id == ticket.key.chat } ?: return
+        val title = input("Conversation title", 120, chat.title, single = true)
+        val dialog = AlertDialog.Builder(this).setTitle("Rename conversation").setView(title)
+            .setNegativeButton(android.R.string.cancel, null).setPositiveButton("Save", null).create()
+        dialog.show()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val value = title.text.toString().trim()
+            if (value.isBlank()) { title.error = "Title required"; return@setOnClickListener }
+            dialog.dismiss()
+            if (value != chat.title && !busy && alive() && resumed && current === s) saveAnd {
+                require(workspace.visible(ticket))
+                library.renameChat(profile.id, chat.id, value)
             }
         }
     }
