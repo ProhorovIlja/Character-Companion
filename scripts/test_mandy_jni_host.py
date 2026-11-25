@@ -21,8 +21,8 @@ def main():
     native = ROOT / 'app/src/main/cpp/mandy/mandy_llama.cpp'
     kotlin = ROOT / 'app/src/main/java/dev/caicompanion/app'
     tests = ROOT / 'tests/native'
-    sources = [kotlin / (name + '.kt') for name in ('EmbeddedLlama', 'EmbeddedTextSink', 'NativeConversation', 'NativeModelLibrary')]
-    sources.append(tests / 'JniBoundarySmoke.kt')
+    sources = [kotlin / (name + '.kt') for name in ('EmbeddedLlama', 'EmbeddedTextSink', 'NativeConversation', 'NativeModelLibrary', 'ResidentModel', 'ModelAdmission')]
+    sources.extend([tests / 'JniBoundarySmoke.kt', tests / 'ResidentModelSmoke.kt'])
     try:
         for source in [native, *sources, tests / 'jni-stub/llama.h', jdk / 'include/jni.h', jdk / 'include/linux/jni_md.h']:
             if not source.is_file():
