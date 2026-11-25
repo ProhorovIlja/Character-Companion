@@ -62,7 +62,7 @@ class MandyModelActivity : Activity() {
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
             imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
             importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_NO
-            filters = arrayOf(android.text.InputFilter.LengthFilter(64))
+            // Validate the entire pasted digest; do not silently truncate it to 64 digits.
             isSaveEnabled = false
         }
         val content = LinearLayout(this).apply {
