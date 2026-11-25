@@ -38,4 +38,8 @@ set(GGML_LLAMAFILE OFF CACHE BOOL "" FORCE)
 add_subdirectory("${MANDY_LLAMA_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/llama")
 add_library(mandy_llama SHARED mandy_llama.cpp)
 target_link_libraries(mandy_llama PRIVATE llama)
-target_link_options(mandy_llama PRIVATE "-Wl,-z,max-page-size=16384")
+target_link_options(mandy_llama PRIVATE
+  "-Wl,-z,max-page-size=16384"
+  "-Wl,--exclude-libs,ALL"
+  "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
+set_property(TARGET mandy_llama APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
