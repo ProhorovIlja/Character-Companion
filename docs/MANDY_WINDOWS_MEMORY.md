@@ -1,0 +1,20 @@
+# Mandy AI — Windows character memory (2026-11-25)
+
+Continuation of the Android NativeCharacterMemory design and the archived development history, not a replacement of the established chat-first Material AMOLED/custom-theme design.
+
+## Source changes
+- dc999a0: Windows CharacterMemory, account and character-scoped local JSON, seven relationship states, reviewed relationship description, pinned information, up to 128 single-line memories (400 UTF-16 units each), optimistic revisions, bounded file reads and flushed temporary-file replacement.
+- f934e52: explicit editor in the character library; reviewed context used in the actual LocalChatTurn request for the active character, including text and dictation. Preserve existing conversation IDs, history and drafts. No extraction or automatic progression. Invalid memory fails the turn without clearing its saved draft.
+- 83cf2ba: reject multiline notes to match line-based editor.
+- 15ebbda / ab88cf8: manually runnable .NET 10 console regression project, linking actual CharacterMemory and LocalHistory. Run command (not a workflow): dotnet run --project windows/Mandy.MemorySmoke/Mandy.MemorySmoke.csproj. 17 assertions defined covering defaults, reload, character/account isolation, stale revisions, duplicate/multiline notes, stage, pinned note, English/Cyrillic and NFKC matching, rare-term ranking, identity preservation and limits. Not executed: .NET SDK/compiler absent.
+
+## Scope and tradeoffs
+Same relationship stages and lexical retrieval strategy as Android: at most four matching notes, favor rare matched terms; preserve identity and latest user message; optional context capped by existing 8,000/12,000 UTF-16-unit budgets. These are not model-token limits. No new runtime dependency, embedding model, vector DB, network or scheduled operation. Plaintext local storage like the existing workspace, not yet interoperable with Android binary memory files. Note editing is explicit, and the next reply can use changed context across conversations, including retries elsewhere. No memory extraction, evidence review, semantic retrieval, revision history/rollback, encrypted transport or device benchmark in this iteration. Instructions inside memory are untrusted; prompt labeling is not a guarantee against injection. Native application uncompiled; exact readback of code and test files verified.
+
+## Research
+- Existing Android source: app/src/main/java/dev/caicompanion/app/NativeCharacterMemory.kt.
+- Saved development history: Google Drive file 1_77aYI3eAJEpxjdtOMaZ9dPBEmlpGvx0 reopened; previous memory/relationship/identity requirements retained.
+- SillyTavern Data Bank and lore: https://github.com/SillyTavern/SillyTavern-Docs/blob/main/Usage/Characters/data-bank.md ; https://github.com/SillyTavern/SillyTavern-Docs/blob/main/Usage/worldinfo.md
+- llama.cpp server and benchmark: https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md ; https://github.com/ggml-org/llama.cpp/blob/master/tools/llama-bench/README.md
+- File replacement: https://learn.microsoft.com/dotnet/api/system.io.file.replace
+References only, no imported upstream code. Context-depth, memory recall, English/Russian quality, latency and concurrent voice resource benchmarks are still required on Pixel 8a and Ryzen/RTX 4070 system. No automatic jobs or workflow changes.
