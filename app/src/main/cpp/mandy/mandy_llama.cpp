@@ -196,7 +196,7 @@ Java_dev_caicompanion_app_EmbeddedLlama_nativeGenerateV3(JNIEnv * env, jobject, 
         add(llama_sampler_init_temp(0.8f));
         add(llama_sampler_init_dist(static_cast<uint32_t>(seed)));
         std::vector<char> piece(256);
-        for (int i = 0; i < output_tokens; ++i) {
+        for (int i = 0; i <= output_tokens; ++i) {
             cb.check();
             llama_token token = llama_sampler_sample(sampler.get(), ctx.get(), -1);
             if (llama_vocab_is_eog(vocab, token)) {
@@ -211,6 +211,9 @@ Java_dev_caicompanion_app_EmbeddedLlama_nativeGenerateV3(JNIEnv * env, jobject, 
                 require(!env->ExceptionCheck());
                 return result;
             }
+            // Check EOG at the exact token boundary without emitting or decoding
+            // an additional content token.
+            if (i == output_tokens) break;
             int len = llama_token_to_piece(vocab, token, piece.data(), piece.size(), 0, false);
             if (len < 0) {
                 require(len >= -65536);
