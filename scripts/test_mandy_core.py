@@ -15,6 +15,7 @@ SOURCES = (
 SUITES = (
     'CommittedReplyRecoverySmoke', 'DraftWriteSmoke', 'KnownDigestImportSmoke',
     'RecoverWithoutModelSmoke', 'StreamingBufferSmoke', 'SpokenTextSmoke',
+    'ConversationFidelitySmoke',
 )
 
 
