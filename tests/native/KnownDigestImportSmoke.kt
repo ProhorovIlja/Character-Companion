@@ -54,6 +54,17 @@ fun main() {
         checkIt(speechLib.import(ByteArrayInputStream(speech), expectedSha = speechModel.sha256, progress = {
             check(Files.newDirectoryStream(speechRoot, "*.part").use { !it.iterator().hasNext() })
         }) == speechModel)
+        val defaultSpeech = NativeModelLibrary(speechRoot, format = NativeModelLibrary.Format.WHISPER)
+        checkIt(defaultSpeech.verify(speechModel.sha256) == speechModel)
+        checkIt(defaultSpeech.import(ByteArrayInputStream(speech)) == speechModel)
+        checkIt(NativeModelLibrary(speechRoot, NativeModelLibrary.Format.WHISPER).list() == listOf(speechModel))
+        reject { NativeModelLibrary(speechRoot, NativeModelLibrary.Format.WHISPER.ceiling + 1, NativeModelLibrary.Format.WHISPER) }
+        reject { NativeModelLibrary(speechRoot, 0, NativeModelLibrary.Format.WHISPER) }
+        reject { NativeModelLibrary(speechRoot, NativeModelLibrary.Format.WHISPER.headerBytes.toLong(), NativeModelLibrary.Format.WHISPER) }
+        reject { defaultSpeech.import(ByteArrayInputStream(speech), expectedBytes = NativeModelLibrary.Format.WHISPER.ceiling + 1) }
+        val limited = NativeModelLibrary(root.resolve("limited"), maxBytes = 99, format = NativeModelLibrary.Format.WHISPER)
+        reject { limited.import(ByteArrayInputStream(speech)) }
+        checkIt(limited.list().isEmpty())
         println("PASS $checks known-digest import checks")
     } finally { root.toFile().deleteRecursively() }
 }
