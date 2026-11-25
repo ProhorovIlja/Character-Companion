@@ -466,7 +466,7 @@ internal sealed class ChatWindow : Window
     private sealed record NamedTheme(string Name, Dictionary<string, Color> Colors);
     private static bool ValidThemeName(string name)
     {
-        if (name.Length is < 1 or > 80 || name != name.Trim() || name.Any(char.IsControl)) return false;
+        if (name.Length is < 1 or > 80 || name != name.Trim() || name.Any(c => char.IsControl(c) || c == '\uFFFE' || c == '\uFFFF')) return false;
         try { LocalHistory.ValidateText(name); return true; }
         catch (ArgumentException) { return false; }
     }
@@ -583,7 +583,10 @@ internal sealed class ChatWindow : Window
             var row = new DockPanel();
             DockPanel.SetDock(swatch, Dock.Left);
             row.Children.Add(swatch); row.Children.Add(box);
-            panel.Children.Add(Labeled(role.Label, row));
+            var group = new StackPanel();
+            group.Children.Add(new TextBlock { Text = role.Label, Margin = new Thickness(0,8,0,4) });
+            group.Children.Add(row);
+            panel.Children.Add(group);
         }
         var warning = new TextBlock { Text = "Use #RRGGBB. Contrast is checked before applying.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0,12,0,8) };
         panel.Children.Add(warning);
