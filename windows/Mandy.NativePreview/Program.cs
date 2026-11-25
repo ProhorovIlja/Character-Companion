@@ -343,9 +343,29 @@ internal sealed class ChatWindow : Window
         AutomationProperties.SetName(history, "Conversation history");
         var copyMessage = new MenuItem { Header = "Copy selected message" };
         var historyMenu = new ContextMenu();
+        var readMessage = new MenuItem { Header = "Read selected reply aloud" };
         historyMenu.Items.Add(copyMessage);
+        historyMenu.Items.Add(readMessage);
         history.ContextMenu = historyMenu;
-        historyMenu.Opened += (_, _) => copyMessage.IsEnabled = history.SelectedItem is MessageRow;
+        // Right-click selects the actual message under the pointer, rather than an older selection.
+        history.PreviewMouseRightButtonDown += (_, e) =>
+        {
+            if (e.OriginalSource is DependencyObject source &&
+                ItemsControl.ContainerFromElement(history, source) is ListBoxItem item)
+                item.IsSelected = true;
+        };
+        historyMenu.Opened += (_, _) =>
+        {
+            copyMessage.IsEnabled = history.SelectedItem is MessageRow;
+            readMessage.IsEnabled = !busy && !closeRequested && historyValid &&
+                history.SelectedItem is MessageRow { IsUser: false };
+        };
+        readMessage.Click += (_, _) =>
+        {
+            if (busy || closeRequested || !historyValid ||
+                history.SelectedItem is not MessageRow { IsUser: false } row) return;
+            status.Text = WindowsReadAloud.Show(this, row.Text);
+        };
         void CopySelected()
         {
             if (history.SelectedItem is not MessageRow row) return;
