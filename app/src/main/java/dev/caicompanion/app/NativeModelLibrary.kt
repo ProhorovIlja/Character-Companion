@@ -24,45 +24,59 @@ class NativeModelLibrary(private val root: Path, private val maxBytes: Long,
         require(sha.matches(Regex("[0-9a-f]{64}")))
         return root.resolve(sha + format.suffix)
     }
-    private fun checkHeader(bytes: ByteArray) {
-        if (format == Format.WHISPER) {
-            val b = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN)
-            require(bytes.size == headerBytes && b.getInt(0) == 0x67676d6c) { "Not a Whisper GGML file" }
-            require((1..10).all { b.getInt(it * 4) > 0 } && b.getInt(44) >= 0 &&
-                b.getInt(12) == b.getInt(28) &&
-                b.getInt(12) % b.getInt(16) == 0 && b.getInt(28) % b.getInt(32) == 0) { "Invalid Whisper header" }
-            return
-        }
-        require(bytes.size == 24 && bytes.copyOfRange(0, 4).contentEquals(byteArrayOf(71, 71, 85, 70))) { "Not a GGUF file" }
-        val b = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN)
-        require(b.getInt(4) in 2..3 && b.getLong(8) > 0 && b.getLong(16) >= 0) { "Invalid GGUF header" }
-    }
-    private fun inspect(input: InputStream, output: FileOutputStream?, expectedBytes: Long?, cancelled: () -> Boolean, progress: (Long) -> Unit): Pair<String, Long> {
-        val digest = MessageDigest.getInstance("SHA-256")
-        val header = ByteArray(headerBytes)
-        var headerSize = 0
-        var total = 0L
-        val buffer = ByteArray(128 * 1024)
-        while (true) {
-            if (cancelled() || Thread.currentThread().isInterrupted) throw IOException("Model operation cancelled")
-            val n = input.read(buffer)
-            if (n < 0) break
-            if (n == 0) throw IOException("Model stream made no progress")
-            if (n.toLong() > maxBytes - total || (expectedBytes != null && n.toLong() > expectedBytes - total)) throw IOException("Model size exceeded")
-            if (headerSize < headerBytes) {
-                val copy = minOf(n, headerBytes - headerSize)
-                buffer.copyInto(header, headerSize, 0, copy)
-                headerSize += copy
-                if (headerSize == headerBytes) checkHeader(header)
+    companion object {
+        private fun checkHeader(bytes: ByteArray, format: Format) {
+            if (format == Format.WHISPER) {
+                val b = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                require(bytes.size == format.headerBytes && b.getInt(0) == 0x67676d6c) { "Not a Whisper GGML file" }
+                require((1..10).all { b.getInt(it * 4) > 0 } && b.getInt(44) >= 0 &&
+                    b.getInt(12) == b.getInt(28) &&
+                    b.getInt(12) % b.getInt(16) == 0 && b.getInt(28) % b.getInt(32) == 0) { "Invalid Whisper header" }
+                return
             }
-            digest.update(buffer, 0, n)
-            output?.write(buffer, 0, n)
-            total += n
-            progress(total)
+            require(bytes.size == 24 && bytes.copyOfRange(0, 4).contentEquals(byteArrayOf(71, 71, 85, 70))) { "Not a GGUF file" }
+            val b = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            require(b.getInt(4) in 2..3 && b.getLong(8) > 0 && b.getLong(16) >= 0) { "Invalid GGUF header" }
         }
-        if (cancelled() || Thread.currentThread().isInterrupted) throw IOException("Model operation cancelled")
-        require(headerSize == headerBytes && total > headerBytes && (expectedBytes == null || total == expectedBytes)) { "Truncated model" }
-        return digest.digest().joinToString("") { "%02x".format(java.util.Locale.ROOT, it.toInt() and 255) } to total
+        private fun inspect(input: InputStream, output: FileOutputStream?, expectedBytes: Long?, cancelled: () -> Boolean, progress: (Long) -> Unit, format: Format, maxBytes: Long): Pair<String, Long> {
+            val headerBytes = format.headerBytes
+            val digest = MessageDigest.getInstance("SHA-256")
+            val header = ByteArray(headerBytes)
+            var headerSize = 0
+            var total = 0L
+            val buffer = ByteArray(128 * 1024)
+            while (true) {
+                if (cancelled() || Thread.currentThread().isInterrupted) throw IOException("Model operation cancelled")
+                val n = input.read(buffer)
+                if (n < 0) break
+                if (n == 0) throw IOException("Model stream made no progress")
+                if (n.toLong() > maxBytes - total || (expectedBytes != null && n.toLong() > expectedBytes - total)) throw IOException("Model size exceeded")
+                if (headerSize < headerBytes) {
+                    val copy = minOf(n, headerBytes - headerSize)
+                    buffer.copyInto(header, headerSize, 0, copy)
+                    headerSize += copy
+                    if (headerSize == headerBytes) checkHeader(header, format)
+                }
+                digest.update(buffer, 0, n)
+                output?.write(buffer, 0, n)
+                total += n
+                progress(total)
+            }
+            if (cancelled() || Thread.currentThread().isInterrupted) throw IOException("Model operation cancelled")
+            require(headerSize == headerBytes && total > headerBytes && (expectedBytes == null || total == expectedBytes)) { "Truncated model" }
+            return digest.digest().joinToString("") { "%02x".format(java.util.Locale.ROOT, it.toInt() and 255) } to total
+        }
+        /** Verify an explicitly selected file in one pass without creating a library directory. */
+        internal fun verifyFile(target: Path, sha: String, format: Format, maxBytes: Long = format.ceiling,
+                                cancelled: () -> Boolean = { false }): Model {
+            require(sha.matches(Regex("[0-9a-f]{64}")) && maxBytes > format.headerBytes && maxBytes <= format.ceiling)
+            require(Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)) { "Model unavailable" }
+            val size = Files.size(target)
+            require(size in (format.headerBytes + 1L)..maxBytes)
+            val (actual, count) = Files.newInputStream(target, LinkOption.NOFOLLOW_LINKS).use { inspect(it, null, size, cancelled, {}, format, maxBytes) }
+            require(actual == sha) { "Model digest mismatch" }
+            return Model(sha, count, target)
+        }
     }
     /** Caller owns input; all disk I/O must run on an explicitly requested worker. */
     @Synchronized fun import(input: InputStream, expectedBytes: Long? = null, expectedSha: String? = null,
@@ -76,7 +90,7 @@ class NativeModelLibrary(private val root: Path, private val maxBytes: Long,
         // If the caller supplied the digest of an existing model, validate both
         // streams without staging another potentially multi-gigabyte copy.
         if (knownTarget != null && Files.exists(knownTarget, LinkOption.NOFOLLOW_LINKS)) {
-            val (actual, size) = inspect(input, null, expectedBytes, cancelled, progress)
+            val (actual, size) = inspect(input, null, expectedBytes, cancelled, progress, format, maxBytes)
             require(actual == expectedSha) { "Model digest mismatch" }
             return verify(actual, cancelled).also { require(it.bytes == size); checkActive() }
         }
@@ -84,7 +98,7 @@ class NativeModelLibrary(private val root: Path, private val maxBytes: Long,
         val temp = Files.createTempFile(root, ".model-", ".part")
         try {
             val (sha, size) = FileOutputStream(temp.toFile()).use { stream ->
-                inspect(input, stream, expectedBytes, cancelled, progress).also { stream.fd.sync() }
+                inspect(input, stream, expectedBytes, cancelled, progress, format, maxBytes).also { stream.fd.sync() }
             }
             checkActive()
             require(expectedSha == null || expectedSha == sha) { "Model digest mismatch" }
@@ -105,15 +119,8 @@ class NativeModelLibrary(private val root: Path, private val maxBytes: Long,
             return Model(sha, size, target)
         } finally { Files.deleteIfExists(temp) }
     }
-    @Synchronized fun verify(sha: String, cancelled: () -> Boolean = { false }): Model {
-        val target = path(sha)
-        require(Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)) { "Model unavailable" }
-        val size = Files.size(target)
-        require(size in (headerBytes + 1L)..maxBytes)
-        val (actual, count) = Files.newInputStream(target, LinkOption.NOFOLLOW_LINKS).use { inspect(it, null, size, cancelled) {} }
-        require(actual == sha) { "Model digest mismatch" }
-        return Model(sha, count, target)
-    }
+    @Synchronized fun verify(sha: String, cancelled: () -> Boolean = { false }): Model =
+        verifyFile(path(sha), sha, format, maxBytes, cancelled)
     /** Inventory only; verification is required before opening any entry in an engine. */
     @Synchronized fun list(): List<Model> = Files.newDirectoryStream(root, "*" + format.suffix).use { entries ->
         entries.filter { Files.isRegularFile(it, LinkOption.NOFOLLOW_LINKS) && it.fileName.toString().removeSuffix(format.suffix).matches(Regex("[0-9a-f]{64}")) }
