@@ -14,10 +14,13 @@ import tempfile
 SMOKES = (
     'windows/InferenceSmoke/CharacterCompanion.InferenceSmoke.csproj',
     'windows/HistorySmoke/CharacterCompanion.HistorySmoke.csproj',
+    'windows/Mandy.MemorySmoke/Mandy.MemorySmoke.csproj',
+    'windows/Mandy.AttachmentSmoke/Mandy.AttachmentSmoke.csproj',
 )
 PROJECT = 'windows/Mandy.NativePreview/Mandy.NativePreview.csproj'
 REQUIRED = ('Mandy.NativePreview.exe', 'Mandy.NativePreview.dll',
-            'Mandy.NativePreview.runtimeconfig.json', 'coreclr.dll',
+            'Mandy.NativePreview.runtimeconfig.json', 'Mandy.NativePreview.deps.json',
+            'coreclr.dll', 'hostfxr.dll', 'hostpolicy.dll',
             'PresentationFramework.dll', 'e_sqlite3.dll')
 
 
@@ -83,7 +86,8 @@ def build(root, output, dotnet, version, run=subprocess.run):
         require(not info.exists() and not (stage / 'SHA256SUMS.txt').exists(), 'Unexpected reserved metadata file')
         info.write_text('SDK=' + version + '\nRID=win-x64\nSELF_CONTAINED=YES\n'
                         'SMOKE_PROJECTS=PASSED\nSIGNING=UNVERIFIED\nUI_DEVICE_TESTED=NO\n'
-                        'REAL_MODEL_TESTED=NO\n', encoding='utf-8')
+                        'REAL_MODEL_TESTED=NO\n' +
+                        ''.join('SMOKE_PASSED=' + project + '\n' for project in SMOKES), encoding='utf-8')
         lines = []
         for path in sorted([*files, info]):
             with path.open('rb') as stream:
