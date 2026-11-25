@@ -1227,6 +1227,9 @@ class MandyWorkspaceActivity : Activity() {
                     } ?: "Reply saved"
                     stopped.get() -> "Stopped • check saved draft or pending message"
                     result.exceptionOrNull() is ModelAdmission.Denied -> admissionMessage(result.exceptionOrNull() as ModelAdmission.Denied) + " • pending message retained"
+                    result.exceptionOrNull() is java.io.IOException &&
+                        result.exceptionOrNull()?.message == "Unsupported local model chat template" ->
+                        "Model chat template is unsupported • choose another trusted model and retry"
                     else -> "Generation failed • check saved draft or retry state"
                 }
             }
