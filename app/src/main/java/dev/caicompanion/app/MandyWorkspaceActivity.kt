@@ -107,7 +107,7 @@ class MandyWorkspaceActivity : Activity() {
     private fun choosePerformancePreset() {
         val presets = InferencePreset.entries
         val labels = presets.map { it.label + " · " + it.contextTokens + " context / " +
-            it.outputTokens + " output · " + it.threads + " CPU threads" }.toTypedArray()
+            it.outputTokens + " output tokens · " + it.threads + " CPU threads · " + it.contextUnits + " text units" }.toTypedArray()
         AlertDialog.Builder(this).setTitle("Local inference preset (experimental)")
             .setSingleChoiceItems(labels, presets.indexOf(performancePreset())) { dialog, index ->
                 dialog.dismiss()
@@ -1026,18 +1026,18 @@ class MandyWorkspaceActivity : Activity() {
         val draft = editor?.text?.toString() ?: return
         if (s.draft.pending == null && draft.isBlank()) { editor?.error = "Enter a message"; return }
         if (!resumed || busy || !alive() || current?.ticket != ticket || current !== s) return
-        // Check the fixed client text budget before model approval or pending-state creation.
+        val preset = performancePreset()
+        // Check the selected client text budget before model approval or pending-state creation.
         // Existing pending replies retain their retry/recovery path.
         if (s.draft.pending == null) {
             val profile = s.profiles.firstOrNull { it.id == ticket.key.character } ?: return
-            val available = TurnBudget.availableForMessage(profile.identity.length)
+            val available = TurnBudget.availableForMessage(profile.identity.length, preset.contextUnits)
             if (draft.length > available) {
-                editor?.error = "Message exceeds the current context allowance (" + available + " UTF-16 units). Shorten the draft."
+                editor?.error = "Message exceeds the current context allowance (" + available + " UTF-16 units). Shorten the draft or choose Longer context in Settings."
                 status.text = "Draft preserved; no message submitted"
                 return
             }
         }
-        val preset = performancePreset()
         val approved = approvedModel?.takeIf { it.first == ticket && s.models.any { model -> model.sha256 == it.second } }
         if (approved != null) {
             generate(ticket, draft, approved.second, s.draft.pending != null, mode, preset)
@@ -1079,7 +1079,7 @@ class MandyWorkspaceActivity : Activity() {
             val result = runCatching {
                 workspace.edit(ticket, draft)
                 saved = true
-                if (!retry) workspace.prepare(ticket, mode)
+                if (!retry) workspace.prepare(ticket, mode, library.resolve(ticket.key).identity, preset.contextUnits)
                 AndroidConversationStore(applicationContext, account).use { history ->
                     EmbeddedChatTurn.sendWithMemory(workspace, ticket, library, history, modelLibrary(), sha, memory, stopped::get, admit = { admitModel(it, preset.contextTokens) }, preset = preset, resident = resident, onMetrics = { metrics = it },
                         onPreparation = { preparation = it }) { origin, part ->
