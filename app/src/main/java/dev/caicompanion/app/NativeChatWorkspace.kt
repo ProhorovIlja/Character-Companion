@@ -119,6 +119,20 @@ class NativeChatWorkspace(root: Path, account: String, private val device: Strin
         require(state.pending?.id == id)
         save(ticket.key, state.copy(pending = null))
     }
+    /** Explicit recovery without model selection, inference, or history writes. */
+    @Synchronized fun recoverCommitted(ticket: Ticket, id: String, history: NativeConversation.History): NativeConversation.Event? {
+        require(visible(ticket) && ticket.key !in running)
+        val state = load(ticket.key)
+        val pending = checkNotNull(state.pending)
+        require(pending.id == id)
+        val reply = history.find(NativeConversation.replyId(id)) ?: return null
+        val user = checkNotNull(history.find(id)) { "Saved reply has no user event" }
+        require(user == NativeConversation.Event(id, device, ticket.key.character, ticket.key.chat,
+            user.clock, "user", pending.mode, pending.text)) { "Conflicting saved user event" }
+        NativeConversation.validateReply(user, reply)
+        save(ticket.key, state.copy(pending = null))
+        return reply
+    }
     /** Explicit send/retry only. UI must recheck ticket on its own render thread. */
     fun sendPending(ticket: Ticket, history: NativeConversation.History, identity: String,
                     cancelled: () -> Boolean = { false }, onText: (Ticket, String) -> Unit,
