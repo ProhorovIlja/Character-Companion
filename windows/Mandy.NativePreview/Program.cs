@@ -831,12 +831,14 @@ internal sealed class ChatWindow : Window
         panel.Children.Add(list);
         var chats = new Button { Content = "Current character conversations" };
         var edit = new Button { Content = "Edit current character", IsEnabled = pending == null };
+        var memory = new Button { Content = "Memory and relationship", IsEnabled = pending == null };
         panel.Children.Add(Buttons(select, add, cancel));
-        panel.Children.Add(Buttons(chats, edit));
+        panel.Children.Add(Buttons(chats, edit, memory));
         var dialog = new Window { Owner = this, Title = "Characters", Width = 430, SizeToContent = SizeToContent.Height,
             WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false, Content = panel };
         Workspace.Profile? selected = null;
-        bool creating = false, browseChats = false, editing = false;
+        bool creating = false, browseChats = false, editing = false, editingMemory = false;
+        memory.Click += (_, _) => { editingMemory = true; dialog.DialogResult = true; };
         edit.Click += (_, _) => { editing = true; dialog.DialogResult = true; };
         chats.Click += (_, _) => { browseChats = true; dialog.DialogResult = true; };
         select.Click += (_, _) => { selected = list.SelectedItem as Workspace.Profile; if (selected != null) dialog.DialogResult = true; };
@@ -844,6 +846,7 @@ internal sealed class ChatWindow : Window
         if (dialog.ShowDialog() != true) return;
         if (browseChats) { await ChooseConversationAsync(); return; }
         if (editing) { await EditCurrentCharacterAsync(); return; }
+        if (editingMemory) { await EditMemoryAsync(); return; }
         string newName = "", newIdentity = "";
         if (creating)
         {
@@ -911,6 +914,63 @@ internal sealed class ChatWindow : Window
             characterTitle.Text = previous.Name;
             status.Text = "Character operation failed. Refresh the original conversation before continuing.";
         }
+        finally { Finish(); }
+    }
+
+    private async Task EditMemoryAsync()
+    {
+        var w = workspace;
+        if (busy || !historyValid || w == null || closeRequested || pending != null) return;
+        var character = w.Character;
+        var store = new CharacterMemory(w.Database, character.Account);
+        CharacterMemory.State original;
+        busy = true; UpdateControls();
+        try { original = await Task.Run(() => store.Read(character.Character)); }
+        catch (Exception)
+        {
+            status.Text = "Memory could not be read. Existing context has not been reset.";
+            return;
+        }
+        finally { Finish(); }
+        if (closeRequested || workspace != w || w.Character != character) return;
+        var stage = new ComboBox { ItemsSource = CharacterMemory.Stages, SelectedItem = original.Stage };
+        var relationship = new TextBox { Text = original.Relationship, MaxLength = 800, AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap, MinHeight = 65 };
+        var pinned = new TextBox { Text = original.Pinned, MaxLength = 1200, AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap, MinHeight = 80 };
+        var notes = new TextBox { Text = string.Join("\n", original.Memories), MaxLength = 51456,
+            AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 140, MaxHeight = 260,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        var panel = new StackPanel { Margin = new Thickness(16) };
+        panel.Children.Add(new TextBlock { Text = "Reviewed context shared across this character's conversations. No automatic relationship progression or memory changes.", TextWrapping = TextWrapping.Wrap });
+        panel.Children.Add(Labeled("Fictional relationship stage", stage));
+        panel.Children.Add(Labeled("Relationship description", relationship));
+        panel.Children.Add(Labeled("Pinned information", pinned));
+        panel.Children.Add(Labeled("Memories — one note per line (128 maximum, 400 characters per note)", notes));
+        var save = new Button { Content = "Save context", IsDefault = true };
+        var cancel = new Button { Content = "Cancel", IsCancel = true };
+        panel.Children.Add(Buttons(save, cancel));
+        var dialog = new Window { Owner = this, Title = "Memory and relationship — " + character.Name,
+            Width = 540, Height = 660, MinHeight = 400, WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ShowInTaskbar = false, Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } };
+        CharacterMemory.State? proposed = null;
+        save.Click += (_, _) =>
+        {
+            var candidate = new CharacterMemory.State(original.Revision, (string?)stage.SelectedItem ?? original.Stage,
+                relationship.Text, pinned.Text, notes.Text.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None)
+                    .Select(n => n.Trim()).Where(n => n.Length > 0).ToArray());
+            try { CharacterMemory.Validate(candidate); proposed = candidate; dialog.DialogResult = true; }
+            catch (Exception ex) when (ex is ArgumentException or InvalidDataException)
+            { MessageBox.Show(dialog, "Check note lengths, count and duplicates.", "Mandy AI"); }
+        };
+        if (dialog.ShowDialog() != true || proposed == null || closeRequested || workspace != w || w.Character != character) return;
+        busy = true; UpdateControls();
+        try
+        {
+            await Task.Run(() => store.Save(character.Character, proposed));
+            status.Text = "Character memory saved.";
+        }
+        catch (Exception) { status.Text = "Context save failed. Existing memory was not reset."; }
         finally { Finish(); }
     }
 
@@ -1237,7 +1297,15 @@ internal sealed class ChatWindow : Window
                 await Task.Run(() => w.SaveDraft(text));
                 lastSavedDraft = text;
             }
-            await turn.SendAsync(request, preview: OnFragment, cancellationToken: token);
+            // Only this character's reviewed context is read; the original identity
+            // and latest user message are never truncated to fit optional memories.
+            var enriched = await Task.Run(() =>
+            {
+                token.ThrowIfCancellationRequested();
+                var memory = new CharacterMemory(w.Database, p.Account);
+                return CharacterMemory.Compose(memory.Read(p.Character), p.Identity, text);
+            }, token);
+            await turn.SendAsync(request with { Identity = enriched }, preview: OnFragment, cancellationToken: token);
             saved = true;
             draft.Clear();
             status.Text = "Reply saved.";
