@@ -11,6 +11,7 @@ internal sealed class Workspace : IDisposable
     internal Profile Character { get; private set; }
     private readonly List<Profile> profiles;
     private readonly string catalogPath;
+    private readonly string titlesPath;
     private readonly string conversationsPath;
     private readonly string selectionPath;
     internal sealed record Conversation(string Character, string Chat, string Title);
@@ -24,6 +25,7 @@ internal sealed class Workspace : IDisposable
     {
         Character = profile; Database = database; this.lease = lease; this.catalogPath = catalogPath; this.profiles = profiles;
         this.conversationsPath = conversationsPath; this.selectionPath = selectionPath; this.conversations = conversations;
+        titlesPath = Path.Combine(Path.GetDirectoryName(database)!, "conversation-titles.json");
     }
     private static void Validate(Profile p)
     {
@@ -49,7 +51,7 @@ internal sealed class Workspace : IDisposable
             throw new IOException("Creation requires an empty folder.");
         if (!create && (!File.Exists(meta) || !File.Exists(db)))
             throw new IOException("Incomplete workspace; existing files have not been reset.");
-        foreach (var path in new[] { meta, db, lockPath, db + "-wal", db + "-shm", catalog, conversationFile, selectionFile })
+        foreach (var path in new[] { meta, db, lockPath, db + "-wal", db + "-shm", catalog, conversationFile, selectionFile, Path.Combine(root, "conversation-titles.json") })
             if (File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
                 throw new IOException("Linked workspace files are not supported.");
         var lease = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
@@ -112,6 +114,7 @@ internal sealed class Workspace : IDisposable
                 }
             }
             var result = new Workspace(p, db, lease, catalog, profiles, conversationFile, selectionFile, chats);
+            result.LoadTitles();
             // Selection is optional UI metadata. Invalid selection never resets history.
             if (File.Exists(selectionFile))
             {
@@ -180,6 +183,52 @@ internal sealed class Workspace : IDisposable
             else File.Move(temp, path);
         }
         finally { if (File.Exists(temp)) File.Delete(temp); }
+    }
+    internal void EditCharacter(string character, string name, string identity)
+    {
+        LocalHistory.Id(character);
+        int index = profiles.FindIndex(p => p.Character == character);
+        if (index < 0) throw new InvalidDataException("Unknown character.");
+        var updated = profiles[index] with { Name = name, Identity = identity };
+        Validate(updated);
+        if (index == 0)
+            WriteJson(Path.Combine(Path.GetDirectoryName(Database)!, "workspace.json"), updated, 65536);
+        else
+        {
+            var next = profiles.Skip(1).Select(p => p.Character == character ? updated : p).ToArray();
+            WriteJson(catalogPath, next, 4_194_304);
+        }
+        profiles[index] = updated;
+        if (Character.Character == character) Character = updated with { Chat = Character.Chat };
+    }
+    private sealed record TitleOverride(string Character, string Chat, string Title);
+    private void LoadTitles()
+    {
+        if (!File.Exists(titlesPath)) return;
+        var entries = ReadJson<List<TitleOverride>>(titlesPath, 1_048_576);
+        if (entries.Count > 1088) throw new InvalidDataException("Too many conversation titles.");
+        var seen = new HashSet<string>();
+        foreach (var entry in entries)
+        {
+            if (entry == null) throw new InvalidDataException("Invalid title.");
+            LocalHistory.Id(entry.Character); LocalHistory.Id(entry.Chat);
+            LocalHistory.ValidateText(entry.Title);
+            int index = conversations.FindIndex(c => c.Character == entry.Character && c.Chat == entry.Chat);
+            if (index < 0 || !seen.Add(entry.Chat) || entry.Title.Length > 120)
+                throw new InvalidDataException("Invalid conversation title scope.");
+            conversations[index] = conversations[index] with { Title = entry.Title };
+        }
+    }
+    internal void RenameConversation(string chat, string title)
+    {
+        LocalHistory.Id(chat); LocalHistory.ValidateText(title);
+        if (title.Length > 120) throw new ArgumentException("Title too long.");
+        int index = conversations.FindIndex(c => c.Character == Character.Character && c.Chat == chat);
+        if (index < 0) throw new InvalidDataException("Unknown conversation.");
+        // Save titles independently, including original chats, without changing the original catalog schema.
+        var next = conversations.Select(c => new TitleOverride(c.Character, c.Chat, c.Chat == chat ? title : c.Title)).ToArray();
+        WriteJson(titlesPath, next, 1_048_576);
+        conversations[index] = conversations[index] with { Title = title };
     }
     internal Conversation AddConversation(string title)
     {
