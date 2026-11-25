@@ -34,10 +34,14 @@ class EmbeddedLlama private constructor() : Closeable {
             val engine = EmbeddedLlama()
             engine.handle = engine.nativeLoad(model.path.toAbsolutePath().toString().toByteArray(Charsets.UTF_8))
             check(engine.handle != 0L)
-            if (cancelled() || Thread.currentThread().isInterrupted) {
-                engine.close(); throw IOException("Model load cancelled")
+            // Ownership transfers only after the final cancellation check succeeds.
+            try {
+                if (cancelled() || Thread.currentThread().isInterrupted) throw IOException("Model load cancelled")
+                return engine
+            } catch (failure: Throwable) {
+                try { engine.close() } catch (cleanup: Throwable) { if (cleanup !== failure) failure.addSuppressed(cleanup) }
+                throw failure
             }
-            return engine
         }
     }
     @Synchronized fun generate(messages: List<NativeConversation.Message>, contextTokens: Int = 4096,
