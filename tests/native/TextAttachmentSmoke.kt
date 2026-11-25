@@ -28,5 +28,20 @@ fun main() {
     reject { NativeTextAttachment.insert("a", 2, 2, "text") }
     reject { NativeTextAttachment.insert("x".repeat(16000), 0, 0, "text") }
     reject { NativeTextAttachment.insert("🌙", 1, 1, "text") }
+    verify(runCatching {
+        NativeTextAttachment.read(ByteArrayInputStream(byteArrayOf(65))) { true }
+    }.exceptionOrNull() is java.io.InterruptedIOException)
+    var cancelled = false
+    val input = object : InputStream() {
+        override fun read() = 65
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            b[off] = 65
+            cancelled = true
+            return 1
+        }
+    }
+    verify(runCatching {
+        NativeTextAttachment.read(input) { cancelled }
+    }.exceptionOrNull() is java.io.InterruptedIOException)
     println("PASS: $checks text attachment assertions")
 }
