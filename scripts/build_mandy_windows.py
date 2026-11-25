@@ -42,15 +42,41 @@ def preflight(root):
 
 
 def check_pe(path):
+    size = path.stat().st_size
     with path.open('rb') as stream:
         header = stream.read(64)
         require(len(header) == 64 and header[:2] == b'MZ', 'Invalid Windows apphost')
         offset = struct.unpack_from('<I', header, 60)[0]
-        require(64 <= offset <= min(path.stat().st_size - 26, 1024 * 1024), 'Invalid PE offset')
+        require(64 <= offset <= min(size - 24, 1024 * 1024), 'Invalid PE offset')
         stream.seek(offset)
-        pe = stream.read(26)
-        require(pe[:4] == b'PE\x00\x00' and struct.unpack_from('<H', pe, 4)[0] == 0x8664
-                and struct.unpack_from('<H', pe, 24)[0] == 0x20b, 'Expected x64 PE32+ apphost')
+        pe = stream.read(24)
+        require(len(pe) == 24 and pe[:4] == b'PE\x00\x00', 'Invalid PE signature')
+        machine, sections, _, _, _, optional_size, flags = struct.unpack_from('<HHIIIHH', pe, 4)
+        require(machine == 0x8664, 'Expected x64 PE32+ apphost')
+        require(flags & 0x0002 and not flags & 0x2000, 'Expected executable, not DLL')
+        table_end = offset + 24 + optional_size + 40 * sections
+        require(1 <= sections <= 96 and optional_size >= 112 and table_end <= size,
+                'Invalid PE optional header or section table')
+        optional = stream.read(optional_size)
+        require(len(optional) == optional_size and struct.unpack_from('<H', optional)[0] == 0x20b,
+                'Expected x64 PE32+ apphost')
+        entry = struct.unpack_from('<I', optional, 16)[0]
+        image_size, headers_size = struct.unpack_from('<II', optional, 56)
+        require(table_end <= headers_size <= size and headers_size <= image_size and 0 < entry < image_size,
+                'Invalid PE image or entry point bounds')
+        has_entry = False
+        for _ in range(sections):
+            section = stream.read(40)
+            require(len(section) == 40, 'Truncated PE section')
+            virtual_size, address, raw_size, raw_offset = struct.unpack_from('<IIII', section, 8)
+            characteristics = struct.unpack_from('<I', section, 36)[0]
+            require(address + max(virtual_size, raw_size) <= image_size, 'Invalid PE section image bounds')
+            if raw_size:
+                require(headers_size <= raw_offset and raw_offset + raw_size <= size,
+                        'Invalid PE section file bounds')
+                if characteristics & 0x20000000 and address <= entry < address + raw_size:
+                    has_entry = True
+        require(has_entry, 'PE entry point is not in a file-backed executable section')
 
 
 def audit(directory):
