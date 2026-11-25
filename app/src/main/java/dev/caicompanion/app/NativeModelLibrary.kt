@@ -10,12 +10,13 @@ import java.nio.file.LinkOption
 import java.security.MessageDigest
 
 /** Explicit local model import. A digest identifies bytes; it does not establish publisher trust. */
-class NativeModelLibrary(private val root: Path, private val maxBytes: Long = 8L * 1024 * 1024 * 1024,
+class NativeModelLibrary(private val root: Path, private val maxBytes: Long,
                          private val format: Format = Format.GGUF) {
     enum class Format(val suffix: String, val headerBytes: Int, val ceiling: Long) {
         GGUF(".gguf", 24, 8L * 1024 * 1024 * 1024),
         WHISPER(".bin", 48, 2L * 1024 * 1024 * 1024)
     }
+    constructor(root: Path, format: Format = Format.GGUF) : this(root, format.ceiling, format)
     private val headerBytes = format.headerBytes
     data class Model(val sha256: String, val bytes: Long, val path: Path)
     init { require(maxBytes > headerBytes && maxBytes <= format.ceiling); Files.createDirectories(root) }
