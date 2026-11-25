@@ -463,11 +463,54 @@ internal sealed class ChatWindow : Window
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException or ArgumentException) { return false; }
     }
 
-    private static string EncodeTheme(Dictionary<string, Color> values) =>
+    private sealed record NamedTheme(string Name, Dictionary<string, Color> Colors);
+    private static bool ValidThemeName(string name)
+    {
+        if (name.Length is < 1 or > 80 || name != name.Trim() || name.Any(char.IsControl)) return false;
+        try { LocalHistory.ValidateText(name); return true; }
+        catch (ArgumentException) { return false; }
+    }
+    private static List<NamedTheme>? ReadThemeLibrary()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(AppearanceKey, false);
+            var value = key?.GetValue("ThemeLibraryV1");
+            if (value == null) return new();
+            if (value is not string raw || raw.Length > 65536) return null;
+            var entries = System.Text.Json.JsonSerializer.Deserialize<string[]>(raw);
+            if (entries == null || entries.Length > 16) return null;
+            var result = new List<NamedTheme>();
+            foreach (var entry in entries)
+            {
+                var theme = entry == null ? null : DecodeTheme(entry);
+                if (theme == null || result.Any(x => x.Name == theme.Name)) return null;
+                result.Add(theme);
+            }
+            return result;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException or System.Text.Json.JsonException or ArgumentException) { return null; }
+    }
+    private static bool SaveThemeLibrary(List<NamedTheme> entries)
+    {
+        if (entries.Count > 16 || entries.Select(x => x.Name).Distinct(StringComparer.Ordinal).Count() != entries.Count) return false;
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(AppearanceKey, true);
+            if (key == null) return false;
+            string raw = System.Text.Json.JsonSerializer.Serialize(entries.Select(x => EncodeTheme(x.Colors, x.Name)).ToArray());
+            if (raw.Length > 65536) return false;
+            key.SetValue("ThemeLibraryV1", raw, RegistryValueKind.String);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException or ArgumentException) { return false; }
+    }
+
+    private static string EncodeTheme(Dictionary<string, Color> values, string name) =>
         System.Text.Json.JsonSerializer.Serialize(new
         {
             schema = 1,
-            name = "Custom",
+            name,
             colors = ColorRoles.ToDictionary(role => role.Key, role =>
             {
                 Color c = values[role.Key];
@@ -475,7 +518,7 @@ internal sealed class ChatWindow : Window
             })
         }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
 
-    private static Dictionary<string, Color>? DecodeTheme(string raw)
+    private static NamedTheme? DecodeTheme(string raw)
     {
         if (raw.Length is < 1 or > 2048) return null;
         try
@@ -486,7 +529,7 @@ internal sealed class ChatWindow : Window
                 !root.EnumerateObject().Select(p => p.Name).OrderBy(x => x, StringComparer.Ordinal)
                     .SequenceEqual(new[] { "colors", "name", "schema" }) ||
                 !root.GetProperty("schema").TryGetInt32(out int version) || version != 1 ||
-                root.GetProperty("name").GetString() is not { Length: > 0 and <= 80 }) return null;
+                root.GetProperty("name").GetString() is not string themeName || !ValidThemeName(themeName)) return null;
             var colors = root.GetProperty("colors");
             if (colors.ValueKind != System.Text.Json.JsonValueKind.Object ||
                 !colors.EnumerateObject().Select(p => p.Name).OrderBy(x => x, StringComparer.Ordinal)
@@ -498,7 +541,7 @@ internal sealed class ChatWindow : Window
                 if (value == null || !System.Text.RegularExpressions.Regex.IsMatch(value, @"\A#[0-9a-fA-F]{6}\z")) return null;
                 result.Add(role.Key, (Color)ColorConverter.ConvertFromString(value));
             }
-            return ColorError(result) == null ? result : null;
+            return ColorError(result) == null ? new NamedTheme(themeName, result) : null;
         }
         catch (Exception ex) when (ex is System.Text.Json.JsonException or InvalidOperationException or FormatException or ArgumentException) { return null; }
     }
@@ -510,19 +553,61 @@ internal sealed class ChatWindow : Window
             WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false,
             Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } };
         var fields = new Dictionary<string, TextBox>();
+        var themeName = new TextBox { Text = "Custom", MaxLength = 80 };
+        AutomationProperties.SetName(themeName, "Theme name");
+        panel.Children.Add(Labeled("Theme name", themeName));
+        var savedThemes = new ComboBox { DisplayMemberPath = nameof(NamedTheme.Name), MinWidth = 180 };
+        AutomationProperties.SetName(savedThemes, "Saved themes");
+        var library = ReadThemeLibrary();
+        void RefreshLibrary() => savedThemes.ItemsSource = library?.OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase).ToArray();
+        RefreshLibrary();
+        panel.Children.Add(Labeled("Saved themes", savedThemes));
+        var loadSaved = new Button { Content = "Load saved theme", IsEnabled = library != null };
+        var deleteSaved = new Button { Content = "Delete saved theme", IsEnabled = library != null };
+        panel.Children.Add(Buttons(loadSaved, deleteSaved));
         string Hex(Color c) => $"#{c.R:X2}{c.G:X2}{c.B:X2}";
         foreach (var role in ColorRoles)
         {
             var box = new TextBox { Text = Hex(existing[role.Key]), MaxLength = 7 };
             AutomationProperties.SetName(box, role.Label);
             fields.Add(role.Key, box);
-            panel.Children.Add(Labeled(role.Label, box));
+            var swatch = new Border { Width = 34, Height = 34, CornerRadius = new CornerRadius(6),
+                BorderThickness = new Thickness(1), BorderBrush = SystemColors.ControlDarkBrush, Margin = new Thickness(0,0,10,0) };
+            void RefreshSwatch()
+            {
+                swatch.Background = System.Text.RegularExpressions.Regex.IsMatch(box.Text, @"\A#[0-9a-fA-F]{6}\z")
+                    ? new SolidColorBrush((Color)ColorConverter.ConvertFromString(box.Text)) : Brushes.Transparent;
+            }
+            box.TextChanged += (_, _) => RefreshSwatch();
+            RefreshSwatch();
+            var row = new DockPanel();
+            DockPanel.SetDock(swatch, Dock.Left);
+            row.Children.Add(swatch); row.Children.Add(box);
+            panel.Children.Add(Labeled(role.Label, row));
         }
         var warning = new TextBlock { Text = "Use #RRGGBB. Contrast is checked before applying.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0,12,0,8) };
         panel.Children.Add(warning);
+        if (library == null) warning.Text = "Saved theme library is unreadable; existing entries will not be replaced.";
+        loadSaved.Click += (_, _) =>
+        {
+            if (savedThemes.SelectedItem is not NamedTheme selected) return;
+            themeName.Text = selected.Name;
+            foreach (var field in fields) field.Value.Text = Hex(selected.Colors[field.Key]);
+            warning.Text = "Theme loaded into fields. Apply to activate.";
+        };
+        deleteSaved.Click += (_, _) =>
+        {
+            if (library == null || savedThemes.SelectedItem is not NamedTheme selected ||
+                MessageBox.Show(dialog, "Delete this saved theme? Active colors will not change.", "Delete theme",
+                    MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+            var next = library.Where(x => x.Name != selected.Name).ToList();
+            if (!SaveThemeLibrary(next)) { warning.Text = "Could not save theme library."; return; }
+            library = next; RefreshLibrary(); warning.Text = "Saved theme deleted.";
+        };
         var copyTheme = new Button { Content = "Copy theme JSON" };
         var importTheme = new Button { Content = "Import theme JSON" };
-        panel.Children.Add(Buttons(copyTheme, importTheme));
+        var saveTheme = new Button { Content = "Save to library", IsEnabled = library != null };
+        panel.Children.Add(Buttons(copyTheme, importTheme, saveTheme));
         var reset = new Button { Content = "Reset fields" };
         var apply = new Button { Content = "Apply", IsDefault = true };
         var cancel = new Button { Content = "Cancel", IsCancel = true };
@@ -546,8 +631,21 @@ internal sealed class ChatWindow : Window
         {
             var candidate = Candidate();
             if (candidate == null) return;
-            try { Clipboard.SetText(EncodeTheme(candidate)); warning.Text = "Theme copied. No chat or account data included."; }
+            if (!ValidThemeName(themeName.Text)) { warning.Text = "Enter a valid theme name."; return; }
+            try { Clipboard.SetText(EncodeTheme(candidate, themeName.Text)); warning.Text = "Theme copied. No chat or account data included."; }
             catch (System.Runtime.InteropServices.ExternalException) { warning.Text = "Clipboard unavailable."; }
+        };
+        saveTheme.Click += (_, _) =>
+        {
+            var candidate = Candidate();
+            if (candidate == null || library == null) return;
+            if (!ValidThemeName(themeName.Text)) { warning.Text = "Enter a valid theme name."; return; }
+            var old = library.FirstOrDefault(x => x.Name == themeName.Text);
+            if (old == null && library.Count >= 16) { warning.Text = "Theme collection is full (16 maximum)."; return; }
+            if (old != null && MessageBox.Show(dialog, "Replace this saved theme?", "Save theme", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+            var next = library.Where(x => x.Name != themeName.Text).Append(new NamedTheme(themeName.Text, candidate)).ToList();
+            if (!SaveThemeLibrary(next)) { warning.Text = "Could not save theme library."; return; }
+            library = next; RefreshLibrary(); warning.Text = "Theme saved. Apply to activate.";
         };
         importTheme.Click += (_, _) =>
         {
@@ -565,7 +663,8 @@ internal sealed class ChatWindow : Window
             {
                 var candidate = DecodeTheme(input.Text);
                 if (candidate == null) { error.Text = "Invalid theme or insufficient contrast."; return; }
-                foreach (var field in fields) field.Value.Text = Hex(candidate[field.Key]);
+                themeName.Text = candidate.Name;
+                foreach (var field in fields) field.Value.Text = Hex(candidate.Colors[field.Key]);
                 warning.Text = "Theme loaded into fields. Apply to save.";
                 importer.DialogResult = true;
             };
