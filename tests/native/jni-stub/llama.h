@@ -11,7 +11,7 @@ struct llama_vocab {};
 struct llama_model { llama_vocab vocab; const char* tmpl = "stub"; };
 struct llama_context { unsigned limit; unsigned decoded; bool (*abort_callback)(void*); void* abort_callback_data; };
 struct llama_sampler { unsigned seed = 0; int sampled = 0; std::vector<llama_sampler*> children; };
-struct llama_model_params { int n_gpu_layers; bool check_tensors; };
+struct llama_model_params { int n_gpu_layers; bool check_tensors; bool (*progress_callback)(float, void*); void* progress_callback_user_data; };
 struct llama_context_params { unsigned n_ctx, n_batch, n_ubatch, n_seq_max; int n_threads, n_threads_batch; bool offload_kqv, op_offload; bool (*abort_callback)(void*); void* abort_callback_data; };
 struct llama_sampler_chain_params {};
 struct llama_chat_message { const char* role; const char* content; };
@@ -21,7 +21,26 @@ inline void llama_backend_init() {}
 inline llama_model_params llama_model_default_params() { return {}; }
 // The smoke test is single-owner: refuse a second load if cleanup leaked.
 inline int live_models = 0;
-inline llama_model* llama_model_load_from_file(const char* path,llama_model_params) { if (live_models != 0) return nullptr; auto p = new llama_model; ++live_models; if (std::strstr(path,"unsupported.gguf")) p->tmpl = "unsupported"; else if (std::strstr(path,"missing.gguf")) p->tmpl = nullptr; return p; }
+inline llama_model* llama_model_load_from_file(const char* path,llama_model_params params) {
+    if (live_models != 0 || !params.progress_callback) return nullptr;
+    auto p = new llama_model; ++live_models;
+    bool worker_continue = false;
+    std::thread worker([&] { worker_continue = params.progress_callback(0.1f, params.progress_callback_user_data); });
+    worker.join();
+    if (!worker_continue) std::abort();
+    for (float fraction : {0.5f, 1.0f}) {
+        if (!params.progress_callback(fraction, params.progress_callback_user_data)) {
+            worker_continue = true;
+            std::thread after([&] { worker_continue = params.progress_callback(fraction, params.progress_callback_user_data); });
+            after.join();
+            if (worker_continue) std::abort();
+            --live_models; delete p; return nullptr;
+        }
+    }
+    if (std::strstr(path,"unsupported.gguf")) p->tmpl = "unsupported";
+    else if (std::strstr(path,"missing.gguf")) p->tmpl = nullptr;
+    return p;
+}
 inline void llama_model_free(llama_model* p) { --live_models; delete p; }
 inline bool llama_model_has_encoder(const llama_model*) {return false;}
 inline bool llama_model_has_decoder(const llama_model*) {return true;}
