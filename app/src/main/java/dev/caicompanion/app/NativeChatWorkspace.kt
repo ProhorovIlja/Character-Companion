@@ -93,7 +93,11 @@ class NativeChatWorkspace(root: Path, account: String, private val device: Strin
     @Synchronized fun state(key: Key): State = load(key)
     @Synchronized fun edit(ticket: Ticket, text: String) {
         require(visible(ticket)) { "Stale session" }
-        save(ticket.key, load(ticket.key).copy(draft = text))
+        val state = load(ticket.key)
+        // Settings and navigation may save an unchanged draft. Avoid a redundant
+        // durable write, but still read and validate the authoritative record.
+        if (state.draft == text) return
+        save(ticket.key, state.copy(draft = text))
     }
     @Synchronized fun prepare(ticket: Ticket, mode: String = "text", identity: String? = null, contextUnits: Int = 12000): Pending {
         require(visible(ticket) && ticket.key !in running)
