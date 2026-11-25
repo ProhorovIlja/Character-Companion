@@ -40,6 +40,7 @@ class MandyWorkspaceActivity : Activity() {
     companion object {
         // Serialize explicitly requested disk operations across activity recreation.
         private val disk = Executors.newSingleThreadExecutor()
+        private const val PICK_TEXT_DOCUMENT = 7412
     }
     private data class Snapshot(val profiles: List<NativeCharacterLibrary.Profile>,
                                 val ticket: NativeChatWorkspace.Ticket?,
@@ -75,6 +76,8 @@ class MandyWorkspaceActivity : Activity() {
     private lateinit var stopSpeech: Button
     private lateinit var sendSpeech: Button
     private var resumed = false
+    private data class TextPick(val snapshot: Snapshot, val draft: String, val start: Int, val end: Int)
+    private var textPick: TextPick? = null
     /** Sample system memory only during explicitly requested local inference. */
     private fun admitModel(model: NativeModelLibrary.Model, contextTokens: Int) {
         val manager = applicationContext.getSystemService(android.app.ActivityManager::class.java)
@@ -472,7 +475,7 @@ class MandyWorkspaceActivity : Activity() {
         editor = field
         composer.addView(field)
         val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
-        actions.addView(chatAction("attach", "Attachments not available in this build", false) {})
+        actions.addView(chatAction("attach", "Import text document", s.draft.pending == null) { pickTextDocument(s) })
         actions.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         actions.addView(chatAction("mic", "Dictate", s.draft.pending == null) {
             if (BuildConfig.MANDY_WHISPER_PREVIEW && s.speechModels.isNotEmpty()) {
@@ -832,6 +835,94 @@ class MandyWorkspaceActivity : Activity() {
         latest.setOnClickListener { load(null) }
         dialog.show()
         load(null)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun pickTextDocument(s: Snapshot) {
+        val field = editor ?: return
+        if (!resumed || busy || !alive() || textPick != null || current !== s || s.ticket == null || s.draft.pending != null) return
+        val draft = field.text.toString()
+        val a = field.selectionStart
+        val b = field.selectionEnd
+        val start = if (a < 0 || b < 0) draft.length else minOf(a, b)
+        val end = if (a < 0 || b < 0) draft.length else maxOf(a, b)
+        textPick = TextPick(s, draft, start, end)
+        try {
+            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "text/plain"
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }, PICK_TEXT_DOCUMENT)
+        } catch (_: Exception) {
+            textPick = null
+            status.text = "Document picker unavailable"
+        }
+    }
+
+    @Deprecated("Activity result retained for the native Activity and scoped document picker")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != PICK_TEXT_DOCUMENT) return
+        val pick = textPick ?: return
+        textPick = null
+        if (resultCode != RESULT_OK || busy || !alive() || current !== pick.snapshot ||
+            editor?.text?.toString() != pick.draft) return
+        val uri = data?.data ?: return
+        if (uri.scheme != "content" || (data.clipData?.itemCount ?: 0) > 1) {
+            status.text = "Select one readable text document"
+            return
+        }
+        val resolver = applicationContext.contentResolver
+        busy = true
+        val states = mutableMapOf<View, Boolean>()
+        suspendInputs(panel, states)
+        status.text = "Reading selected text document…"
+        disk.execute {
+            val result = runCatching {
+                resolver.openInputStream(uri)?.use { stream -> NativeTextAttachment.read(stream) }
+                    ?: error("Document unavailable")
+            }
+            runOnUiThread {
+                if (!alive()) return@runOnUiThread
+                busy = false
+                states.forEach { (view, enabled) -> view.isEnabled = enabled }
+                if (!resumed || current !== pick.snapshot || editor?.text?.toString() != pick.draft) {
+                    status.text = "Document import cancelled; draft preserved"
+                    return@runOnUiThread
+                }
+                val text = result.getOrNull()
+                if (text == null) {
+                    status.text = "Cannot import document. Use UTF-8 plain text (6,000 characters maximum)."
+                    return@runOnUiThread
+                }
+                reviewTextDocument(pick, text)
+            }
+        }
+    }
+
+    private fun reviewTextDocument(pick: TextPick, text: String) {
+        val change = runCatching { NativeTextAttachment.insert(pick.draft, pick.start, pick.end, text) }.getOrNull()
+        if (change == null) { status.text = "Document does not fit the draft; original draft preserved"; return }
+        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(8), dp(16), dp(8)) }
+        content.addView(label("Review the selected document. Insert adds quoted text to your draft and saves it locally. It does not send a message.", 14f))
+        content.addView(label(text, 14f).apply { setTextIsSelectable(true) })
+        status.text = "Text document ready for review"
+        AlertDialog.Builder(this).setTitle("Import text document")
+            .setView(ScrollView(this).apply { addView(content) })
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton("Insert into draft") { _, _ ->
+                val field = editor
+                val ticket = pick.snapshot.ticket
+                if (field != null && ticket != null && resumed && alive() && !busy &&
+                    current === pick.snapshot && field.text.toString() == pick.draft) {
+                    field.setText(change.text)
+                    field.setSelection(change.caret)
+                    work(afterSuccess = {
+                        editor?.setSelection(change.caret.coerceIn(0, editor?.length() ?: 0))
+                        status.text = "Document text saved to draft"
+                    }) { workspace.edit(ticket, change.text) }
+                }
+            }.show()
     }
 
     private fun chooseModel(s: Snapshot, mode: String = "text") {
