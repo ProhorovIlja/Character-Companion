@@ -607,6 +607,61 @@ class MandyWorkspaceActivity : Activity() {
         require(paletteError(p) == null)
         NamedPalette(name, p.toMap())
     }.getOrNull()
+    /** Edit one staged color; no preference or draft writes until the parent Apply action. */
+    private fun chooseRoleColor(role: ColorRole, field: EditText, fallback: Int) {
+        val raw = field.text.toString().trim()
+        val initial = if (raw.matches(Regex("#[0-9a-fA-F]{6}"))) android.graphics.Color.parseColor(raw) else fallback
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(12), dp(20), dp(12))
+        }
+        val preview = TextView(this).apply {
+            gravity = android.view.Gravity.CENTER
+            textSize = 18f
+            minHeight = dp(64)
+        }
+        body.addView(preview, LinearLayout.LayoutParams(-1, -2))
+        val channels = intArrayOf(android.graphics.Color.red(initial),
+            android.graphics.Color.green(initial), android.graphics.Color.blue(initial))
+        val names = arrayOf("Red", "Green", "Blue")
+        fun selectedColor() = android.graphics.Color.rgb(channels[0], channels[1], channels[2])
+        fun refresh() {
+            val color = selectedColor()
+            preview.text = colorHex(color)
+            preview.setTextColor(if (contrast(android.graphics.Color.BLACK, color) >=
+                contrast(android.graphics.Color.WHITE, color)) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+            preview.background = GradientDrawable().apply {
+                cornerRadius = dp(12).toFloat()
+                setColor(color)
+                setStroke(dp(1), ShellAppearance.color(this@MandyWorkspaceActivity, R.attr.shellOutline))
+            }
+        }
+        for (index in channels.indices) {
+            val channelLabel = label(names[index] + " · " + channels[index], 14f)
+            body.addView(channelLabel)
+            body.addView(android.widget.SeekBar(this).apply {
+                max = 255
+                progress = channels[index]
+                minHeight = dp(48)
+                contentDescription = names[index] + " channel"
+                setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(bar: android.widget.SeekBar?, value: Int, fromUser: Boolean) {
+                        channels[index] = value
+                        channelLabel.text = names[index] + " · " + value
+                        refresh()
+                    }
+                    override fun onStartTrackingTouch(bar: android.widget.SeekBar?) = Unit
+                    override fun onStopTrackingTouch(bar: android.widget.SeekBar?) = Unit
+                })
+            }, LinearLayout.LayoutParams(-1, -2))
+        }
+        refresh()
+        AlertDialog.Builder(this).setTitle(role.title)
+            .setView(ScrollView(this).apply { addView(body) })
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton("Use color") { _, _ -> field.setText(colorHex(selectedColor())) }
+            .show()
+    }
     private fun editPalette(initial: NamedPalette? = null) {
         val saved = initial?.colors ?: savedPalette()
         val fields = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(8), dp(16), dp(8)) }
@@ -622,7 +677,10 @@ class MandyWorkspaceActivity : Activity() {
                 gravity = android.view.Gravity.CENTER_VERTICAL
             }
             val swatch = View(this).apply {
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                contentDescription = "Choose " + role.title
+                isFocusable = true
+                setOnClickListener { chooseRoleColor(role, field, base) }
             }
             fun refreshSwatch() {
                 val value = field.text.toString().trim()
@@ -639,13 +697,13 @@ class MandyWorkspaceActivity : Activity() {
                 override fun onTextChanged(text: CharSequence?, start: Int, before: Int, count: Int) { refreshSwatch() }
                 override fun afterTextChanged(text: android.text.Editable?) = Unit
             })
-            row.addView(swatch, LinearLayout.LayoutParams(dp(40), dp(40)).apply { marginEnd = dp(12) })
+            row.addView(swatch, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginEnd = dp(12) })
             row.addView(field, LinearLayout.LayoutParams(0, -2, 1f))
             fields.addView(row)
             refreshSwatch()
             field
         }
-        val warning = label("Use #RRGGBB. Apply saves the named theme to your local collection (16 maximum).", 13f)
+        val warning = label("Tap a color swatch or enter #RRGGBB. Apply saves the named theme to your local collection (16 maximum).", 13f)
         fields.addView(warning)
         fun candidate(): Map<String, Int>? {
             val p = mutableMapOf<String, Int>()
