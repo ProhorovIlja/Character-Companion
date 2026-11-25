@@ -161,6 +161,9 @@ internal sealed class ChatWindow : Window
         AutomationProperties.SetName(amoled, "Material AMOLED appearance (off: graphite dark)");
         amoled.IsEnabled = !SystemParameters.HighContrast && Application.Current.Resources.MergedDictionaries.Count > 0;
         var colors = DefaultColors(true);
+        string activeThemeName = savedAppearance.Name;
+        bool appliedBlack = savedAppearance.Black;
+        bool restoringPreset = false;
         void ApplyColors(Dictionary<string, Color> values)
         {
             if (!amoled.IsEnabled || SystemParameters.HighContrast) return;
@@ -177,10 +180,22 @@ internal sealed class ChatWindow : Window
         }
         void ApplyAppearance()
         {
-            if (!amoled.IsEnabled || SystemParameters.HighContrast) return;
-            var next = DefaultColors(amoled.IsChecked == true);
-            if (WriteAppearance(amoled.IsChecked == true, next)) ApplyColors(next);
-            else status.Text = "Could not save appearance. Existing colors retained.";
+            if (restoringPreset || !amoled.IsEnabled || SystemParameters.HighContrast) return;
+            bool black = amoled.IsChecked == true;
+            var next = DefaultColors(black);
+            if (WriteAppearance(black, next, black ? "Material AMOLED" : "Graphite dark"))
+            {
+                appliedBlack = black;
+                activeThemeName = black ? "Material AMOLED" : "Graphite dark";
+                ApplyColors(next);
+            }
+            else
+            {
+                restoringPreset = true;
+                try { amoled.IsChecked = appliedBlack; }
+                finally { restoringPreset = false; }
+                status.Text = "Could not save appearance. Existing colors retained.";
+            }
         }
         amoled.Checked += (_, _) => ApplyAppearance();
         amoled.Unchecked += (_, _) => ApplyAppearance();
@@ -189,10 +204,15 @@ internal sealed class ChatWindow : Window
         customColors.Click += (_, _) =>
         {
             if (SystemParameters.HighContrast) return;
-            var edited = EditColors(colors, DefaultColors(amoled.IsChecked == true));
+            var edited = EditColors(colors, DefaultColors(amoled.IsChecked == true), activeThemeName);
             if (edited != null)
             {
-                if (WriteAppearance(amoled.IsChecked == true, edited)) ApplyColors(edited);
+                if (WriteAppearance(amoled.IsChecked == true, edited.Colors, edited.Name))
+                {
+                    activeThemeName = edited.Name;
+                    appliedBlack = amoled.IsChecked == true;
+                    ApplyColors(edited.Colors);
+                }
                 else status.Text = "Could not save appearance. Existing colors retained.";
             }
         };
@@ -423,11 +443,16 @@ internal sealed class ChatWindow : Window
 
     // One small, versioned per-user registry value, only colors. No credentials or chat data.
     private const string AppearanceKey = @"Software\MandyAI\NativePreview";
-    private static (bool Black, Dictionary<string, Color> Values) ReadAppearance()
+    private static (bool Black, Dictionary<string, Color> Values, string Name) ReadAppearance()
     {
         try
         {
             using var key = Registry.CurrentUser.OpenSubKey(AppearanceKey, false);
+            // Prefer the single versioned record so name, preset and colors cannot diverge.
+            if (key?.GetValue("AppearanceV2") is string v2 && v2.Length <= 2050 &&
+                v2.Length >= 3 && v2[1] == '|' && (v2[0] == '0' || v2[0] == '1') &&
+                DecodeTheme(v2[2..]) is NamedTheme named)
+                return (v2[0] == '1', named.Colors, named.Name);
             var raw = key?.GetValue("AppearanceV1") as string;
             if (raw != null && raw.Length <= 100)
             {
@@ -438,26 +463,23 @@ internal sealed class ChatWindow : Window
                     var values = ColorRoles.Select((role, i) =>
                         (role.Key, Value: (Color)ColorConverter.ConvertFromString(parts[i+2])))
                         .ToDictionary(x => x.Key, x => x.Value);
-                    if (ColorError(values) == null) return (parts[1] == "1", values);
+                    if (ColorError(values) == null) return (parts[1] == "1", values, "Custom");
                 }
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException or FormatException or ArgumentException) { }
-        return (true, DefaultColors(true));
+        return (true, DefaultColors(true), "Material AMOLED");
     }
-    private static bool WriteAppearance(bool black, Dictionary<string, Color> values)
+    private static bool WriteAppearance(bool black, Dictionary<string, Color> values, string name)
     {
-        if (ColorError(values) != null) return false;
+        if (!ValidThemeName(name) || ColorError(values) != null) return false;
         try
         {
             using var key = Registry.CurrentUser.CreateSubKey(AppearanceKey, true);
             if (key == null) return false;
-            string raw = "1|" + (black ? "1" : "0") + "|" + string.Join("|", ColorRoles.Select(role =>
-            {
-                Color c = values[role.Key];
-                return $"#{c.R:X2}{c.G:X2}{c.B:X2}";
-            }));
-            key.SetValue("AppearanceV1", raw, RegistryValueKind.String);
+            string raw = (black ? "1|" : "0|") + EncodeTheme(values, name);
+            if (raw.Length > 2050) return false;
+            key.SetValue("AppearanceV2", raw, RegistryValueKind.String);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException or ArgumentException) { return false; }
@@ -546,14 +568,14 @@ internal sealed class ChatWindow : Window
         catch (Exception ex) when (ex is System.Text.Json.JsonException or InvalidOperationException or FormatException or ArgumentException) { return null; }
     }
 
-    private Dictionary<string, Color>? EditColors(Dictionary<string, Color> existing, Dictionary<string, Color> defaults)
+    private NamedTheme? EditColors(Dictionary<string, Color> existing, Dictionary<string, Color> defaults, string activeName)
     {
         var panel = new StackPanel { Margin = new Thickness(16) };
         var dialog = new Window { Owner = this, Title = "Custom colors", Width = 450, Height = 590,
             WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false,
             Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } };
         var fields = new Dictionary<string, TextBox>();
-        var themeName = new TextBox { Text = "Custom", MaxLength = 80 };
+        var themeName = new TextBox { Text = activeName, MaxLength = 80 };
         AutomationProperties.SetName(themeName, "Theme name");
         panel.Children.Add(Labeled("Theme name", themeName));
         var savedThemes = new ComboBox { DisplayMemberPath = nameof(NamedTheme.Name), MinWidth = 180 };
@@ -615,7 +637,7 @@ internal sealed class ChatWindow : Window
         var apply = new Button { Content = "Apply", IsDefault = true };
         var cancel = new Button { Content = "Cancel", IsCancel = true };
         panel.Children.Add(Buttons(reset, apply, cancel));
-        Dictionary<string, Color>? result = null;
+        NamedTheme? result = null;
         reset.Click += (_, _) => { foreach (var field in fields) field.Value.Text = Hex(defaults[field.Key]); };
         Dictionary<string, Color>? Candidate()
         {
@@ -677,7 +699,8 @@ internal sealed class ChatWindow : Window
         {
             var candidate = Candidate();
             if (candidate == null) return;
-            result = candidate; dialog.DialogResult = true;
+            if (!ValidThemeName(themeName.Text)) { warning.Text = "Enter a valid theme name."; return; }
+            result = new NamedTheme(themeName.Text, candidate); dialog.DialogResult = true;
         };
         return dialog.ShowDialog() == true ? result : null;
     }
