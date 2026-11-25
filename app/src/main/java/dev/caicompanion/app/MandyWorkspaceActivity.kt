@@ -489,28 +489,53 @@ class MandyWorkspaceActivity : Activity() {
         scroll.post { if (alive() && historyScroll === scroll) scroll.scrollTo(0, (messages.height - scroll.height).coerceAtLeast(0)) }
     }
 
-    private fun applyAppearance(custom: Map<String, Int>? = null, black: Boolean = amoled()) {
+    private data class NamedPalette(val name: String, val colors: Map<String, Int>)
+    private val savedThemePrefix = "saved_theme_v1_"
+    private fun validThemeName(name: String): Boolean = name.length in 1..80 && name == name.trim() &&
+        name.none { it == '\r' || it == '\n' || it == '\t' } &&
+        runCatching { NativeConversation.validateText(name) }.isSuccess
+    private fun activeThemeName(): String =
+        (appearancePrefs().all["custom_name"] as? String)?.takeIf(::validThemeName) ?: "Custom"
+    private fun namedPalettes(): List<NamedPalette> = appearancePrefs().all.entries
+        .filter { it.key.startsWith(savedThemePrefix) }
+        .take(16)
+        .mapNotNull { (key, value) ->
+            (value as? String)?.let(::decodePalette)?.takeIf { key == savedThemePrefix + it.name }
+        }.sortedBy { it.name.lowercase(java.util.Locale.ROOT) }
+    private fun applyAppearance(custom: Map<String, Int>? = null, black: Boolean = amoled(),
+                                name: String = "Custom", saveNamed: Boolean = false) {
         if (busy || !alive()) return
         val ticket = current?.ticket
         val draft = editor?.text?.toString()
         work(afterSuccess = { if (alive()) recreate() }) {
             if (ticket != null && draft != null) workspace.edit(ticket, draft)
             val edit = appearancePrefs().edit().putBoolean("amoled", black).putBoolean("custom", custom != null)
-            custom?.forEach { (key, color) -> edit.putString("color_" + key, colorHex(color)) }
+            if (custom != null) {
+                require(validThemeName(name) && paletteError(custom) == null)
+                custom.forEach { (key, color) -> edit.putString("color_" + key, colorHex(color)) }
+                edit.putString("custom_name", name)
+                if (saveNamed) {
+                    val key = savedThemePrefix + name
+                    val keys = appearancePrefs().all.keys.filter { it.startsWith(savedThemePrefix) }
+                    require(key in keys || keys.size < 16) { "Theme collection is full" }
+                    edit.putString(key, encodePalette(custom, name))
+                }
+            }
             check(edit.commit())
         }
     }
-    private fun encodePalette(p: Map<String, Int>): String {
-        require(paletteError(p) == null)
+    private fun encodePalette(p: Map<String, Int>, name: String): String {
+        require(validThemeName(name) && paletteError(p) == null)
         val colors = org.json.JSONObject()
         colorRoles.forEach { colors.put(it.key, colorHex(p.getValue(it.key))) }
-        return org.json.JSONObject().put("schema", 1).put("name", "Custom").put("colors", colors).toString(2)
+        return org.json.JSONObject().put("schema", 1).put("name", name).put("colors", colors).toString(2)
     }
-    private fun decodePalette(raw: String): Map<String, Int>? = runCatching {
+    private fun decodePalette(raw: String): NamedPalette? = runCatching {
         require(raw.length in 1..2048)
         val allowed = colorRoles.map { it.key }.toSet()
         val p = linkedMapOf<String, Int>()
         val seen = mutableSetOf<String>()
+        var name = ""
         android.util.JsonReader(java.io.StringReader(raw)).use { reader ->
             reader.isLenient = false
             reader.beginObject()
@@ -524,7 +549,8 @@ class MandyWorkspaceActivity : Activity() {
                     }
                     "name" -> {
                         require(reader.peek() == android.util.JsonToken.STRING)
-                        require(reader.nextString().length in 1..80)
+                        name = reader.nextString()
+                        require(validThemeName(name))
                     }
                     "colors" -> {
                         reader.beginObject()
@@ -546,11 +572,14 @@ class MandyWorkspaceActivity : Activity() {
         }
         require(seen == setOf("schema", "name", "colors") && p.keys == allowed)
         require(paletteError(p) == null)
-        p.toMap()
+        NamedPalette(name, p.toMap())
     }.getOrNull()
-    private fun editPalette() {
-        val saved = savedPalette()
+    private fun editPalette(initial: NamedPalette? = null) {
+        val saved = initial?.colors ?: savedPalette()
         val fields = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(8), dp(16), dp(8)) }
+        val nameField = input("Theme name", 80, initial?.name ?: activeThemeName(), single = true)
+        fields.addView(label("Theme name", 14f))
+        fields.addView(nameField)
         val editors = colorRoles.associateWith { role ->
             val base = if (role.key == "icons") iconColor() else chatColor(role.attr)
             val field = input(role.title, 7, colorHex(saved[role.key] ?: base), single = true)
@@ -583,7 +612,7 @@ class MandyWorkspaceActivity : Activity() {
             refreshSwatch()
             field
         }
-        val warning = label("Use #RRGGBB. Text and action contrast is checked before applying.", 13f)
+        val warning = label("Use #RRGGBB. Apply saves the named theme to your local collection (16 maximum).", 13f)
         fields.addView(warning)
         fun candidate(): Map<String, Int>? {
             val p = mutableMapOf<String, Int>()
@@ -600,10 +629,12 @@ class MandyWorkspaceActivity : Activity() {
         }
         fields.addView(button("Copy theme JSON") {
             val p = candidate()
+            val name = nameField.text.toString().trim()
+            if (!validThemeName(name)) { nameField.error = "Enter a valid theme name"; return@button }
             if (p != null) {
                 val clipboard = getSystemService(android.content.ClipboardManager::class.java)
                 if (clipboard != null) {
-                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Mandy theme", encodePalette(p)))
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Mandy theme", encodePalette(p, name)))
                     warning.text = "Theme copied. No chat or account data included."
                 }
             }
@@ -616,7 +647,8 @@ class MandyWorkspaceActivity : Activity() {
             importer.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val p = decodePalette(source.text.toString())
                 if (p == null) { source.error = "Invalid theme or insufficient contrast"; return@setOnClickListener }
-                editors.forEach { (role, field) -> field.setText(colorHex(p.getValue(role.key))) }
+                nameField.setText(p.name)
+                editors.forEach { (role, field) -> field.setText(colorHex(p.colors.getValue(role.key))) }
                 warning.text = "Theme loaded into fields. Apply to save."
                 importer.dismiss()
             }
@@ -635,22 +667,59 @@ class MandyWorkspaceActivity : Activity() {
         }
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             val p = candidate() ?: return@setOnClickListener
-            dialog.dismiss()
-            applyAppearance(p.toMap())
+            val name = nameField.text.toString().trim()
+            if (!validThemeName(name)) { nameField.error = "Enter a valid theme name"; return@setOnClickListener }
+            val key = savedThemePrefix + name
+            val prefs = appearancePrefs().all
+            if (key !in prefs && prefs.keys.count { it.startsWith(savedThemePrefix) } >= 16) {
+                warning.text = "Theme collection is full. Delete a saved theme or use an existing name."
+                return@setOnClickListener
+            }
+            fun save() {
+                dialog.dismiss()
+                applyAppearance(p.toMap(), name = name, saveNamed = true)
+            }
+            if (key in prefs && (prefs[key] as? String)?.let(::decodePalette)?.colors != p) {
+                AlertDialog.Builder(this).setTitle("Replace saved theme?")
+                    .setMessage(name).setNegativeButton(android.R.string.cancel, null)
+                    .setPositiveButton("Replace") { _, _ -> save() }.show()
+            } else save()
         }
+    }
+    private fun chooseSavedPalette() {
+        val themes = namedPalettes()
+        if (themes.isEmpty()) { status.text = "No saved themes yet. Use Custom colors to create one."; return }
+        AlertDialog.Builder(this).setTitle("Saved themes")
+            .setItems(themes.map { it.name }.toTypedArray()) { _, index ->
+                val theme = themes[index]
+                AlertDialog.Builder(this).setTitle(theme.name)
+                    .setItems(arrayOf("Apply", "Edit or copy", "Delete from library")) { _, action ->
+                        when (action) {
+                            0 -> applyAppearance(theme.colors, name = theme.name)
+                            1 -> editPalette(theme)
+                            2 -> AlertDialog.Builder(this).setTitle("Delete saved theme?")
+                                .setMessage("The current appearance is not changed.")
+                                .setNegativeButton(android.R.string.cancel, null)
+                                .setPositiveButton("Delete") { _, _ ->
+                                    saveAnd { check(appearancePrefs().edit().remove(savedThemePrefix + theme.name).commit()) }
+                                }.show()
+                        }
+                    }.setNegativeButton(android.R.string.cancel, null).show()
+            }.setNegativeButton(android.R.string.cancel, null).show()
     }
     private fun chooseAppearance() {
         val active = if (customColors.isNotEmpty()) 2 else if (amoled()) 1 else 0
         AlertDialog.Builder(this).setTitle("Appearance")
-            .setSingleChoiceItems(arrayOf("Graphite dark", "Material AMOLED", "Custom colors"), active) { dialog, index ->
+            .setSingleChoiceItems(arrayOf("Graphite dark", "Material AMOLED", "Custom colors", "Saved themes"), active) { dialog, index ->
                 dialog.dismiss()
                 if (index == 2) editPalette()
+                else if (index == 3) chooseSavedPalette()
                 else if (index != active) applyAppearance(black = index == 1)
             }.setNegativeButton(android.R.string.cancel, null).show()
     }
     private fun showWorkspaceSettings(s: Snapshot) {
         val options = mutableListOf<Pair<String, () -> Unit>>()
-        options += ("Appearance · " + if (customColors.isNotEmpty()) "Custom" else if (amoled()) "Material AMOLED" else "Graphite dark") to { chooseAppearance() }
+        options += ("Appearance · " + if (customColors.isNotEmpty()) activeThemeName() else if (amoled()) "Material AMOLED" else "Graphite dark") to { chooseAppearance() }
         options += "AI models" to {
             if (editor != null && editor?.text?.toString() != current?.draft?.draft)
                 status.text = "Save the current draft before opening models."
