@@ -60,7 +60,8 @@ object NativeConversation {
              cancelled: () -> Boolean = { false }, onText: (String) -> Unit,
              generate: (List<Message>, () -> Boolean, (String) -> Unit) -> String): Event {
         fun checkActive() { if (cancelled() || Thread.currentThread().isInterrupted) throw IOException("Turn cancelled") }
-        require(identity.isNotBlank() && identity.length <= 8000 && contextUnits in 256..64000)
+        validateText(identity)
+        require(identity.length <= 8000 && contextUnits in 256..64000)
         Event(id, device, character, chat, 1, "user", mode, text)
         require(identity.length + text.length <= contextUnits)
         checkActive()
@@ -83,6 +84,9 @@ object NativeConversation {
             remaining -= row.text.length
             recent.add(Message(if (row.role == "character") "assistant" else "user", row.text))
         }
+        // A bounded recent suffix must not begin with an assistant reply whose
+        // user turn was omitted. Keep the newest user message and core identity.
+        if (recent.size > 1 && recent.last().role == "assistant") recent.removeAt(recent.lastIndex)
         val messages = listOf(Message("system", identity)) + recent.asReversed()
         val streamed = StringBuilder()
         checkActive()
