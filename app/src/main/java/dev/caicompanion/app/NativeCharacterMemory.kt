@@ -92,9 +92,10 @@ class NativeCharacterMemory(root: Path, account: String) {
         } finally { Files.deleteIfExists(tmp) }
     }
     /** Preserve core identity verbatim; optional context is bounded by the existing turn limits. */
-    fun compose(character: String, identity: String, query: String): String {
+    fun compose(character: String, identity: String, query: String, contextUnits: Int = 12000): String {
+        require(contextUnits in 256..64000)
         val state = get(character)
-        val limit = minOf(8000, 12000 - query.length)
+        val limit = minOf(8000, contextUnits - query.length)
         val out = StringBuilder(identity)
         fun add(value: String): Boolean {
             if (value.length > limit - out.length) return false
