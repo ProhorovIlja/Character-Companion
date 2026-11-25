@@ -508,18 +508,45 @@ class MandyWorkspaceActivity : Activity() {
     }
     private fun decodePalette(raw: String): Map<String, Int>? = runCatching {
         require(raw.length in 1..2048)
-        val root = org.json.JSONObject(raw)
-        require(root.opt("schema") == 1 && root.keys().asSequence().toSet() == setOf("schema", "name", "colors"))
-        require(root.opt("name") is String && root.getString("name").length in 1..80)
-        val colors = root.getJSONObject("colors")
-        require(colors.keys().asSequence().toSet() == colorRoles.map { it.key }.toSet())
-        val p = colorRoles.associate { role ->
-            val value = colors.opt(role.key) as? String ?: error("Invalid color")
-            require(value.matches(Regex("#[0-9a-fA-F]{6}")))
-            role.key to android.graphics.Color.parseColor(value)
+        val allowed = colorRoles.map { it.key }.toSet()
+        val p = linkedMapOf<String, Int>()
+        val seen = mutableSetOf<String>()
+        android.util.JsonReader(java.io.StringReader(raw)).use { reader ->
+            reader.isLenient = false
+            reader.beginObject()
+            while (reader.hasNext()) {
+                val key = reader.nextName()
+                require(seen.add(key))
+                when (key) {
+                    "schema" -> {
+                        require(reader.peek() == android.util.JsonToken.NUMBER)
+                        require(reader.nextString() == "1")
+                    }
+                    "name" -> {
+                        require(reader.peek() == android.util.JsonToken.STRING)
+                        require(reader.nextString().length in 1..80)
+                    }
+                    "colors" -> {
+                        reader.beginObject()
+                        while (reader.hasNext()) {
+                            val role = reader.nextName()
+                            require(role in allowed && role !in p)
+                            require(reader.peek() == android.util.JsonToken.STRING)
+                            val value = reader.nextString()
+                            require(value.matches(Regex("#[0-9a-fA-F]{6}")))
+                            p[role] = android.graphics.Color.parseColor(value)
+                        }
+                        reader.endObject()
+                    }
+                    else -> error("Unknown theme field")
+                }
+            }
+            reader.endObject()
+            require(reader.peek() == android.util.JsonToken.END_DOCUMENT)
         }
+        require(seen == setOf("schema", "name", "colors") && p.keys == allowed)
         require(paletteError(p) == null)
-        p
+        p.toMap()
     }.getOrNull()
     private fun editPalette() {
         val saved = savedPalette()
