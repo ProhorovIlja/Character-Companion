@@ -92,6 +92,12 @@ android {
             manifestPlaceholders["companionRenderer"] = "gecko"
             ndk { abiFilters.add("arm64-v8a") }
         }
+        // Direct native workspace, same application ID and local data paths.
+        create("mandy") {
+            dimension = "browserEngine"
+            manifestPlaceholders["companionRenderer"] = "mandy"
+            ndk { abiFilters.add("arm64-v8a") }
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
