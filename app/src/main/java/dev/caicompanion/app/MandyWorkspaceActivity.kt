@@ -977,6 +977,50 @@ class MandyWorkspaceActivity : Activity() {
             }.show()
     }
 
+    /** Inspect a single local metadata page only when the user opens the selector. */
+    private fun chooseTextModel(s: Snapshot, title: String, onSelect: (NativeModelLibrary.Model) -> Unit) {
+        val originalDraft = editor?.text?.toString()
+        fun valid() = resumed && alive() && !busy && current === s &&
+            editor?.text?.toString() == originalDraft && s.ticket != null
+        fun showPage(offset: Int) {
+            if (!valid()) return
+            if (s.models.isEmpty()) { status.text = "No imported text models"; return }
+            busy = true
+            val states = mutableMapOf<View, Boolean>()
+            suspendInputs(panel, states)
+            val previousStatus = status.text
+            status.text = "Reading local model metadata…"
+            disk.execute {
+                val result = runCatching { ModelPickerPage.read(s.models, offset) }
+                runOnUiThread {
+                    if (!alive()) return@runOnUiThread
+                    busy = false
+                    states.forEach { (view, enabled) -> view.isEnabled = enabled }
+                    status.text = previousStatus
+                    if (!valid()) return@runOnUiThread
+                    val page = result.getOrNull()
+                    if (page == null || page.entries.isEmpty()) {
+                        status.text = "Model list unavailable; no model selected"
+                        return@runOnUiThread
+                    }
+                    val dialog = AlertDialog.Builder(this)
+                        .setTitle(title + " · " + (page.offset + 1) + "–" + (page.offset + page.entries.size) + " of " + page.total)
+                        .setItems(page.entries.map { it.label }.toTypedArray()) { _, index ->
+                            if (valid()) onSelect(page.entries[index].model)
+                        }.setNegativeButton(android.R.string.cancel, null)
+                    if (page.hasPrevious) dialog.setNeutralButton("Previous") { _, _ ->
+                        showPage(page.offset - ModelPickerPage.PAGE_SIZE)
+                    }
+                    if (page.hasNext) dialog.setPositiveButton("Next") { _, _ ->
+                        showPage(page.offset + ModelPickerPage.PAGE_SIZE)
+                    }
+                    dialog.show()
+                }
+            }
+        }
+        showPage(0)
+    }
+
     private fun chooseModel(s: Snapshot, mode: String = "text") {
         val ticket = s.ticket ?: return
         val draft = editor?.text?.toString() ?: return
@@ -988,9 +1032,7 @@ class MandyWorkspaceActivity : Activity() {
             generate(ticket, draft, approved.second, s.draft.pending != null, mode, preset)
             return
         }
-        val labels = s.models.map { it.sha256 + "\nBytes: " + it.bytes }.toTypedArray()
-        AlertDialog.Builder(this).setTitle("Choose a trusted local model").setItems(labels) { _, index ->
-            val model = s.models[index]
+        chooseTextModel(s, "Choose a trusted local model") { model ->
             AlertDialog.Builder(this).setTitle("Experimental inference")
                 .setMessage("Approve this model for the current conversation selection? Only use models from trusted publishers. The model is verified by digest before use; no network fallback. Clear approval in Settings.\nPreset: " + preset.label + "\nSHA-256: " + model.sha256)
                 .setNegativeButton(android.R.string.cancel, null)
@@ -1000,7 +1042,7 @@ class MandyWorkspaceActivity : Activity() {
                         generate(ticket, draft, model.sha256, s.draft.pending != null, mode, preset)
                     }
                 }.show()
-        }.setNegativeButton(android.R.string.cancel, null).show()
+        }
     }
     private fun generate(ticket: NativeChatWorkspace.Ticket, draft: String, sha: String, retry: Boolean, mode: String, preset: InferencePreset) {
         if (!resumed || busy || !alive() || !BuildConfig.MANDY_EMBEDDED_PREVIEW || current?.ticket != ticket) return
@@ -1327,14 +1369,15 @@ class MandyWorkspaceActivity : Activity() {
 
     private fun chooseAssessmentModel(s: Snapshot, forMemory: Boolean = false) {
         val ticket = s.ticket ?: return
-        val labels = s.models.map { it.sha256 + "\nBytes: " + it.bytes }.toTypedArray()
-        AlertDialog.Builder(this).setTitle("Select a trusted local assessment model").setItems(labels) { _, index ->
-            val sha = s.models[index].sha256
+        chooseTextModel(s, "Select a trusted local assessment model") { model ->
+            val sha = model.sha256
             AlertDialog.Builder(this).setTitle(if (forMemory) "Review memory" else "Review fictional relationship")
-                .setMessage("Analyze the latest completed dialogue locally. Nothing is changed without your approval. Only continue if you trust the model publisher. Experimental inference may fail.")
+                .setMessage("Analyze the latest completed dialogue locally. Nothing is changed without your approval. Only continue if you trust the model publisher. Experimental inference may fail.\nSHA-256: " + sha)
                 .setNegativeButton(android.R.string.cancel, null)
-                .setPositiveButton("Assess") { _, _ -> assessDialogue(ticket, sha, forMemory) }.show()
-        }.setNegativeButton(android.R.string.cancel, null).show()
+                .setPositiveButton("Assess") { _, _ ->
+                    if (resumed && alive() && !busy && current === s) assessDialogue(ticket, sha, forMemory)
+                }.show()
+        }
     }
     private fun assessDialogue(ticket: NativeChatWorkspace.Ticket, sha: String, forMemory: Boolean) {
         if (!resumed || busy || !alive() || !BuildConfig.MANDY_EMBEDDED_PREVIEW || current?.ticket != ticket) return
