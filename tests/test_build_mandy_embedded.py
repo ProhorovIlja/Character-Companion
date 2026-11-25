@@ -48,6 +48,15 @@ class BuildGate(unittest.TestCase):
                     build.check_package(self.apk, flavor='legacy')
                 build.check_package(self.apk, flavor='gecko')
 
+    def test_mandy_native_layout(self):
+        self.package([(build.LIB, elf())])
+        build.check_package(self.apk, flavor='mandy')
+
+    def test_mandy_rejects_bundled_gecko(self):
+        self.package([(build.LIB, elf()), ('lib/arm64-v8a/libxul.so', elf())])
+        with self.assertRaisesRegex(ValueError, 'Unexpected bundled Gecko'):
+            build.check_package(self.apk, flavor='mandy')
+
     def test_unknown_embedded_flavor(self):
         self.package([(build.LIB, elf())])
         with self.assertRaisesRegex(ValueError, 'Unsupported flavor'):
