@@ -92,7 +92,6 @@ internal static class WindowsReadAloud
                     voice.IsEnabled = play.IsEnabled = true;
                 }
             };
-            stop.Click += (_, _) => dialog.Close();
             try { dialog.ShowDialog(); }
             finally
             {
