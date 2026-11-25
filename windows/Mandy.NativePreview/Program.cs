@@ -46,6 +46,19 @@ internal sealed class ChatWindow : Window
     private readonly TextBox alias = new() { Text = "mandy-local", MaxLength = 256 };
     private readonly TextBox port = new() { Text = "8080", MaxLength = 5 };
     private readonly PasswordBox key = new() { MaxLength = 128 };
+    // Text units are UTF-16 code units, not the provider's tokenizer budget.
+    private sealed record ReplyPreset(string Label, int ContextUnits, int OutputTokens);
+    private static readonly ReplyPreset[] ReplyPresets =
+    {
+        new("Compact · shorter replies", 12000, 256),
+        new("Balanced", 12000, 512),
+        new("Extended · more conversation context", 24000, 1024)
+    };
+    private readonly ComboBox replyPreset = new()
+    {
+        ItemsSource = ReplyPresets, SelectedIndex = 1, DisplayMemberPath = nameof(ReplyPreset.Label),
+        ToolTip = "Client-side text and reply limits. The local server must support the requested context. Limits are not device performance guarantees."
+    };
     private readonly TextBox draft = new() { MaxLength = 16000, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 76, MaxHeight = 144, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
     private readonly ListBox history = new() { HorizontalContentAlignment = HorizontalAlignment.Stretch };
     private readonly Border configuration = new() { Visibility = Visibility.Visible };
@@ -132,6 +145,7 @@ internal sealed class ChatWindow : Window
         settings.Children.Add(Labeled("Trusted local server model alias", alias));
         settings.Children.Add(Labeled("Loopback port", port));
         settings.Children.Add(Labeled("Local server API key (not saved)", key));
+        settings.Children.Add(Labeled("Conversation preset", replyPreset));
         settings.Children.Add(Buttons(refresh, saveDraft));
         saveDraft.Click += async (_, _) => await SaveCurrentDraftAsync();
         settings.Children.Add(Labeled("Local speech executable", whisperExe));
@@ -778,7 +792,7 @@ internal sealed class ChatWindow : Window
         bool ready = workspace != null && historyValid && !busy;
         choose.IsEnabled = create.IsEnabled = open.IsEnabled = !busy && workspace == null;
         name.IsEnabled = identity.IsEnabled = !busy && workspace == null;
-        alias.IsEnabled = port.IsEnabled = key.IsEnabled = !busy;
+        alias.IsEnabled = port.IsEnabled = key.IsEnabled = replyPreset.IsEnabled = !busy;
         draft.IsEnabled = ready && pending == null;
         UpdateSendAvailability();
         string action = pending != null ? "Retry pending message (Ctrl+Enter)" : "Send message (Ctrl+Enter)";
@@ -1455,9 +1469,15 @@ internal sealed class ChatWindow : Window
         var p = w.Character;
         var text = pending?.Text ?? draft.Text;
         if (string.IsNullOrWhiteSpace(text)) { status.Text = "Enter a message."; return; }
+        var preset = replyPreset.SelectedItem as ReplyPreset ?? ReplyPresets[1];
+        if (text.Length + p.Identity.Length > preset.ContextUnits)
+        {
+            status.Text = "Message and character identity exceed the selected context budget. Choose Extended or shorten the draft. Nothing was sent.";
+            return;
+        }
         var request = new LocalChatTurn.Request(p.Account,p.Device,p.Character,p.Chat,
-            pending?.Id ?? Guid.NewGuid().ToString(),text,p.Identity,pending?.Mode ?? mode);
-        var turn = new LocalChatTurn(w.Database, client);
+            pending?.Id ?? Guid.NewGuid().ToString(),text,p.Identity,pending?.Mode ?? mode, preset.ContextUnits);
+        var turn = new LocalChatTurn(w.Database, client, preset.OutputTokens);
         busy = true; operation = new CancellationTokenSource(); UpdateControls();
         status.Text = "Generating locally…";
         liveReply.Clear();
@@ -1499,7 +1519,7 @@ internal sealed class ChatWindow : Window
             {
                 token.ThrowIfCancellationRequested();
                 var memory = new CharacterMemory(w.Database, p.Account);
-                return CharacterMemory.Compose(memory.Read(p.Character), p.Identity, text);
+                return CharacterMemory.Compose(memory.Read(p.Character), p.Identity, text, preset.ContextUnits);
             }, token);
             await turn.SendAsync(request with { Identity = enriched }, preview: OnFragment, cancellationToken: token);
             saved = true;
