@@ -41,7 +41,8 @@ internal sealed class CharacterMemory
         foreach (var note in state.Memories)
         {
             CheckText(note, 400);
-            if (string.IsNullOrWhiteSpace(note)) throw new ArgumentException("Empty memory.");
+            if (string.IsNullOrWhiteSpace(note) || note.Contains('\r') || note.Contains('\n'))
+                throw new ArgumentException("Memory notes must be nonempty single lines.");
         }
     }
     internal State Read(string character)
