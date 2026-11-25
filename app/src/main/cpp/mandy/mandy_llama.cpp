@@ -80,6 +80,9 @@ struct Callbacks {
         cb.next_poll = now + std::chrono::milliseconds(10);
         return cb.poll();
     }
+    static bool progress(float, void * data) noexcept {
+        return !static_cast<Callbacks *>(data)->poll();
+    }
     void check() { require(!poll()); }
     void output(const char * data, int n) {
         check();
@@ -99,14 +102,19 @@ using Sampler = std::unique_ptr<llama_sampler, decltype(&llama_sampler_free)>;
 }
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_dev_caicompanion_app_EmbeddedLlama_nativeLoad(JNIEnv * env, jobject, jbyteArray path) {
+Java_dev_caicompanion_app_EmbeddedLlama_nativeLoadV2(JNIEnv * env, jobject, jbyteArray path, jobject sink) {
     try {
+        Callbacks cb(env, sink);
+        cb.check();
         auto name = bytes(env, path, 16384);
         std::call_once(backend_once, [] { llama_log_set(silent_log, nullptr); llama_backend_init(); });
         auto params = llama_model_default_params();
         params.n_gpu_layers = 0;
         params.check_tensors = true;
+        params.progress_callback = Callbacks::progress;
+        params.progress_callback_user_data = &cb;
         Model model(llama_model_load_from_file(name.c_str(), params), llama_model_free);
+        cb.check();
         require(model && !llama_model_has_encoder(model.get()) && llama_model_has_decoder(model.get()));
         const char * tmpl = llama_model_chat_template(model.get(), nullptr);
         // The pinned lightweight formatter supports only a fixed template set.
