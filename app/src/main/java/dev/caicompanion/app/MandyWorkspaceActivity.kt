@@ -1256,7 +1256,7 @@ class MandyWorkspaceActivity : Activity() {
         var engine: android.speech.tts.TextToSpeech? = null
         val session = UUID.randomUUID().toString()
         var index = 0
-        fun active() = playbackDialog === dialog && resumed && alive() && current === s && !busy
+        fun active() = playbackDialog === dialog && dialog.isShowing && resumed && alive() && current === s && !busy
         fun finish(message: String) {
             if (playbackDialog !== dialog) return
             status.text = message
