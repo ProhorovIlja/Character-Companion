@@ -7,7 +7,7 @@
 using llama_token = int;
 enum ggml_log_level { GGML_LOG_LEVEL_NONE };
 struct llama_vocab {};
-struct llama_model { llama_vocab vocab; };
+struct llama_model { llama_vocab vocab; const char* tmpl = "stub"; };
 struct llama_context { unsigned limit; unsigned decoded = 0; };
 struct llama_sampler { unsigned seed = 0; int sampled = 0; std::vector<llama_sampler*> children; };
 struct llama_model_params { int n_gpu_layers; bool check_tensors; };
@@ -18,14 +18,14 @@ struct llama_batch { llama_token* tokens; int n; };
 inline void llama_log_set(void(*)(ggml_log_level,const char*,void*),void*) {}
 inline void llama_backend_init() {}
 inline llama_model_params llama_model_default_params() { return {}; }
-inline llama_model* llama_model_load_from_file(const char*,llama_model_params) { return new llama_model; }
+inline llama_model* llama_model_load_from_file(const char* path,llama_model_params) { auto p = new llama_model; if (std::strstr(path,"unsupported.gguf")) p->tmpl = "unsupported"; else if (std::strstr(path,"missing.gguf")) p->tmpl = nullptr; return p; }
 inline void llama_model_free(llama_model* p) { delete p; }
 inline bool llama_model_has_encoder(const llama_model*) {return false;}
 inline bool llama_model_has_decoder(const llama_model*) {return true;}
-inline const char* llama_model_chat_template(const llama_model*,const char*) {return "stub";}
+inline const char* llama_model_chat_template(const llama_model* p,const char*) {return p->tmpl;}
 inline int llama_model_n_ctx_train(const llama_model*) {return 8192;}
 inline const llama_vocab* llama_model_get_vocab(const llama_model* p) {return &p->vocab;}
-inline int llama_chat_apply_template(const char*,const llama_chat_message*,size_t,bool,char* out,size_t cap) {if(cap) out[0]='x'; return 1;}
+inline int llama_chat_apply_template(const char* tmpl,const llama_chat_message*,size_t,bool,char* out,size_t cap) {if (!tmpl || std::strcmp(tmpl,"stub")) return -1; if(out && cap) out[0]='x'; return 1;}
 inline int llama_tokenize(const llama_vocab*,const char*,int,llama_token* out,int cap,bool,bool) {if(cap<2) return -2; out[0]=100;out[1]=100; return 2;}
 inline llama_context_params llama_context_default_params() { return {}; }
 inline llama_context* llama_init_from_model(llama_model*,llama_context_params p) {return new llama_context{p.n_ctx};}
