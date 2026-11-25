@@ -89,12 +89,16 @@ def build_whisper(root, sdk, checkout, scratch, suffix):
     return stage, sha
 
 
-def check_package(apk, whisper_sha=None):
+def check_package(apk, whisper_sha=None, flavor='gecko'):
+    require(flavor in ('legacy', 'gecko'), 'Unsupported flavor')
     with zipfile.ZipFile(apk) as archive:
         names = archive.namelist()
         for name in ('AndroidManifest.xml', 'classes.dex', LIB):
             require(names.count(name) == 1 and archive.getinfo(name).file_size > 0, 'Missing, empty or duplicate APK entry: ' + name)
         require(all(n.startswith('lib/arm64-v8a/') for n in names if n.startswith('lib/') and n.endswith('.so')), 'Non-ARM64 native library')
+        if flavor == 'legacy':
+            require(not any(n.rsplit('/', 1)[-1] in ('libxul.so', 'libmozglue.so') for n in names),
+                    'Unexpected bundled Gecko runtime in lightweight APK')
         if whisper_sha is None:
             require(WHISPER_LIB not in names, 'Unexpected speech library in text-only build')
         else:
@@ -103,18 +107,20 @@ def check_package(apk, whisper_sha=None):
             with archive.open(WHISPER_LIB) as stream:
                 require(hashlib.file_digest(stream, 'sha256').hexdigest() == whisper_sha, 'Packaged speech library digest mismatch')
         require(archive.testzip() is None, 'APK ZIP integrity failure')
-    _, errors = audit(apk, 'gecko')
+    _, errors = audit(apk, flavor)
     require(not errors, 'ELF audit failed: ' + '; '.join(errors))
 
 
-def preflight(root, sdk, llama):
+def preflight(root, sdk, llama, flavor='gecko'):
+    require(flavor in ('legacy', 'gecko'), 'Unsupported flavor')
+    minor = 2 if flavor == 'gecko' else 0
     check_checkout(llama)
     suffix = '.exe' if os.name == 'nt' else ''
     tools = sdk / 'build-tools/36.0.0'
     java_home = os.environ.get('JAVA_HOME')
     java = str(Path(java_home) / 'bin' / ('java' + suffix)) if java_home else shutil.which('java')
     require(java and Path(java).is_file(), 'Java executable missing')
-    require((sdk / 'platforms/android-37.2/android.jar').is_file(), 'Android SDK 37.2 missing')
+    require((sdk / ('platforms/android-37.' + str(minor)) / 'android.jar').is_file(), 'Android SDK 37.' + str(minor) + ' missing')
     require((sdk / 'ndk/29.0.13113456/source.properties').is_file(), 'Pinned NDK missing')
     require((sdk / 'cmake/3.31.6/bin' / ('cmake' + suffix)).is_file(), 'Pinned CMake missing')
     for item in ('lib/apksigner.jar', 'aapt' + suffix, 'zipalign' + suffix):
@@ -133,12 +139,14 @@ def main():
     parser.add_argument('--sdk', required=True, type=Path)
     parser.add_argument('--llama', required=True, type=Path)
     parser.add_argument('--whisper', type=Path, help='Optional clean pinned Whisper source checkout')
+    parser.add_argument('--flavor', choices=('legacy', 'gecko'), default='gecko',
+                        help='legacy uses system WebView, without bundled Gecko; default preserves existing build')
     parser.add_argument('--build', action='store_true', help='Actually invoke Gradle; otherwise preflight only')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     try:
         sdk, llama = args.sdk.resolve(), args.llama.resolve()
-        java, wrapper, tools, suffix = preflight(root, sdk, llama)
+        java, wrapper, tools, suffix = preflight(root, sdk, llama, args.flavor)
         whisper = args.whisper.resolve() if args.whisper else None
         if whisper is not None:
             check_whisper_checkout(whisper)
@@ -147,22 +155,26 @@ def main():
         print('PREFLIGHT=PASSED', flush=True)
         if not args.build:
             return 0
-        apk = root / 'app/build/outputs/apk/gecko/debug/app-gecko-debug.apk'
+        apk = root / 'app/build/outputs/apk' / args.flavor / 'debug' / ('app-' + args.flavor + '-debug.apk')
         apk.unlink(missing_ok=True)
         env = dict(os.environ, ANDROID_HOME=str(sdk), ANDROID_SDK_ROOT=str(sdk))
         with tempfile.TemporaryDirectory(prefix='mandy-native-') as temporary:
             arguments = [java, '-classpath', str(wrapper), 'org.gradle.wrapper.GradleWrapperMain', '--no-daemon',
-                         ':app:assembleGeckoDebug', '-PcompanionSdkMinor=2', '-PmandyLlamaDir=' + str(llama)]
+                         ':app:assemble' + args.flavor.capitalize() + 'Debug',
+                         '-PcompanionSdkMinor=' + ('2' if args.flavor == 'gecko' else '0'),
+                         '-PmandyLlamaDir=' + str(llama)]
             whisper_sha = None
             if whisper is not None:
                 stage, whisper_sha = build_whisper(root, sdk, whisper, Path(temporary), suffix)
                 arguments += ['-PmandyWhisperJniDir=' + str(stage), '-PmandyWhisperSha256=' + whisper_sha]
             subprocess.run(arguments, cwd=root, env=env, check=True)
-            check_package(apk, whisper_sha)
+            check_package(apk, whisper_sha, args.flavor)
         certs = output([java, '-jar', tools / 'lib/apksigner.jar', 'verify', '--verbose', '--print-certs', apk])
         require('CN=Android Debug' in certs, 'Expected debug signing identity')
         require("package: name='dev.caicompanion.app'" in output([tools / ('aapt' + suffix), 'dump', 'badging', apk]), 'Unexpected application ID')
         subprocess.run([str(tools / ('zipalign' + suffix)), '-c', '-P', '16', '4', str(apk)], check=True)
+        print('FLAVOR=' + args.flavor)
+        print('APK_BYTES=' + str(apk.stat().st_size))
         print('EMBEDDED_DEBUG_APK=' + str(apk))
         print('APK_SHA256=' + digest(apk))
         print('WHISPER_PACKAGED=' + ('YES' if whisper_sha is not None else 'NO'))
