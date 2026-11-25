@@ -43,6 +43,8 @@ def check_elf(stream, size, machine):
 
 
 def audit(path, flavor):
+    if flavor not in ('gecko', 'legacy', 'mandy'):
+        raise ValueError('Unsupported APK flavor')
     errors = []
     count = 0
     seen = set()
@@ -60,8 +62,11 @@ def audit(path, flavor):
                 continue
             seen.add(name)
             count += 1
-            if flavor == 'gecko' and parts[1] != 'arm64-v8a':
-                errors.append('unexpected Gecko ABI: ' + repr(name))
+            if flavor in ('gecko', 'mandy') and parts[1] != 'arm64-v8a':
+                errors.append('unexpected ' + ('Gecko' if flavor == 'gecko' else 'Mandy') + ' ABI: ' + repr(name))
+                continue
+            if flavor == 'mandy' and parts[2].lower() in ('libxul.so', 'libmozglue.so'):
+                errors.append('unexpected Gecko library in native Mandy APK: ' + repr(name))
                 continue
             if entry.create_system == 3 and stat.S_ISLNK(entry.external_attr >> 16):
                 errors.append('native library is a symbolic link: ' + repr(name))
@@ -72,13 +77,15 @@ def audit(path, flavor):
                 errors.append(repr(name) + ': ' + issue)
     if flavor == 'gecko' and count == 0:
         errors.append('Gecko APK contains no supported native libraries')
+    if flavor == 'mandy' and 'lib/arm64-v8a/libmandy_llama.so' not in seen:
+        errors.append('Mandy APK is missing its embedded inference library')
     return count, errors
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('apk')
-    parser.add_argument('flavor', choices=('gecko', 'legacy'))
+    parser.add_argument('flavor', choices=('gecko', 'legacy', 'mandy'))
     args = parser.parse_args()
     try:
         count, errors = audit(args.apk, args.flavor)
