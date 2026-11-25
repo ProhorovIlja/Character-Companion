@@ -36,7 +36,6 @@ internal sealed class LocalChatTurn
         LocalHistory.ValidateText(request.Text);
         LocalHistory.ValidateText(request.Identity);
         if (request.Identity.Length > 8000 || request.ContextUnits is < 256 or > 64000 ||
-            request.Text.Length + request.Identity.Length > request.ContextUnits ||
             request.Mode is not ("text" or "dictation" or "call"))
             throw new ArgumentException("Invalid character prompt or turn budget.");
         cancellationToken.ThrowIfCancellationRequested();
@@ -49,8 +48,29 @@ internal sealed class LocalChatTurn
             return await Task.Run(async () =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                bool exceedsBudget = request.Text.Length + request.Identity.Length > request.ContextUnits;
+                if (exceedsBudget && !File.Exists(path))
+                    throw new ArgumentException("Message exceeds context allowance.");
                 using var history = new LocalHistory(path, request.Account);
                 cancellationToken.ThrowIfCancellationRequested();
+                // Recover a completed turn without consuming a newly saved draft.
+                // No provider call or new user event is needed, even under a smaller preset.
+                var completed = history.Find(LocalHistory.ReplyId(request.MessageId));
+                if (completed != null)
+                {
+                    var original = history.Find(request.MessageId);
+                    if (original == null ||
+                        original != new LocalHistory.Event(request.MessageId, request.Device, request.Character,
+                            request.Chat, original.Clock, "user", request.Mode, request.Text) ||
+                        completed != new LocalHistory.Event(LocalHistory.ReplyId(original.Id), original.Device,
+                            original.Character, original.Chat, completed.Clock, "character", original.Mode, completed.Text) ||
+                        completed.Clock <= original.Clock)
+                        throw new InvalidDataException("Conflicting saved turn.");
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return completed;
+                }
+                if (exceedsBudget)
+                    throw new ArgumentException("Message exceeds context allowance.");
                 var user = history.AppendUser(request.MessageId, request.Device, request.Character,
                     request.Chat, request.Mode, request.Text);
                 var old = history.Find(LocalHistory.ReplyId(user.Id));
