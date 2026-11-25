@@ -98,6 +98,7 @@ internal sealed class ChatWindow : Window
     private Workspace? workspace;
     private LocalHistory.Event? pending;
     private CancellationTokenSource? operation;
+    private BundledModelHost? bundledModel;
     private bool busy, closeRequested, historyValid;
 
     internal ChatWindow()
@@ -145,6 +146,8 @@ internal sealed class ChatWindow : Window
         settings.Children.Add(Labeled("Trusted local server model alias", alias));
         settings.Children.Add(Labeled("Loopback port", port));
         settings.Children.Add(Labeled("Local server API key (not saved)", key));
+        if (BundledModelHost.IsAvailable)
+            settings.Children.Add(new TextBlock { Text = "The bundled local model starts on your first send when the server key is empty.", TextWrapping = TextWrapping.Wrap });
         settings.Children.Add(Labeled("Conversation preset", replyPreset));
         settings.Children.Add(Buttons(refresh, saveDraft));
         saveDraft.Click += async (_, _) => await SaveCurrentDraftAsync();
@@ -433,6 +436,7 @@ internal sealed class ChatWindow : Window
             {
                 e.Cancel = true; closeRequested = false; return;
             }
+            bundledModel?.Dispose();
             workspace?.Dispose();
         };
         UpdateControls();
@@ -1538,6 +1542,27 @@ internal sealed class ChatWindow : Window
     {
         var w = workspace;
         if (busy || !historyValid || w == null) return;
+        if (bundledModel != null && !bundledModel.IsRunning)
+        {
+            bundledModel.Dispose(); bundledModel = null; key.Clear();
+        }
+        if (key.Password.Length == 0 && BundledModelHost.IsAvailable)
+        {
+            busy = true; operation = new CancellationTokenSource(); UpdateControls();
+            status.Text = "Starting bundled local model…";
+            try
+            {
+                bundledModel = new BundledModelHost();
+                await bundledModel.StartAsync(operation.Token);
+                alias.Text = "mandy-local";
+                port.Text = bundledModel.Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                key.Password = bundledModel.ApiKey;
+            }
+            catch (OperationCanceledException) { status.Text = "Local model startup stopped. Draft preserved."; return; }
+            catch (Exception) { status.Text = "Bundled local model could not start. Draft preserved."; return; }
+            finally { Finish(); }
+            if (closeRequested || workspace != w) return;
+        }
         if (!int.TryParse(port.Text, out int localPort)) { status.Text = "Invalid local port."; return; }
         LocalInferenceClient client;
         try { client = new LocalInferenceClient(alias.Text, localPort, key.Password); }

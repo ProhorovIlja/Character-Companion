@@ -1,3 +1,27 @@
+## Mandy AI native Windows preview (25 November 2026)
+
+`windows/Mandy.NativePreview` is a separate, native WPF desktop app. A self-contained
+Windows x64 folder was compiled and launched on Windows with .NET 10. The app saved
+text exchanges in its local SQLite history, including replies from a local
+Qwen3-0.6B-Q8_0 model served by llama.cpp. This starter model is small and its
+answers are not representative of the intended full assistant quality.
+
+To build the app on Windows, install .NET 10 SDK and run
+`python scripts/build_mandy_windows.py --build --output <new-empty-output-path>`
+from the repository root. The script runs the inference, history, memory and
+attachment smoke projects before publishing. The model is not downloaded by the
+build. To use the optional bundled starter model, place the Windows x64 CPU
+llama.cpp `llama-server.exe` and its release DLLs, license files, and
+`Qwen3-0.6B-Q8_0.gguf` in a `LocalModel` directory beside
+`Mandy.NativePreview.exe`. Keep the whole publish folder together. When no server
+key is entered, the first Send starts this model on a random loopback port and
+the app stops it when the window closes. A manually configured trusted local
+server remains supported. The bundled model is CPU-only; GPU acceleration,
+dictation and live calls need separate setup or further validation.
+
+The older CharacterCompanion.Windows CEF prototype documented below is a
+different application and its source-only status does not describe this preview.
+
 ### v0.11.0 source-only CEF self-contained process host
 
 An explicit WPF `Program.Main` handles CefSharp renderer/GPU/utility subprocesses with `SelfHost.Main(args)` before launching the main window. This is required by the manual `--self-contained true` folder publish; the existing `windows/build-windows.ps1` checks BrowserSubprocess.Core, Chromium data files, libcef and locales. Launch the **published CharacterCompanion.Windows.exe**, not `dotnet.exe CharacterCompanion.Windows.dll`. The code has not been compiled or runtime-tested on Windows. See [release notes](RELEASE_NOTES_v0.11.0-prealpha.md).
