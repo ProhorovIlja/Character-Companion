@@ -107,6 +107,29 @@ fun main() {
             checkIt(dimensionLib.list() == listOf(dimensionModel))
             checkIt(Files.newDirectoryStream(dimensionRoot, "*.part").use { !it.iterator().hasNext() })
         }
+        // The direct transcription verifier accepts an explicitly selected path,
+        // but must enforce the same header and digest checks as library verification.
+        val direct = root.resolve("selected-speech.bin")
+        Files.write(direct, validDimensions)
+        val directSha = dimensionModel.sha256
+        checkIt(NativeModelLibrary.verifyFile(direct, directSha, NativeModelLibrary.Format.WHISPER).path == direct)
+        val malformed = validDimensions.clone().also {
+            ByteBuffer.wrap(it).order(ByteOrder.LITTLE_ENDIAN).putInt(16, 5)
+        }
+        Files.write(direct, malformed)
+        val malformedSha = MessageDigest.getInstance("SHA-256").digest(malformed).joinToString("") { "%02x".format(it.toInt() and 255) }
+        reject { NativeModelLibrary.verifyFile(direct, malformedSha, NativeModelLibrary.Format.WHISPER) }
+        Files.write(direct, validDimensions)
+        reject { NativeModelLibrary.verifyFile(direct, malformedSha, NativeModelLibrary.Format.WHISPER) }
+        reject { NativeModelLibrary.verifyFile(direct, directSha, NativeModelLibrary.Format.WHISPER, cancelled = { true }) }
+        reject { NativeModelLibrary.verifyFile(direct, directSha, NativeModelLibrary.Format.WHISPER, maxBytes = 99) }
+        Files.write(direct, validDimensions.copyOf(48))
+        reject { NativeModelLibrary.verifyFile(direct, directSha, NativeModelLibrary.Format.WHISPER) }
+        Files.write(direct, validDimensions)
+        val link = root.resolve("linked-speech.bin")
+        Files.createSymbolicLink(link, direct)
+        reject { NativeModelLibrary.verifyFile(link, directSha, NativeModelLibrary.Format.WHISPER) }
+        checkIt(Files.readAllBytes(direct).contentEquals(validDimensions))
         println("PASS $checks known-digest import checks")
     } finally { root.toFile().deleteRecursively() }
 }
