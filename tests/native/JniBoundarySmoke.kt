@@ -31,6 +31,23 @@ fun main() {
             var stop = false
             val cancelled = runCatching { engine.generate(messages, 512, 4, 4, cancelled = { stop }, onText = { stop = true }) }
             verify(cancelled.exceptionOrNull() is IOException)
+            val callbackFailure = IllegalStateException("test callback failure")
+            val callback = runCatching { engine.generate(messages, 512, 4, 4, onText = { throw callbackFailure }) }
+            verify(callback.exceptionOrNull() === callbackFailure)
+            var stopChecks = 0
+            val stopFailure = IllegalArgumentException("test cancellation callback failure")
+            val stopCallback = runCatching {
+                engine.generate(messages, 512, 4, 4, cancelled = {
+                    if (++stopChecks == 3) throw stopFailure
+                    false
+                }, onText = {})
+            }
+            verify(stopCallback.exceptionOrNull() === stopFailure)
+            val metricsFailure = IllegalStateException("test metrics callback failure")
+            val metricsCallback = runCatching {
+                engine.generate(messages, 512, 4, 2, onMetrics = { throw metricsFailure }, onText = {})
+            }
+            verify(metricsCallback.exceptionOrNull() === metricsFailure)
             success(2, 2) // engine reusable after failure/cancellation
         }
         println("PASS $checks host JNI boundary checks (simulated backend)")
