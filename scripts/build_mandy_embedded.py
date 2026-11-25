@@ -11,6 +11,7 @@ import tempfile
 import zipfile
 
 from check_apk_native import audit, check_elf
+from check_mandy_permissions import check_permissions
 from check_whisper_linkage import audit_linkage, ndk_tools
 
 PIN = 'dbaf582af41941ebbfc4384fb9fa1b40dff7a510'
@@ -176,6 +177,8 @@ def main():
         if args.flavor == 'mandy':
             require("launchable-activity: name='dev.caicompanion.app.MandyWorkspaceActivity'" in badging,
                     'Native Mandy launcher missing')
+            check_permissions(output([tools / ('aapt' + suffix), 'dump', 'permissions', apk]))
+            print('MANDY_PERMISSION_GATE=PASSED')
         subprocess.run([str(tools / ('zipalign' + suffix)), '-c', '-P', '16', '4', str(apk)], check=True)
         print('FLAVOR=' + args.flavor)
         print('APK_BYTES=' + str(apk.stat().st_size))
