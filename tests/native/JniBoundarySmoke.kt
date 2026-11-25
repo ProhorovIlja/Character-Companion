@@ -1,0 +1,38 @@
+package dev.caicompanion.app
+
+import java.io.IOException
+import java.nio.file.Files
+
+fun main() {
+    val root = Files.createTempDirectory("mandy-jni-smoke-")
+    var checks = 0
+    fun verify(ok: Boolean) { check(ok); checks++ }
+    try {
+        val path = root.resolve("synthetic.gguf")
+        Files.write(path, byteArrayOf(1))
+        val model = NativeModelLibrary.Model("0".repeat(64), 1, path)
+        val messages = listOf(NativeConversation.Message("system", "Identity"), NativeConversation.Message("user", "Hello"))
+        EmbeddedLlama.openVerified(model) { false }.use { engine ->
+            fun success(seed: Int, cap: Int) {
+                val streamed = StringBuilder()
+                var metrics: GenerationMetrics? = null
+                val reply = engine.generate(messages, 512, cap, seed, onMetrics = { metrics = it }, onText = { streamed.append(it) })
+                verify(reply == "a".repeat(seed) && reply == streamed.toString())
+                verify(metrics?.outputTokens == seed && metrics?.promptTokens == 2)
+            }
+            success(1, 4)
+            success(4, 4)
+            success(510, 510) // exact full context, no extra decode
+            val streamed = StringBuilder()
+            var reported = false
+            val failed = runCatching { engine.generate(messages, 512, 4, 5, onMetrics = { reported = true }, onText = { streamed.append(it) }) }
+            verify(failed.exceptionOrNull() is IOException)
+            verify(streamed.toString() == "aaaa" && !reported)
+            var stop = false
+            val cancelled = runCatching { engine.generate(messages, 512, 4, 4, cancelled = { stop }, onText = { stop = true }) }
+            verify(cancelled.exceptionOrNull() is IOException)
+            success(2, 2) // engine reusable after failure/cancellation
+        }
+        println("PASS $checks host JNI boundary checks (simulated backend)")
+    } finally { root.toFile().deleteRecursively() }
+}
