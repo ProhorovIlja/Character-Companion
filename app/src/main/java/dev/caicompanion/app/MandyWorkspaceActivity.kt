@@ -492,7 +492,7 @@ class MandyWorkspaceActivity : Activity() {
     private data class NamedPalette(val name: String, val colors: Map<String, Int>)
     private val savedThemePrefix = "saved_theme_v1_"
     private fun validThemeName(name: String): Boolean = name.length in 1..80 && name == name.trim() &&
-        name.none { it == '\r' || it == '\n' || it == '\t' } &&
+        name.none { Character.isISOControl(it) || it == '\uFFFE' || it == '\uFFFF' } &&
         runCatching { NativeConversation.validateText(name) }.isSuccess
     private fun activeThemeName(): String =
         (appearancePrefs().all["custom_name"] as? String)?.takeIf(::validThemeName) ?: "Custom"
