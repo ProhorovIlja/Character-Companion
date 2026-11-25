@@ -10,11 +10,14 @@ object NativeTextAttachment {
     const val MAX_BYTES = 65536
     const val MAX_UNITS = 6000
     const val MAX_DRAFT_UNITS = 16000
-    fun read(input: InputStream): String {
+    fun read(input: InputStream, cancelled: () -> Boolean = { false }): String {
+        fun checkCancelled() { if (cancelled()) throw java.io.InterruptedIOException("Document import cancelled") }
+        checkCancelled()
         val out = ByteArrayOutputStream()
         val buffer = ByteArray(4096)
         while (true) {
             val count = input.read(buffer, 0, minOf(buffer.size, MAX_BYTES + 1 - out.size()))
+            checkCancelled()
             if (count < 0) break
             require(count > 0 && count <= MAX_BYTES - out.size()) { "Document exceeds byte limit or stalled" }
             out.write(buffer, 0, count)
@@ -24,6 +27,7 @@ object NativeTextAttachment {
             .toString().removePrefix("\uFEFF")
         require(text.isNotBlank() && text.length <= MAX_UNITS) { "Document exceeds text limit or is empty" }
         require(text.none { it.isISOControl() && it !in "\t\r\n" }) { "Unsupported control character" }
+        checkCancelled()
         return text
     }
     data class Edit(val text: String, val caret: Int)
