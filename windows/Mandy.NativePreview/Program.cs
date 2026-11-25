@@ -830,17 +830,20 @@ internal sealed class ChatWindow : Window
         var panel = new StackPanel { Margin = new Thickness(16) };
         panel.Children.Add(list);
         var chats = new Button { Content = "Current character conversations" };
+        var edit = new Button { Content = "Edit current character", IsEnabled = pending == null };
         panel.Children.Add(Buttons(select, add, cancel));
-        panel.Children.Add(chats);
+        panel.Children.Add(Buttons(chats, edit));
         var dialog = new Window { Owner = this, Title = "Characters", Width = 430, SizeToContent = SizeToContent.Height,
             WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false, Content = panel };
         Workspace.Profile? selected = null;
-        bool creating = false, browseChats = false;
+        bool creating = false, browseChats = false, editing = false;
+        edit.Click += (_, _) => { editing = true; dialog.DialogResult = true; };
         chats.Click += (_, _) => { browseChats = true; dialog.DialogResult = true; };
         select.Click += (_, _) => { selected = list.SelectedItem as Workspace.Profile; if (selected != null) dialog.DialogResult = true; };
         add.Click += (_, _) => { creating = true; dialog.DialogResult = true; };
         if (dialog.ShowDialog() != true) return;
         if (browseChats) { await ChooseConversationAsync(); return; }
+        if (editing) { await EditCurrentCharacterAsync(); return; }
         string newName = "", newIdentity = "";
         if (creating)
         {
@@ -911,6 +914,47 @@ internal sealed class ChatWindow : Window
         finally { Finish(); }
     }
 
+    private async Task EditCurrentCharacterAsync()
+    {
+        var w = workspace;
+        if (busy || !historyValid || w == null || closeRequested || pending != null) return;
+        var original = w.Character;
+        var n = new TextBox { Text = original.Name, MaxLength = 120 };
+        var i = new TextBox { Text = original.Identity, MaxLength = 8000, AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap, MinHeight = 160, MaxHeight = 280, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        var panel = new StackPanel { Margin = new Thickness(16) };
+        panel.Children.Add(new TextBlock { Text = "Changes affect future replies in all conversations with this character. Existing messages and drafts remain unchanged.", TextWrapping = TextWrapping.Wrap });
+        panel.Children.Add(Labeled("Character name", n));
+        panel.Children.Add(Labeled("Character identity", i));
+        var apply = new Button { Content = "Save changes", IsDefault = true };
+        var cancel = new Button { Content = "Cancel", IsCancel = true };
+        panel.Children.Add(Buttons(apply, cancel));
+        var dialog = new Window { Owner = this, Title = "Edit character", Width = 480, SizeToContent = SizeToContent.Height,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false, Content = panel };
+        apply.Click += (_, _) =>
+        {
+            try { LocalHistory.ValidateText(n.Text); LocalHistory.ValidateText(i.Text); dialog.DialogResult = true; }
+            catch (ArgumentException) { MessageBox.Show(dialog, "Enter a valid name and identity.", "Mandy AI"); }
+        };
+        if (dialog.ShowDialog() != true) return;
+        string newName = n.Text, newIdentity = i.Text;
+        if (newName == original.Name && newIdentity == original.Identity) return;
+        busy = true; UpdateControls();
+        try
+        {
+            await Task.Run(() => w.EditCharacter(original.Character, newName, newIdentity));
+            name.Text = w.Character.Name;
+            identity.Text = w.Character.Identity;
+            characterTitle.Text = w.Character.Name;
+            // Only display labels change; do not reload or replace the user's editable draft.
+            if (history.ItemsSource is IEnumerable<MessageRow> rows)
+                history.ItemsSource = rows.Select(row => row.IsUser ? row : row with { Author = w.Character.Name }).ToArray();
+            status.Text = "Character saved.";
+        }
+        catch (Exception) { status.Text = "Character edit failed. Reopen the workspace if the view is stale."; }
+        finally { Finish(); }
+    }
+
     private async Task ChooseConversationAsync()
     {
         var w = workspace;
@@ -920,23 +964,46 @@ internal sealed class ChatWindow : Window
         list.SelectedItem = options.Single(c => c.Chat == w.Character.Chat);
         var openChat = new Button { Content = "Open conversation", IsDefault = true };
         var addChat = new Button { Content = "New conversation" };
+        var renameChat = new Button { Content = "Rename selected" };
         var cancel = new Button { Content = "Cancel", IsCancel = true };
         var title = new TextBox { MaxLength = 120, Text = "Conversation " + (options.Count + 1) };
         var panel = new StackPanel { Margin = new Thickness(16) };
         panel.Children.Add(list);
-        panel.Children.Add(Labeled("New conversation title", title));
-        panel.Children.Add(Buttons(openChat, addChat, cancel));
+        panel.Children.Add(Labeled("Conversation title (new or rename)", title));
+        panel.Children.Add(Buttons(openChat, addChat, renameChat, cancel));
         var dialog = new Window { Owner = this, Title = "Conversations — " + w.Character.Name,
             Width = 440, SizeToContent = SizeToContent.Height, WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false, Content = panel };
         Workspace.Conversation? selected = null;
-        bool creating = false;
+        bool creating = false, renaming = false;
+        renameChat.Click += (_, _) =>
+        {
+            selected = list.SelectedItem as Workspace.Conversation;
+            if (selected == null) return;
+            try { LocalHistory.ValidateText(title.Text); renaming = true; dialog.DialogResult = true; }
+            catch (ArgumentException) { MessageBox.Show(dialog, "Enter a valid title.", "Mandy AI"); }
+        };
         openChat.Click += (_, _) => { selected = list.SelectedItem as Workspace.Conversation; if (selected != null) dialog.DialogResult = true; };
         addChat.Click += (_, _) =>
         {
             try { LocalHistory.ValidateText(title.Text); creating = true; dialog.DialogResult = true; }
             catch (ArgumentException) { MessageBox.Show(dialog, "Enter a valid title.", "Mandy AI"); }
         };
-        if (dialog.ShowDialog() != true || (!creating && (selected == null || selected.Chat == w.Character.Chat))) return;
+        if (dialog.ShowDialog() != true) return;
+        if (renaming && selected != null)
+        {
+            string renamed = title.Text, chatId = selected.Chat;
+            busy = true; UpdateControls();
+            try
+            {
+                await Task.Run(() => w.RenameConversation(chatId, renamed));
+                charactersButton.ToolTip = w.ConversationTitle;
+                status.Text = "Conversation renamed.";
+            }
+            catch (Exception) { status.Text = "Conversation rename failed."; }
+            finally { Finish(); }
+            return;
+        }
+        if (!creating && (selected == null || selected.Chat == w.Character.Chat)) return;
         var previous = w.Character;
         var previousPending = pending;
         var previousRows = history.ItemsSource;
