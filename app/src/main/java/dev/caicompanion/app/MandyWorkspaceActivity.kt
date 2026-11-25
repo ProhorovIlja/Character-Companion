@@ -1201,9 +1201,15 @@ class MandyWorkspaceActivity : Activity() {
                 }
             }
             val refreshed = if (saved) runCatching { snapshot() }.getOrNull() else null
+            val unsupportedTemplate = result.exceptionOrNull().let {
+                it is java.io.IOException && it.message == "Unsupported local model chat template"
+            }
             runOnUiThread {
                 if (!alive()) return@runOnUiThread
                 busy = false
+                // The next explicit retry must offer model selection rather than
+                // silently reusing the same incompatible approval.
+                if (unsupportedTemplate && approvedModel == (ticket to sha)) approvedModel = null
                 composerMode()
                 if (refreshed != null) {
                     current = refreshed
@@ -1227,8 +1233,7 @@ class MandyWorkspaceActivity : Activity() {
                     } ?: "Reply saved"
                     stopped.get() -> "Stopped • check saved draft or pending message"
                     result.exceptionOrNull() is ModelAdmission.Denied -> admissionMessage(result.exceptionOrNull() as ModelAdmission.Denied) + " • pending message retained"
-                    result.exceptionOrNull() is java.io.IOException &&
-                        result.exceptionOrNull()?.message == "Unsupported local model chat template" ->
+                    unsupportedTemplate ->
                         "Model chat template is unsupported • choose another trusted model and retry"
                     else -> "Generation failed • check saved draft or retry state"
                 }
