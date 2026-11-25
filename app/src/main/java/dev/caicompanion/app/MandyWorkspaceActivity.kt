@@ -78,6 +78,7 @@ class MandyWorkspaceActivity : Activity() {
     private lateinit var stopSpeech: Button
     private lateinit var sendSpeech: Button
     private var resumed = false
+    private var playbackDialog: AlertDialog? = null
     private data class TextPick(val snapshot: Snapshot, val draft: String, val start: Int, val end: Int)
     private var textPick: TextPick? = null
     private var queuedTextPick: Pair<TextPick, android.net.Uri>? = null
@@ -363,6 +364,8 @@ class MandyWorkspaceActivity : Activity() {
                     canvas.drawArc(5f,7f,19f,18f,0f,180f,false,ink)
                     l(12f,18f,12f,21f); l(8f,21f,16f,21f)
                 }
+                "copy" -> { canvas.drawRoundRect(8f,8f,21f,21f,2f,2f,ink); l(3f,16f,3f,3f); l(3f,3f,16f,3f) }
+                "speaker" -> { l(3f,9f,7f,9f); l(7f,9f,12f,5f); l(12f,5f,12f,19f); l(12f,19f,7f,15f); l(7f,15f,3f,15f); l(3f,15f,3f,9f); canvas.drawArc(11f,7f,21f,17f,-60f,120f,false,ink) }
                 "send" -> { l(12f,20f,12f,4f); l(5f,11f,12f,4f); l(12f,4f,19f,11f) }
                 "retry" -> { canvas.drawArc(4f,4f,20f,20f,25f,300f,false,ink); l(20f,3f,20f,9f); l(14f,9f,20f,9f) }
             }
@@ -455,6 +458,27 @@ class MandyWorkspaceActivity : Activity() {
             if (it.role == "user") row.background = roundedSurface(R.attr.shellAction, 20)
             row.addView(chatLabel(author, 13f).apply { setPadding(0, 0, 0, dp(4)); typeface = android.graphics.Typeface.DEFAULT_BOLD })
             row.addView(chatLabel(it.text).apply { setPadding(0, 0, 0, 0); setTextIsSelectable(true); setLineSpacing(dp(3).toFloat(), 1f) })
+            if (it.role == "character") {
+                val reply = it.text
+                row.addView(LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    addView(chatAction("copy", "Copy reply") {
+                        if (resumed && current === s) {
+                            runCatching {
+                                val clipboard = getSystemService(android.content.ClipboardManager::class.java)
+                                    ?: error("Clipboard unavailable")
+                                val clip = android.content.ClipData.newPlainText("Mandy reply", reply)
+                                clip.description.extras = android.os.PersistableBundle().apply {
+                                    putBoolean("android.content.extra.IS_SENSITIVE", true)
+                                }
+                                clipboard.setPrimaryClip(clip)
+                            }.onSuccess { status.text = "Reply copied" }
+                                .onFailure { status.text = "Clipboard unavailable" }
+                        }
+                    })
+                    addView(chatAction("speaker", "Read reply aloud") { chooseReadAloud(s, reply) })
+                })
+            }
             messages.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
                 if (it.role == "user") marginStart = dp(36) else marginEnd = dp(24)
                 topMargin = dp(4); bottomMargin = dp(4)
@@ -1208,6 +1232,95 @@ class MandyWorkspaceActivity : Activity() {
             }
         }
     }
+    private fun chooseReadAloud(s: Snapshot, text: String) {
+        if (!resumed || busy || !alive() || current !== s || playbackDialog != null) return
+        AlertDialog.Builder(this).setTitle("Read reply aloud")
+            .setMessage("Send this reply to your installed Android speech engine? Use a trusted engine. Mandy selects a voice advertised as offline and installed, but cannot verify another app's network behavior.")
+            .setNegativeButton(android.R.string.cancel, null)
+            .setNeutralButton("Russian") { _, _ -> readAloud(s, text, "ru") }
+            .setPositiveButton("English") { _, _ -> readAloud(s, text, "en") }
+            .show()
+    }
+
+    /** One foreground playback session. No microphone, auto-play, download or background service. */
+    private fun readAloud(s: Snapshot, text: String, language: String) {
+        if (!resumed || busy || !alive() || current !== s || playbackDialog != null) return
+        val chunks = runCatching {
+            SpokenText.chunks(text, minOf(4000, android.speech.tts.TextToSpeech.getMaxSpeechInputLength()))
+        }.getOrElse { status.text = "Reply cannot be read aloud"; return }
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+        val dialog = AlertDialog.Builder(this).setTitle("Read aloud")
+            .setMessage("Opening installed speech engine…")
+            .setNegativeButton("Stop", null).create()
+        playbackDialog = dialog
+        var engine: android.speech.tts.TextToSpeech? = null
+        val session = UUID.randomUUID().toString()
+        var index = 0
+        fun active() = playbackDialog === dialog && resumed && alive() && current === s && !busy
+        fun finish(message: String) {
+            if (playbackDialog !== dialog) return
+            status.text = message
+            dialog.dismiss()
+        }
+        fun next() {
+            if (!active()) return
+            if (index >= chunks.size) { finish("Read aloud completed"); return }
+            dialog.setMessage("Reading part " + (index + 1) + " of " + chunks.size)
+            val result = runCatching {
+                engine?.speak(chunks[index], android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, session + ":" + index)
+            }.getOrNull()
+            if (result != android.speech.tts.TextToSpeech.SUCCESS) finish("Speech playback failed")
+        }
+        dialog.setOnDismissListener {
+            if (playbackDialog === dialog) playbackDialog = null
+            val previous = engine
+            engine = null
+            runCatching { previous?.stop() }
+            runCatching { previous?.shutdown() }
+        }
+        dialog.show()
+        try {
+            engine = android.speech.tts.TextToSpeech(this) { initialized ->
+                // Post even for a synchronous initialization callback so engine is assigned.
+                main.post {
+                    if (!active()) return@post
+                    val tts = engine ?: return@post
+                    if (initialized != android.speech.tts.TextToSpeech.SUCCESS) {
+                        finish("Installed speech engine unavailable"); return@post
+                    }
+                    val configured = runCatching {
+                        val voice = tts.voices.orEmpty().filter {
+                            it.locale.language == language && !it.isNetworkConnectionRequired &&
+                                android.speech.tts.TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED !in it.features.orEmpty()
+                        }.sortedWith(compareByDescending<android.speech.tts.Voice> { it.quality }
+                            .thenBy { it.latency }.thenBy { it.name }).firstOrNull()
+                        voice != null && tts.setVoice(voice) == android.speech.tts.TextToSpeech.SUCCESS &&
+                            tts.voice?.let { it.name == voice.name && !it.isNetworkConnectionRequired } == true
+                    }.getOrDefault(false)
+                    if (!configured) { finish("No installed offline-capable " + language.uppercase(java.util.Locale.ROOT) + " voice"); return@post }
+                    val listener = object : android.speech.tts.UtteranceProgressListener() {
+                        override fun onStart(utteranceId: String?) = Unit
+                        override fun onDone(utteranceId: String?) {
+                            main.post {
+                                if (active() && utteranceId == session + ":" + index) { index++; next() }
+                            }
+                        }
+                        @Suppress("DEPRECATION")
+                        override fun onError(utteranceId: String?) {
+                            main.post {
+                                if (active() && utteranceId == session + ":" + index) finish("Speech playback failed")
+                            }
+                        }
+                    }
+                    if (runCatching { tts.setOnUtteranceProgressListener(listener) }.getOrNull() != android.speech.tts.TextToSpeech.SUCCESS) {
+                        finish("Speech playback unavailable"); return@post
+                    }
+                    next()
+                }
+            }
+        } catch (_: Exception) { finish("Speech engine unavailable") }
+    }
+
     private fun chooseSpeechLanguage(s: Snapshot) {
         if (!resumed || busy || current?.ticket != s.ticket || s.ticket == null) return
         if (Build.VERSION.SDK_INT < 31 || !SpeechRecognizer.isOnDeviceRecognitionAvailable(this)) {
@@ -1420,6 +1533,7 @@ class MandyWorkspaceActivity : Activity() {
 
     override fun onPause() {
         resumed = false
+        playbackDialog?.dismiss()
         cancelTextRead()
         stopped.set(true)
         // Serialize lifecycle cleanup after any in-flight explicit inference; never load here.
@@ -1429,6 +1543,7 @@ class MandyWorkspaceActivity : Activity() {
     }
 
     override fun onDestroy() {
+        playbackDialog?.dismiss()
         queuedTextPick = null
         textPick = null
         cancelTextRead()
