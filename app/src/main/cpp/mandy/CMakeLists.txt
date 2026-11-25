@@ -35,6 +35,10 @@ set(GGML_CPU_KLEIDIAI OFF CACHE BOOL "" FORCE)
 set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
 set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
 set(GGML_LLAMAFILE OFF CACHE BOOL "" FORCE)
+# The manual preview packages a Debug APK. Optimize its native kernels
+# without defining NDEBUG or removing debug information; keep Release unchanged.
+# Apply before add_subdirectory so llama and GGML inherit the setting.
+add_compile_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:C,CXX>>:-O2>")
 add_subdirectory("${MANDY_LLAMA_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/llama")
 add_library(mandy_llama SHARED mandy_llama.cpp)
 target_link_libraries(mandy_llama PRIVATE llama)
