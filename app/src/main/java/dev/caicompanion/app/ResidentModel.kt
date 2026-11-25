@@ -44,7 +44,16 @@ internal class ResidentModel : Closeable {
             if (loaded?.model != model) clear()
             checkActive()
             val admissionStart = System.nanoTime()
-            admit(model)
+            try {
+                admit(model)
+            } catch (denial: ModelAdmission.Denied) {
+                // Existing model residency may contribute to the low available-memory reading.
+                // Release once and measure again; never weaken the admission threshold.
+                if (loaded == null || denial.decision.reason != ModelAdmission.Reason.INSUFFICIENT_HEADROOM) throw denial
+                clear()
+                checkActive()
+                admit(model)
+            }
             val admissionNanos = System.nanoTime() - admissionStart
             checkActive()
             val reused = loaded != null
