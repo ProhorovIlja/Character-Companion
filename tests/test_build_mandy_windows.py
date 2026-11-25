@@ -103,6 +103,19 @@ class PreviewBuild(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, name):
                     build.audit(stage)
 
+    def test_missing_or_empty_speech_component(self):
+        for empty in (False, True):
+            with self.subTest(empty=empty), tempfile.TemporaryDirectory() as tmp:
+                stage = Path(tmp) / 'publish'
+                fixture(stage)
+                path = stage / 'System.Speech.dll'
+                if empty:
+                    path.write_bytes(b'')
+                else:
+                    path.unlink()
+                with self.assertRaisesRegex(ValueError, 'System.Speech.dll'):
+                    build.audit(stage)
+
     def test_failed_audit_no_output(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
