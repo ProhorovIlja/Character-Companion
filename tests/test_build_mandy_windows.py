@@ -63,30 +63,45 @@ class PreviewBuild(unittest.TestCase):
                 if args[1] == 'publish':
                     fixture(Path(args[-1]))
             build.build(root, output, 'dotnet', '10.0.404', run)
-            self.assertEqual([c[1] for c in calls], ['run', 'run', 'publish'])
-            self.assertEqual(calls[0][3], build.SMOKES[0])
-            self.assertEqual(calls[1][3], build.SMOKES[1])
-            self.assertIn('--self-contained', calls[2])
+            self.assertEqual([c[1] for c in calls], ['run'] * 4 + ['publish'])
+            self.assertEqual([c[3] for c in calls[:-1]], list(build.SMOKES))
+            self.assertIn('windows/Mandy.MemorySmoke/Mandy.MemorySmoke.csproj', build.SMOKES)
+            self.assertIn('windows/Mandy.AttachmentSmoke/Mandy.AttachmentSmoke.csproj', build.SMOKES)
+            self.assertIn('--self-contained', calls[-1])
+            info = (output / 'BUILD_INFO.txt').read_text().splitlines()
+            self.assertEqual([line for line in info if line.startswith('SMOKE_PASSED=')],
+                             ['SMOKE_PASSED=' + project for project in build.SMOKES])
             self.assertIn('UI_DEVICE_TESTED=NO', (output / 'BUILD_INFO.txt').read_text())
             for line in (output / 'SHA256SUMS.txt').read_text().splitlines():
                 sha, name = line.split('  ', 1)
                 self.assertEqual(hashlib.sha256((output / name).read_bytes()).hexdigest(), sha)
             with self.assertRaisesRegex(ValueError, 'existing output'):
                 build.build(root, output, 'dotnet', '10.0.404', run)
-            self.assertEqual(len(calls), 3)
+            self.assertEqual(len(calls), 5)
 
     def test_smoke_failure_stops_publish(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            output = root / 'result'
-            calls = []
-            def run(args, **kwargs):
-                calls.append(args)
-                raise subprocess.CalledProcessError(1, args)
-            with self.assertRaises(subprocess.CalledProcessError):
-                build.build(root, output, 'dotnet', '10.0.404', run)
-            self.assertEqual(len(calls), 1)
-            self.assertFalse(output.exists())
+        for index, project in enumerate(build.SMOKES):
+            with self.subTest(project=project), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                output = root / 'result'
+                calls = []
+                def run(args, **kwargs):
+                    calls.append(args)
+                    if args[3] == project:
+                        raise subprocess.CalledProcessError(1, args)
+                with self.assertRaises(subprocess.CalledProcessError):
+                    build.build(root, output, 'dotnet', '10.0.404', run)
+                self.assertEqual([c[1] for c in calls], ['run'] * (index + 1))
+                self.assertFalse(output.exists())
+
+    def test_missing_runtime_component(self):
+        for name in ('hostfxr.dll', 'hostpolicy.dll', 'Mandy.NativePreview.deps.json'):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp:
+                stage = Path(tmp) / 'publish'
+                fixture(stage)
+                (stage / name).unlink()
+                with self.assertRaisesRegex(ValueError, name):
+                    build.audit(stage)
 
     def test_failed_audit_no_output(self):
         with tempfile.TemporaryDirectory() as tmp:
