@@ -64,6 +64,30 @@ fun main() {
                 }, onText = {})
             }
             verify(stopCallback.exceptionOrNull() === stopFailure)
+            // First graph callback follows the five boundary checks; the stub
+            // also invokes it on a worker, where Java must not be called.
+            val caller = Thread.currentThread()
+            var decodeChecks = 0
+            var decodePreview = false
+            var decodeMetrics = false
+            val decodeStop = runCatching {
+                engine.generate(messages, 512, 4, 4, cancelled = {
+                    check(Thread.currentThread() === caller)
+                    ++decodeChecks == 6
+                }, onMetrics = { decodeMetrics = true }, onText = { decodePreview = true })
+            }
+            verify(decodeStop.exceptionOrNull() is IOException && decodeChecks == 6)
+            verify(!decodePreview && !decodeMetrics)
+            val decodeFailure = IllegalStateException("test in-decode cancellation callback failure")
+            decodeChecks = 0
+            val decodeException = runCatching {
+                engine.generate(messages, 512, 4, 4, cancelled = {
+                    check(Thread.currentThread() === caller)
+                    if (++decodeChecks == 6) throw decodeFailure
+                    false
+                }, onText = { error("No partial reply expected") })
+            }
+            verify(decodeException.exceptionOrNull() === decodeFailure && decodeChecks == 6)
             val metricsFailure = IllegalStateException("test metrics callback failure")
             val metricsCallback = runCatching {
                 engine.generate(messages, 512, 4, 2, onMetrics = { throw metricsFailure }, onText = {})
