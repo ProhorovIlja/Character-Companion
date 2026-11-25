@@ -18,8 +18,10 @@ struct llama_batch { llama_token* tokens; int n; };
 inline void llama_log_set(void(*)(ggml_log_level,const char*,void*),void*) {}
 inline void llama_backend_init() {}
 inline llama_model_params llama_model_default_params() { return {}; }
-inline llama_model* llama_model_load_from_file(const char* path,llama_model_params) { auto p = new llama_model; if (std::strstr(path,"unsupported.gguf")) p->tmpl = "unsupported"; else if (std::strstr(path,"missing.gguf")) p->tmpl = nullptr; return p; }
-inline void llama_model_free(llama_model* p) { delete p; }
+// The smoke test is single-owner: refuse a second load if cleanup leaked.
+inline int live_models = 0;
+inline llama_model* llama_model_load_from_file(const char* path,llama_model_params) { if (live_models != 0) return nullptr; auto p = new llama_model; ++live_models; if (std::strstr(path,"unsupported.gguf")) p->tmpl = "unsupported"; else if (std::strstr(path,"missing.gguf")) p->tmpl = nullptr; return p; }
+inline void llama_model_free(llama_model* p) { --live_models; delete p; }
 inline bool llama_model_has_encoder(const llama_model*) {return false;}
 inline bool llama_model_has_decoder(const llama_model*) {return true;}
 inline const char* llama_model_chat_template(const llama_model* p,const char*) {return p->tmpl;}
