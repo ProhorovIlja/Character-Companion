@@ -1,6 +1,6 @@
 {
   global:
-    Java_dev_caicompanion_app_EmbeddedLlama_nativeLoad;
+    Java_dev_caicompanion_app_EmbeddedLlama_nativeLoadV2;
     Java_dev_caicompanion_app_EmbeddedLlama_nativeClose;
     Java_dev_caicompanion_app_EmbeddedLlama_nativeGenerateV3;
   local: *;
