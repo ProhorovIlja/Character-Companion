@@ -22,16 +22,35 @@ fun main() {
         }
         verify(runCatching { EmbeddedLlama.openVerified(model) { true }.close() }.exceptionOrNull() is IOException)
         var checksAfterLoad = 0
-        verify(runCatching { EmbeddedLlama.openVerified(model) { ++checksAfterLoad == 2 }.close() }.exceptionOrNull() is IOException)
+        verify(runCatching { EmbeddedLlama.openVerified(model) { ++checksAfterLoad == 6 }.close() }.exceptionOrNull() is IOException)
         val loadFailure = IllegalStateException("test post-load callback failure")
         var loadChecks = 0
         val failedLoad = runCatching {
             EmbeddedLlama.openVerified(model) {
-                if (++loadChecks == 2) throw loadFailure
+                if (++loadChecks == 6) throw loadFailure
                 false
             }.close()
         }
         verify(failedLoad.exceptionOrNull() === loadFailure)
+        val loadCaller = Thread.currentThread()
+        var loadingChecks = 0
+        val cancelledWhileLoading = runCatching {
+            EmbeddedLlama.openVerified(model) {
+                check(Thread.currentThread() === loadCaller)
+                ++loadingChecks == 3
+            }.close()
+        }
+        verify(cancelledWhileLoading.exceptionOrNull() is IOException && loadingChecks == 3)
+        loadingChecks = 0
+        val progressFailure = IllegalStateException("test model progress callback failure")
+        val failedWhileLoading = runCatching {
+            EmbeddedLlama.openVerified(model) {
+                check(Thread.currentThread() === loadCaller)
+                if (++loadingChecks == 4) throw progressFailure
+                false
+            }.close()
+        }
+        verify(failedWhileLoading.exceptionOrNull() === progressFailure && loadingChecks == 4)
         // The stub refuses a new load if a previous model was leaked.
         EmbeddedLlama.openVerified(model) { false }.use { engine ->
             fun success(seed: Int, cap: Int) {
