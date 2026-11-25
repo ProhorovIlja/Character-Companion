@@ -462,6 +462,20 @@ class MandyWorkspaceActivity : Activity() {
         }
         if (s.draft.pending != null) {
             messages.addView(chatLabel("Pending message • " + s.draft.pending.text))
+            messages.addView(button("Recover saved reply") {
+                val draft = editor?.text?.toString() ?: return@button
+                if (!resumed || busy || !alive() || current !== s) return@button
+                var recovered = false
+                work(afterSuccess = {
+                    status.text = if (recovered) "Saved reply recovered · no model used"
+                        else "No completed reply found · pending message retained"
+                }) {
+                    workspace.edit(ticket, draft)
+                    AndroidConversationStore(applicationContext, account).use { history ->
+                        recovered = workspace.recoverCommitted(ticket, s.draft.pending.id, history) != null
+                    }
+                }
+            })
             messages.addView(button("Discard pending retry") {
                 AlertDialog.Builder(this).setMessage("Discard retry state? Already committed messages remain in history.")
                     .setNegativeButton(android.R.string.cancel, null)
