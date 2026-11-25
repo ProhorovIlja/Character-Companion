@@ -90,6 +90,23 @@ fun main() {
             checkIt(Files.getLastModifiedTime(destination) == competingStamp)
             checkIt(Files.newDirectoryStream(raceRoot, "*.part").use { !it.iterator().hasNext() })
         }
+        // Head dimensions must divide their corresponding state exactly.
+        val validDimensions = speech.clone().also {
+            ByteBuffer.wrap(it).order(ByteOrder.LITTLE_ENDIAN)
+                .putInt(12, 384).putInt(16, 6).putInt(28, 384).putInt(32, 6)
+        }
+        val dimensionRoot = Files.createDirectory(root.resolve("dimensions"))
+        val dimensionLib = NativeModelLibrary(dimensionRoot, format = NativeModelLibrary.Format.WHISPER)
+        val dimensionModel = dimensionLib.import(ByteArrayInputStream(validDimensions))
+        checkIt(dimensionLib.verify(dimensionModel.sha256) == dimensionModel)
+        for ((offset, invalid) in listOf(16 to 5, 32 to 5, 16 to 385, 32 to 385)) {
+            val malformed = validDimensions.clone().also {
+                ByteBuffer.wrap(it).order(ByteOrder.LITTLE_ENDIAN).putInt(offset, invalid)
+            }
+            reject { dimensionLib.import(ByteArrayInputStream(malformed)) }
+            checkIt(dimensionLib.list() == listOf(dimensionModel))
+            checkIt(Files.newDirectoryStream(dimensionRoot, "*.part").use { !it.iterator().hasNext() })
+        }
         println("PASS $checks known-digest import checks")
     } finally { root.toFile().deleteRecursively() }
 }
