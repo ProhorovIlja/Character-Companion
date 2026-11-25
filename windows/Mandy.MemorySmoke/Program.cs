@@ -43,6 +43,14 @@ try
         prompt.IndexOf("Relevant memory: Enjoys jazz music", StringComparison.Ordinal), "Rare term first");
     string constrained = CharacterMemory.Compose(reopened, new string('I', 7999), "query");
     Check(constrained == new string('I', 7999), "No identity truncation");
+    string longQuery = new string('x', 16000);
+    string expanded = CharacterMemory.Compose(reopened, "Core identity.", longQuery, 24000);
+    Check(expanded.StartsWith("Core identity.", StringComparison.Ordinal) &&
+        expanded.Contains("Pinned memory: Prefers tea.") && expanded.Length + longQuery.Length <= 24000,
+        "Extended context preserves identity and fitting memory");
+    Check(CharacterMemory.Compose(reopened, "Core identity.", longQuery) == "Core identity.",
+        "Default budget never silently truncates identity");
+    Reject(() => CharacterMemory.Compose(reopened, "Core identity.", "query", 64001), "Invalid context limit");
     var many = reopened with { Memories = Enumerable.Range(0, 128).Select(i => "music note " + i).ToArray() };
     store.Save(a, many);
     Check(store.Read(a).Memories.Length == 128, "128 note capacity");
