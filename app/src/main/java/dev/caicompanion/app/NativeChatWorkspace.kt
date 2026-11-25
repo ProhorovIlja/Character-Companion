@@ -95,10 +95,15 @@ class NativeChatWorkspace(root: Path, account: String, private val device: Strin
         require(visible(ticket)) { "Stale session" }
         save(ticket.key, load(ticket.key).copy(draft = text))
     }
-    @Synchronized fun prepare(ticket: Ticket, mode: String = "text"): Pending {
+    @Synchronized fun prepare(ticket: Ticket, mode: String = "text", identity: String? = null, contextUnits: Int = 12000): Pending {
         require(visible(ticket) && ticket.key !in running)
         val state = load(ticket.key)
         check(state.pending == null) { "Resolve existing pending message first" }
+        require(contextUnits in 256..64000)
+        if (identity != null) {
+            NativeConversation.validateText(identity)
+            require(identity.length <= 8000 && identity.length + state.draft.length <= contextUnits) { "Message exceeds context allowance" }
+        }
         val pending = Pending(UUID.randomUUID().toString(), state.draft, mode)
         save(ticket.key, State(pending = pending))
         return pending
@@ -113,6 +118,11 @@ class NativeChatWorkspace(root: Path, account: String, private val device: Strin
     /** Explicit send/retry only. UI must recheck ticket on its own render thread. */
     fun sendPending(ticket: Ticket, history: NativeConversation.History, identity: String,
                     cancelled: () -> Boolean = { false }, onText: (Ticket, String) -> Unit,
+                    generate: (List<NativeConversation.Message>, () -> Boolean, (String) -> Unit) -> String): NativeConversation.Event =
+        sendPendingWithBudget(ticket, history, identity, 12000, cancelled, onText, generate)
+
+    fun sendPendingWithBudget(ticket: Ticket, history: NativeConversation.History, identity: String, contextUnits: Int,
+                    cancelled: () -> Boolean = { false }, onText: (Ticket, String) -> Unit,
                     generate: (List<NativeConversation.Message>, () -> Boolean, (String) -> Unit) -> String): NativeConversation.Event {
         val pending = synchronized(this) {
             require(visible(ticket)) { "Stale session" }
@@ -124,7 +134,7 @@ class NativeChatWorkspace(root: Path, account: String, private val device: Strin
         try {
             val stop = { cancelled() || !visible(ticket) }
             val event = NativeConversation.send(history, pending.id, device, ticket.key.character, ticket.key.chat,
-                pending.text, identity, pending.mode, cancelled = stop, onText = { fragment ->
+                pending.text, identity, pending.mode, contextUnits = contextUnits, cancelled = stop, onText = { fragment ->
                     if (!visible(ticket)) throw IOException("Session changed")
                     onText(ticket, fragment)
                 }, generate = generate)
