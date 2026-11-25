@@ -147,7 +147,7 @@ internal sealed class ChatWindow : Window
         settings.Children.Add(Labeled("Loopback port", port));
         settings.Children.Add(Labeled("Local server API key (not saved)", key));
         if (BundledModelHost.IsAvailable)
-            settings.Children.Add(new TextBlock { Text = "The bundled local model starts on your first send when the server key is empty.", TextWrapping = TextWrapping.Wrap });
+            settings.Children.Add(new TextBlock { Text = $"Bundled {BundledModelHost.DisplayName} starts on first Send when the server key is empty.", TextWrapping = TextWrapping.Wrap });
         settings.Children.Add(Labeled("Conversation preset", replyPreset));
         settings.Children.Add(Buttons(refresh, saveDraft));
         saveDraft.Click += async (_, _) => await SaveCurrentDraftAsync();
@@ -1549,7 +1549,7 @@ internal sealed class ChatWindow : Window
         if (key.Password.Length == 0 && BundledModelHost.IsAvailable)
         {
             busy = true; operation = new CancellationTokenSource(); UpdateControls();
-            status.Text = "Starting bundled local model…";
+            status.Text = $"Starting bundled {BundledModelHost.DisplayName}…";
             try
             {
                 bundledModel = new BundledModelHost();

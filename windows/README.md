@@ -10,14 +10,15 @@ To build the app on Windows, install .NET 10 SDK and run
 `python scripts/build_mandy_windows.py --build --output <new-empty-output-path>`
 from the repository root. The script runs the inference, history, memory and
 attachment smoke projects before publishing. The model is not downloaded by the
-build. To use the optional bundled starter model, place the Windows x64 CPU
-llama.cpp `llama-server.exe` and its release DLLs, license files, and
-`Qwen3-0.6B-Q8_0.gguf` in a `LocalModel` directory beside
-`Mandy.NativePreview.exe`. Keep the whole publish folder together. When no server
-key is entered, the first Send starts this model on a random loopback port and
-the app stops it when the window closes. A manually configured trusted local
-server remains supported. The bundled model is CPU-only; GPU acceleration,
-dictation and live calls need separate setup or further validation.
+build. For a bundled CPU starter, place the Windows x64 CPU llama.cpp
+`llama-server.exe`, its release DLLs and licenses, and `Qwen3-0.6B-Q8_0.gguf`
+in a `LocalModel` directory beside `Mandy.NativePreview.exe`. For an RTX GPU,
+use the corresponding CUDA 12.4 llama.cpp release, its CUDA runtime DLLs and
+`Qwen3-8B-Q4_K_M.gguf` instead. Keep the whole publish folder together. When
+the server key is empty, first Send starts the available bundled model on a
+random loopback port; the app stops it when the window closes. A manually
+configured trusted local server remains supported. Dictation and live calls
+need separate setup or further validation.
 
 The older CharacterCompanion.Windows CEF prototype documented below is a
 different application and its source-only status does not describe this preview.

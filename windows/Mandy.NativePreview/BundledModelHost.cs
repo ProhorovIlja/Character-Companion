@@ -8,15 +8,22 @@ using System.Text.Json;
 
 namespace Mandy.NativePreview;
 
-/// <summary>Owns the optional, app-distributed CPU starter model while this window is open.</summary>
+/// <summary>Owns the optional, app-distributed local model while this window is open.</summary>
 internal sealed class BundledModelHost : IDisposable
 {
-    private const string ModelName = "Qwen3-0.6B-Q8_0.gguf";
+    private const string CpuModelName = "Qwen3-0.6B-Q8_0.gguf";
+    private const string GpuModelName = "Qwen3-8B-Q4_K_M.gguf";
     private Process? process;
 
     internal static string DirectoryPath => Path.Combine(AppContext.BaseDirectory, "LocalModel");
-    internal static bool IsAvailable => File.Exists(Path.Combine(DirectoryPath, "llama-server.exe")) &&
-        File.Exists(Path.Combine(DirectoryPath, ModelName));
+    private static bool HasGpuModel => File.Exists(Path.Combine(DirectoryPath, "ggml-cuda.dll")) &&
+        File.Exists(Path.Combine(DirectoryPath, GpuModelName));
+    private static string? AvailableModel => File.Exists(Path.Combine(DirectoryPath, "llama-server.exe"))
+        ? HasGpuModel ? GpuModelName
+            : File.Exists(Path.Combine(DirectoryPath, CpuModelName)) ? CpuModelName : null
+        : null;
+    internal static bool IsAvailable => AvailableModel != null;
+    internal static string DisplayName => HasGpuModel ? "Qwen3-8B on GPU" : "Qwen3-0.6B on CPU";
 
     internal bool IsRunning => process is { HasExited: false };
     internal int Port { get; private set; }
@@ -26,7 +33,7 @@ internal sealed class BundledModelHost : IDisposable
     {
         if (IsRunning) return;
         Dispose();
-        if (!IsAvailable) throw new FileNotFoundException("Bundled local model files are missing.");
+        var model = AvailableModel ?? throw new FileNotFoundException("Bundled local model files are missing.");
         cancellationToken.ThrowIfCancellationRequested();
 
         using (var listener = new TcpListener(IPAddress.Loopback, 0))
@@ -45,10 +52,11 @@ internal sealed class BundledModelHost : IDisposable
         start.Environment["LLAMA_API_KEY"] = ApiKey;
         foreach (var argument in new[]
         {
-            "--model", Path.Combine(DirectoryPath, ModelName), "--alias", "mandy-local",
+            "--model", Path.Combine(DirectoryPath, model), "--alias", "mandy-local",
             "--host", "127.0.0.1", "--port", Port.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            "--ctx-size", "4096", "--threads", Math.Clamp(Environment.ProcessorCount / 2, 1, 8).ToString(),
-            "--n-gpu-layers", "0"
+            "--ctx-size", model == GpuModelName ? "8192" : "4096", "--parallel", "1",
+            "--threads", Math.Clamp(Environment.ProcessorCount / 2, 1, 8).ToString(),
+            "--n-gpu-layers", model == GpuModelName ? "99" : "0"
         }) start.ArgumentList.Add(argument);
 
         try
