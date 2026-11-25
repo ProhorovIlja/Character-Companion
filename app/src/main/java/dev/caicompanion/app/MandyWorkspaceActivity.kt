@@ -41,6 +41,8 @@ class MandyWorkspaceActivity : Activity() {
         // Serialize explicitly requested disk operations across activity recreation.
         private val disk = Executors.newSingleThreadExecutor()
         private const val PICK_TEXT_DOCUMENT = 7412
+        // A blocked external provider must never occupy the workspace disk executor.
+        private val textReaderOccupied = AtomicBoolean(false)
     }
     private data class Snapshot(val profiles: List<NativeCharacterLibrary.Profile>,
                                 val ticket: NativeChatWorkspace.Ticket?,
@@ -78,6 +80,9 @@ class MandyWorkspaceActivity : Activity() {
     private var resumed = false
     private data class TextPick(val snapshot: Snapshot, val draft: String, val start: Int, val end: Int)
     private var textPick: TextPick? = null
+    private var queuedTextPick: Pair<TextPick, android.net.Uri>? = null
+    private data class TextRead(val cancelled: AtomicBoolean, val states: Map<View, Boolean>)
+    private var textRead: TextRead? = null
     /** Sample system memory only during explicitly requested local inference. */
     private fun admitModel(model: NativeModelLibrary.Model, contextTokens: Int) {
         val manager = applicationContext.getSystemService(android.app.ActivityManager::class.java)
@@ -208,7 +213,10 @@ class MandyWorkspaceActivity : Activity() {
         }
         cancelGeneration = Button(this).apply {
             text = "Stop generation"; isAllCaps = false; visibility = View.GONE
-            setOnClickListener { stopped.set(true); isEnabled = false; status.text = "Stopping…" }
+            setOnClickListener {
+                if (textRead != null) cancelTextRead()
+                else { stopped.set(true); isEnabled = false; status.text = "Stopping…" }
+            }
         }
         speechControls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; visibility = View.GONE }
         stopSpeech = Button(this).apply {
@@ -840,7 +848,8 @@ class MandyWorkspaceActivity : Activity() {
     @Suppress("DEPRECATION")
     private fun pickTextDocument(s: Snapshot) {
         val field = editor ?: return
-        if (!resumed || busy || !alive() || textPick != null || current !== s || s.ticket == null || s.draft.pending != null) return
+        if (!resumed || busy || !alive() || textPick != null || queuedTextPick != null || current !== s || s.ticket == null || s.draft.pending != null) return
+        if (textReaderOccupied.get()) { status.text = "Previous document provider is still closing. Try again when it returns."; return }
         val draft = field.text.toString()
         val a = field.selectionStart
         val b = field.selectionEnd
@@ -872,32 +881,75 @@ class MandyWorkspaceActivity : Activity() {
             status.text = "Select one readable text document"
             return
         }
+        // Android can deliver the picker result before onResume.
+        queuedTextPick = pick to uri
+        if (resumed) startQueuedTextRead()
+    }
+
+    private fun startQueuedTextRead() {
+        val (pick, uri) = queuedTextPick ?: return
+        queuedTextPick = null
+        if (!resumed || busy || !alive() || current !== pick.snapshot || editor?.text?.toString() != pick.draft) return
+        if (!textReaderOccupied.compareAndSet(false, true)) {
+            status.text = "Previous document provider is still closing"
+            return
+        }
         val resolver = applicationContext.contentResolver
-        busy = true
         val states = mutableMapOf<View, Boolean>()
         suspendInputs(panel, states)
+        val read = TextRead(AtomicBoolean(false), states)
+        textRead = read
+        busy = true
+        composerMode(generating = true)
+        cancelGeneration.text = "Cancel import"
+        cancelGeneration.isEnabled = true
         status.text = "Reading selected text document…"
-        disk.execute {
-            val result = runCatching {
-                resolver.openInputStream(uri)?.use { stream -> NativeTextAttachment.read(stream) }
-                    ?: error("Document unavailable")
-            }
-            runOnUiThread {
-                if (!alive()) return@runOnUiThread
-                busy = false
-                states.forEach { (view, enabled) -> view.isEnabled = enabled }
-                if (!resumed || current !== pick.snapshot || editor?.text?.toString() != pick.draft) {
-                    status.text = "Document import cancelled; draft preserved"
-                    return@runOnUiThread
+        try {
+            Thread({
+                val result = try {
+                    runCatching {
+                        if (read.cancelled.get()) throw java.io.InterruptedIOException()
+                        resolver.openInputStream(uri)?.use { stream ->
+                            NativeTextAttachment.read(stream, read.cancelled::get)
+                        } ?: error("Document unavailable")
+                    }
+                } finally { textReaderOccupied.set(false) }
+                runOnUiThread {
+                    if (!alive() || textRead !== read) return@runOnUiThread
+                    finishTextRead(read)
+                    if (read.cancelled.get() || !resumed || current !== pick.snapshot || editor?.text?.toString() != pick.draft) {
+                        status.text = "Document import cancelled; draft preserved"
+                        return@runOnUiThread
+                    }
+                    val text = result.getOrNull()
+                    if (text == null) {
+                        status.text = "Cannot import document. Use UTF-8 plain text (6,000 characters maximum)."
+                        return@runOnUiThread
+                    }
+                    reviewTextDocument(pick, text)
                 }
-                val text = result.getOrNull()
-                if (text == null) {
-                    status.text = "Cannot import document. Use UTF-8 plain text (6,000 characters maximum)."
-                    return@runOnUiThread
-                }
-                reviewTextDocument(pick, text)
-            }
+            }, "mandy-document-reader").start()
+        } catch (_: Exception) {
+            textReaderOccupied.set(false)
+            finishTextRead(read)
+            status.text = "Document reader unavailable; draft preserved"
         }
+    }
+
+    private fun finishTextRead(read: TextRead) {
+        if (textRead !== read) return
+        textRead = null
+        busy = false
+        composerMode()
+        cancelGeneration.text = "Stop generation"
+        read.states.forEach { (view, enabled) -> view.isEnabled = enabled }
+    }
+
+    private fun cancelTextRead() {
+        val read = textRead ?: return
+        read.cancelled.set(true)
+        finishTextRead(read)
+        status.text = "Document import cancelled; draft preserved"
     }
 
     private fun reviewTextDocument(pick: TextPick, text: String) {
@@ -1238,10 +1290,12 @@ class MandyWorkspaceActivity : Activity() {
     override fun onResume() {
         super.onResume()
         resumed = true
+        startQueuedTextRead()
     }
 
     override fun onPause() {
         resumed = false
+        cancelTextRead()
         stopped.set(true)
         // Serialize lifecycle cleanup after any in-flight explicit inference; never load here.
         disk.execute { resident.close() }
@@ -1250,6 +1304,9 @@ class MandyWorkspaceActivity : Activity() {
     }
 
     override fun onDestroy() {
+        queuedTextPick = null
+        textPick = null
+        cancelTextRead()
         cancelSpeech("Dictation cancelled")
         super.onDestroy()
     }
@@ -1441,6 +1498,7 @@ class MandyWorkspaceActivity : Activity() {
     }
     @Deprecated("Legacy back callback for this preview")
     override fun onBackPressed() {
+        if (textRead != null) { cancelTextRead(); return }
         if (speechToken != null) { cancelSpeech("Dictation cancelled · draft preserved"); return }
         if (busy) { stopped.set(true); return }
         if (editor?.text?.toString() != current?.draft?.draft && editor != null) {
