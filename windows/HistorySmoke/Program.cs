@@ -84,6 +84,19 @@ try
     try { await advanced.SendAsync(next); Check(false); } catch (InvalidDataException) { Check(true); }
     using (var h = new LocalHistory(turnPath, account))
         Check(h.Find(LocalHistory.ReplyId(next.MessageId)) == null);
+    var longPath = Path.Combine(dir, "long-turn.db");
+    var longRequest = request with { MessageId = Guid.NewGuid().ToString(), Text = new string('x', 16000) };
+    var longTurn = new LocalChatTurn(longPath, (messages, _, _) =>
+    {
+        Check(messages[0].Content == request.Identity && messages[^1].Content == longRequest.Text);
+        return Task.FromResult("Long request accepted");
+    });
+    try { await longTurn.SendAsync(longRequest); Check(false); }
+    catch (ArgumentException) { Check(!File.Exists(longPath)); }
+    Check((await longTurn.SendAsync(longRequest with { ContextUnits = 24000 })).Text == "Long request accepted");
+    var client = new LocalInferenceClient("mandy-local", 8080, new string('a', 48));
+    Reject<ArgumentOutOfRangeException>(() => new LocalChatTurn(longPath, client, 0));
+    Reject<ArgumentOutOfRangeException>(() => new LocalChatTurn(longPath, client, 1025));
     Console.WriteLine($"PASS {checks} native history and turn checks");
 }
 finally { Directory.Delete(dir, true); }
